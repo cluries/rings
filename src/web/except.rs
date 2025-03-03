@@ -1,0 +1,148 @@
+use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
+use crate::erx::Layouted;
+use crate::tos;
+use crate::web::api::Out;
+
+
+// Except is use in controller/action.
+// wrapper some defined error.
+// except object can fast convert to response
+#[derive(Serialize, Deserialize, Clone, PartialOrd, PartialEq)]
+pub enum Except {
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    InternalServerError,
+    Unknown(String),
+    InvalidParams(String),
+    Fuzzy(String, String),
+    FuzzyService(String, String),
+    FuzzyModel(String, String),
+    FuzzyAction(String, String),
+}
+
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ExceptGrow {
+    except: Except,
+    grows: HashMap<String, String>,
+}
+
+impl<T> Into<Out<T>> for Except
+where
+    T: Serialize,
+{
+    fn into(self) -> Out<T> {
+        self.out()
+    }
+}
+
+
+impl Except {
+    pub fn out<T>(&self) -> Out<T>
+    where
+        T: Serialize,
+    {
+        use crate::erx::{COMM, FUZZ};
+
+        match self {
+            Except::Unauthorized => {
+                Out::<T> { code: Layouted::common(COMM, "0401").into(), message: tos!("unauthorized"), data: None }
+            }
+            Except::Forbidden => {
+                Out::<T> { code: Layouted::common(COMM, "0400").into(), message: tos!("forbidden"), data: None }
+            }
+            Except::NotFound => {
+                Out::<T> { code: Layouted::common(COMM, "0404").into(), message: tos!("resource not found"), data: None }
+            }
+            Except::InternalServerError => {
+                Out::<T> { code: Layouted::common(COMM, "0500").into(), message: tos!("internal server error"), data: None }
+            }
+            Except::Unknown(m) => {
+                let m = if m.is_empty() {
+                    "unknown error"
+                } else {
+                    m
+                };
+                Out::<T> { code: Layouted::common(COMM, "9999").into(), message: tos!(m), data: None }
+            }
+            Except::InvalidParams(m) => {
+                let m = if m.is_empty() {
+                    "invalid params"
+                } else {
+                    m
+                };
+                Out::<T> { code: Layouted::common(COMM, "1000").into(), message: tos!(m), data: None }
+            }
+            Except::Fuzzy(detail, m) => {
+                Out::<T> { code: Layouted::common(FUZZ, detail).into(), message: tos!(m), data: None }
+            }
+            Except::FuzzyService(detail, m) => {
+                Out::<T> { code: Layouted::service(FUZZ, detail).into(), message: tos!(m), data: None }
+            }
+            Except::FuzzyModel(detail, m) => {
+                Out::<T> { code: Layouted::model(FUZZ, detail).into(), message: tos!(m), data: None }
+            }
+            Except::FuzzyAction(detail, m) => {
+                Out::<T> { code: Layouted::action(FUZZ, detail).into(), message: tos!(m), data: None }
+            }
+        }
+    }
+
+    pub fn grow(self) -> ExceptGrow {
+        ExceptGrow {
+            except: self,
+            grows: HashMap::new(),
+        }
+    }
+}
+
+
+impl ExceptGrow {
+    pub fn add(&mut self, key: String, value: String) -> &mut Self {
+        self.grows.insert(key, value);
+        self
+    }
+
+    pub fn add_all(&mut self, all: HashMap<String, String>) -> &mut Self {
+        self.grows.extend(all);
+        self
+    }
+
+    pub fn get(&self, key: String) -> Option<&String> {
+        self.grows.get(&key)
+    }
+
+    pub fn get_mut(&mut self, key: String) -> Option<&mut String> {
+        self.grows.get_mut(&key)
+    }
+
+    pub fn get_default(&self, key: String, val: String) -> String {
+        self.grows.get(&key).unwrap_or(&val).to_string()
+    }
+
+    pub fn grows(&self) -> HashMap<String, String> {
+        self.grows.clone()
+    }
+
+    pub fn mut_grows(&mut self) -> &mut HashMap<String, String> {
+        &mut self.grows
+    }
+
+    pub fn grows_size(&self) -> usize {
+        self.grows.len()
+    }
+
+    pub fn diminish(self) -> Except {
+        self.except
+    }
+
+
+    pub fn out<T>(self) -> Out<T>
+    where
+        T: Serialize,
+    {
+        self.diminish().out()
+    }
+}
