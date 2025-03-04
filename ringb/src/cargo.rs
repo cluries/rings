@@ -76,7 +76,7 @@ fn dependencies(flags: &Flags, content: &str) -> DocumentMut {
 
 
 fn refactor_dependencies(doc: DocumentMut, workspace_existing_dependencies: &Vec<String>) -> toml_edit::Table {
-    let mut build_depends = toml_edit::Table::new();
+    let mut build_dependencies = toml_edit::Table::new();
     if doc.contains_key(STR_DEPENDENCIES) {
         let dependencies = doc.get(STR_DEPENDENCIES).unwrap().as_table().unwrap();
         let mut depend_keys = dependencies.iter().map(|(name, _)| name.to_string()).collect::<Vec<String>>();
@@ -90,22 +90,20 @@ fn refactor_dependencies(doc: DocumentMut, workspace_existing_dependencies: &Vec
                 table
             } else {
                 let depend = dependencies.get(key).unwrap();
-                let depend = if depend.is_str() {
+                if depend.is_str() {
                     let mut table = toml_edit::Table::new();
                     table.insert(STR_VERSION, depend.clone());
                     table
                 } else {
                     depend.clone().into_table().expect("dependencies are not a table")
-                };
-
-                depend
+                }
             };
 
-            build_depends.insert(key, table.into_inline_table().into());
+            build_dependencies.insert(key, table.into_inline_table().into());
         }
     }
 
-    build_depends
+    build_dependencies
 }
 
 fn refactor_workspace(doc: DocumentMut, workspace_existing_dependencies: &mut Vec<String>) -> toml_edit::Table {
