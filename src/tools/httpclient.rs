@@ -4,6 +4,10 @@ use std::{str::FromStr, time::Duration};
 
 use crate::web::url::join as url_join;
 
+// 默认的User-Agent字符串
+static DEFAULT_USER_AGENT: &str = "Rings/1.0.0 (Linux; en-US; Iusworks.inc)";
+
+
 pub struct ClientBuilder {
     base: String,
     headers: reqwest::header::HeaderMap,
@@ -16,9 +20,96 @@ pub struct Client {
     base: String,
     cli: reqwest::Client,
 }
+ 
+pub struct UserAgentBuilder {
+    product: String,
+    version: String,
+    platform: Option<String>,
+    os: Option<String>,
+    os_version: Option<String>,
+    language: Option<String>,
+    vendor: Option<String>,
+    comments: Vec<String>,
+}
 
+impl UserAgentBuilder {
+    pub fn new(product: String, version: String) -> Self {
+        UserAgentBuilder {
+            product,
+            version,
+            platform: None,
+            os: None,
+            os_version: None,
+            language: None,
+            vendor: None,
+            comments: Vec::new(),
+        }
+    }
 
-static DEFAULT_USER_AGENT: &str = "Rings/1.0.0 (V1; Linux ; en-US; Iusworks.inc;)";
+    pub fn platform(&mut self, platform: String) -> &mut Self {
+        self.platform = Some(platform);
+        self
+    }
+
+    pub fn os(&mut self, os: String, version: Option<String>) -> &mut Self {
+        self.os = Some(os);
+        self.os_version = version;
+        self
+    }
+
+    pub fn language(&mut self, language: String) -> &mut Self {
+        self.language = Some(language);
+        self
+    }
+
+    pub fn vendor(&mut self, vendor: String) -> &mut Self {
+        self.vendor = Some(vendor);
+        self
+    }
+
+    pub fn add_comment(&mut self, comment: String) -> &mut Self {
+        self.comments.push(comment);
+        self
+    }
+
+    // 构建标准格式的User-Agent字符串
+    pub fn build(&self) -> String {
+        let mut parts = vec![format!("{}/{}", self.product, self.version)];
+        
+        let mut details = Vec::new();
+        
+        if let Some(platform) = &self.platform {
+            details.push(platform.clone());
+        }
+        
+        if let Some(os) = &self.os {
+            let os_str = if let Some(ver) = &self.os_version {
+                format!("{}; {}", os, ver)
+            } else {
+                os.clone()
+            };
+            details.push(os_str);
+        }
+        
+        if let Some(lang) = &self.language {
+            details.push(lang.clone());
+        }
+        
+        if let Some(vendor) = &self.vendor {
+            details.push(vendor.clone());
+        }
+        
+        if !details.is_empty() {
+            parts.push(format!("({})", details.join("; ")));
+        }
+        
+        for comment in &self.comments {
+            parts.push(format!("[{}]", comment));
+        }
+        
+        parts.join(" ")
+    }
+}
 
 impl ClientBuilder {
     pub fn new(base: String) -> ClientBuilder {

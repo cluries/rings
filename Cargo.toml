@@ -8,6 +8,7 @@ members = ["ringb", "ringsmacro"]
 
 [workspace.dependencies]
 aes = { version = "0.8" }
+async-openai = { version = "0.28.0" }
 async-trait = { version = "0.1" }
 axum = { version = "0.8.1", features = ["macros", "json", "tokio", "multipart"] }
 base64 = { version = "0.22" }
@@ -48,6 +49,7 @@ url = { version = "2", features = ["default", "serde"] }
 
 [dependencies]
 aes = { workspace = true }
+async-openai = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
 base64 = { workspace = true }

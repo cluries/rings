@@ -7,4 +7,5 @@ pub mod strings;
 pub mod datetime;
 pub mod encrypt;
 pub mod httpclient;
+mod openai;
  
