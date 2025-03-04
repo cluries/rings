@@ -3,111 +3,171 @@ use std::path::Path;
 use std::str::FromStr;
 use toml_edit::{DocumentMut, Formatted, Item};
 
-pub fn dependencies(toml_path: &Path) -> i32 {
-    let content = fs::read_to_string(toml_path).unwrap();
+const STR_DEPENDENCIES: &str = "dependencies";
+const STR_WORKSPACE: &str = "workspace";
+const STR_MEMBERS: &str = "members";
 
-    let _ = process_dependencies(&content);
-    //
-    // let c = toml::to_string(&val).unwrap();
-    // println!("{}", c);
-    0
+
+#[derive(Debug)]
+pub struct Flags {
+    pub toml: String,
+    pub write: bool,
+    pub dependencies_into_workspace: bool,
 }
 
-fn process_dependencies(content: &str) -> i32 {
-    let mut doc = DocumentMut::from_str(content).unwrap();
+impl Flags {
+    pub fn toml_path(&self) -> &Path {
+        Path::new(&self.toml)
+    }
+}
+
+pub fn cargo(flags: Flags) {
+    let content = fs::read_to_string(flags.toml_path()).expect(
+        &format!("failed to read cargo toml from {:?}", flags.toml)
+    );
+    let doc = dependencies(&flags, &content);
+    let content = doc.to_string();
+
+    if flags.write {
+        fs::write(flags.toml_path(), content).expect(
+            &format!("failed write cargo toml to: {:?}", flags.toml)
+        );
+    } else {
+        println!("{}", doc.to_string());
+    }
+}
+
+fn dependencies(flags: &Flags, content: &str) -> DocumentMut {
+    let mut document = DocumentMut::from_str(content).expect("failed to parse content as toml document");
+
+    let senseless = |document: &mut DocumentMut| {
+        let mut workspace_existing_dependencies: Vec<String> = Vec::new();
+
+        let workspace = refactor_workspace(document.clone(), &mut workspace_existing_dependencies);
+        let dependencies = refactor_dependencies(document.clone(), &workspace_existing_dependencies);
+
+        document[STR_WORKSPACE] = workspace.into();
+        document[STR_DEPENDENCIES] = dependencies.into();
+
+        workspace_existing_dependencies
+    };
+
+    let workspace_existing_dependencies = senseless(&mut document);
+
+    if flags.dependencies_into_workspace {
+        let rdoc = document.clone();
+        let workspace_dependencies = document
+            .get_mut(STR_WORKSPACE).unwrap().as_table_mut().unwrap()
+            .get_mut(STR_DEPENDENCIES).unwrap().as_table_mut().unwrap();
+        let dependencies = rdoc.get(STR_DEPENDENCIES).unwrap().as_table().unwrap();
+
+        if dependencies.iter().filter(
+            |(key, _)| !workspace_existing_dependencies.contains(&key.to_string())
+        ).map(
+            |(key, val)| workspace_dependencies[key] = val.clone()
+        ).count() > 0 {
+            senseless(&mut document);
+        }
+    }
+
+    document
+}
 
 
-    let rdoc = doc.clone();
+fn refactor_dependencies(doc: DocumentMut, workspace_existing_dependencies: &Vec<String>) -> toml_edit::Table {
+    let mut build_depends = toml_edit::Table::new();
+    if doc.contains_key(STR_DEPENDENCIES) {
+        let dependencies = doc.get(STR_DEPENDENCIES).unwrap().as_table().unwrap();
+        let mut depend_keys = dependencies.iter().map(|(name, _)| name.to_string()).collect::<Vec<String>>();
 
+        depend_keys.sort();
+
+        for key in depend_keys.iter() {
+            let table = if workspace_existing_dependencies.contains(key) {
+                let mut table = toml_edit::Table::new();
+                table.insert(STR_WORKSPACE, toml_edit::value(true));
+                table
+            } else {
+                let depend = dependencies.get(key).unwrap();
+                let depend = if depend.is_str() {
+                    let mut table = toml_edit::Table::new();
+                    table.insert("version", depend.clone());
+                    table
+                } else {
+                    depend.clone().into_table().expect("dependencies are not a table")
+                };
+
+                depend
+            };
+
+            build_depends.insert(key, table.into_inline_table().into());
+        }
+    }
+
+    build_depends
+}
+
+fn refactor_workspace(doc: DocumentMut, workspace_existing_dependencies: &mut Vec<String>) -> toml_edit::Table {
     let mut build_workspace = toml_edit::Table::new();
 
-    let mut workspace_depends_keys: Vec<String> = vec![];
+    if doc.contains_key(STR_WORKSPACE) {
+        let origin_workspace = doc.get(STR_WORKSPACE).unwrap().as_table().unwrap();
 
-    if rdoc.contains_key("workspace") {
-        let workspace = rdoc.get("workspace").unwrap().as_table().unwrap();
+        if origin_workspace.contains_key(STR_MEMBERS) {
+            let members = origin_workspace.get(STR_MEMBERS).unwrap().as_array()
+                .expect("workspace.members must be array");
 
-        if workspace.contains_key("members") {
-            let members = workspace.get("members").unwrap().as_array().unwrap();
-            let mut members: Vec<String> = members.iter().filter(
-                |x| x.is_str()
-            ).map(
-                |x| x.as_str().unwrap().to_string()
-            ).collect::<Vec<String>>();
+            let mut members = members.iter()
+                .filter(|x| x.is_str())
+                .map(|x| x.as_str().expect("members item must be string").to_string())
+                .collect::<Vec<String>>();
 
             members.sort();
 
             let mut build_members = toml_edit::Array::new();
             for (i, member) in members.iter().enumerate() {
-                build_members.insert(i, toml_edit::Value::String(Formatted::new(member.to_string())));
+                build_members.insert(
+                    i,
+                    toml_edit::Value::String(Formatted::new(member.to_string())),
+                );
             }
 
-            build_workspace["members"] = build_members.into();
+            build_workspace[STR_MEMBERS] = build_members.into();
         }
 
-        if workspace.contains_key("dependencies") {
-            let dependencies = workspace.get("dependencies").unwrap().as_table().unwrap();
+        if origin_workspace.contains_key(STR_DEPENDENCIES) {
+            let origin_workspace_dependencies = origin_workspace.get(STR_DEPENDENCIES).unwrap().as_table().expect("workspace.dependencies must be table");
 
-            let mut depend_keys = dependencies.iter().map(
-                |(name, _)| {
-                    name.to_string()
-                }
-            ).collect::<Vec<String>>();
-            depend_keys.sort();
+            let mut workspace_depend_keys = origin_workspace_dependencies.iter()
+                .map(|(name, _)| name.to_string())
+                .collect::<Vec<String>>();
 
-            let mut build_depends = toml_edit::Table::new();
-            for key in depend_keys.iter() {
-                workspace_depends_keys.push(key.clone());
-                let depend = dependencies.get(key).unwrap();
-                build_depends.insert(key, single_version_tabled(depend));
+            workspace_depend_keys.sort();
+
+            let mut build_dependencies = toml_edit::Table::new();
+            for key in workspace_depend_keys.iter() {
+                workspace_existing_dependencies.push(key.clone());
+                let depend = origin_workspace_dependencies.get(key).unwrap();
+                build_dependencies.insert(key, depend_single_version_tabled(depend));
             }
 
-            build_workspace["dependencies"] = build_depends.into();
+            build_workspace[STR_DEPENDENCIES] = build_dependencies.into();
         }
     }
 
-    doc["workspace"] = build_workspace.into();
-
-
-    let mut build_depends = toml_edit::Table::new();
-    if rdoc.contains_key("dependencies") {
-        let dependencies = rdoc.get("dependencies").unwrap().as_table().unwrap();
-        let mut depend_keys = dependencies.iter().map(|(name, _)| name.to_string()).collect::<Vec<String>>();
-        depend_keys.sort();
-
-        for key in depend_keys.iter() {
-            let table = if workspace_depends_keys.contains(key) {
-                let mut table = toml_edit::Table::new();
-                table.insert("workspace", toml_edit::value(true));
-                table
-            } else {
-                let depend = dependencies.get(key).unwrap();
-                if depend.is_str() {
-                    let mut table = toml_edit::Table::new();
-                    table.insert("version", depend.clone());
-                    table
-                } else {
-                    depend.clone().into_table().unwrap()
-                }
-            };
-
-
-            build_depends.insert(key, table.into());
-        }
-    }
-
-    doc["dependencies"] = build_depends.clone().into();
-    print!("{}", doc.to_string());
-
-    0
+    build_workspace
 }
 
 
-fn single_version_tabled(depend: &Item) -> Item {
-    if depend.is_str() {
-        let mut table = toml_edit::Table::new();
-        table.insert("version", toml_edit::value(depend.as_str().unwrap().to_string()));
-        table.into()
-    } else {
-        depend.clone()
+fn depend_single_version_tabled(depend: &Item) -> Item {
+    if !depend.is_str() {
+        return depend.clone();
     }
+
+    let mut table = toml_edit::Table::new();
+    table.insert(
+        "version",
+        toml_edit::value(depend.as_str().unwrap().to_string()),
+    );
+    table.into()
 }
