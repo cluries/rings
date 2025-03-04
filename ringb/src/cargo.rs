@@ -147,7 +147,10 @@ fn refactor_workspace(doc: DocumentMut, workspace_existing_dependencies: &mut Ve
             for key in workspace_depend_keys.iter() {
                 workspace_existing_dependencies.push(key.clone());
                 let depend = origin_workspace_dependencies.get(key).unwrap();
-                build_dependencies.insert(key, depend_single_version_tabled(depend));
+                build_dependencies.insert(
+                    key,
+                    depend_single_version_tabled(depend),
+                );
             }
 
             build_workspace[STR_DEPENDENCIES] = build_dependencies.into();
