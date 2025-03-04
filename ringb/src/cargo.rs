@@ -6,6 +6,7 @@ use toml_edit::{DocumentMut, Formatted, Item};
 const STR_DEPENDENCIES: &str = "dependencies";
 const STR_WORKSPACE: &str = "workspace";
 const STR_MEMBERS: &str = "members";
+const STR_VERSION: &str = "version";
 
 
 #[derive(Debug)]
@@ -91,7 +92,7 @@ fn refactor_dependencies(doc: DocumentMut, workspace_existing_dependencies: &Vec
                 let depend = dependencies.get(key).unwrap();
                 let depend = if depend.is_str() {
                     let mut table = toml_edit::Table::new();
-                    table.insert("version", depend.clone());
+                    table.insert(STR_VERSION, depend.clone());
                     table
                 } else {
                     depend.clone().into_table().expect("dependencies are not a table")
@@ -166,7 +167,7 @@ fn depend_single_version_tabled(depend: &Item) -> Item {
 
     let mut table = toml_edit::Table::new();
     table.insert(
-        "version",
+        STR_VERSION,
         toml_edit::value(depend.as_str().unwrap().to_string()),
     );
     table.into()
