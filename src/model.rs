@@ -8,6 +8,7 @@ use std::sync::RwLock;
 use std::time::Duration;
 use tokio::sync::OnceCell;
 
+
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
 use crate::conf::{Backend, BackendKind};
@@ -100,6 +101,8 @@ pub async fn new_database_connection(backend: &Backend) -> DatabaseConnection {
 
     let connection_string = backend.connect.clone();
     let mut opt = ConnectOptions::new(connection_string.clone());
+
+    use log;
 
     opt.max_connections(MAX_CONNECTIONS)
         .min_connections(MIN_CONNECTIONS)

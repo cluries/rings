@@ -61,6 +61,7 @@ futures-util = { workspace = true }
 hex = { workspace = true }
 hmac = { workspace = true }
 lazy_static = { workspace = true }
+log = { workspace = true }
 ofb = { workspace = true }
 pem = { workspace = true }
 percent-encoding = { workspace = true }

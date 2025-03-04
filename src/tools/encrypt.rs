@@ -100,7 +100,7 @@ impl AESMode {
     }
 
     pub fn generate_iv() -> Vec<u8> {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut iv = vec![0u8; AESMode::BIT128_BLOCK_SIZE];
         rng.fill(&mut iv[..]);
         iv
@@ -292,7 +292,7 @@ impl RSAPadding {
         match self {
             RSAPadding::PKCS1v15 => {
                 let key: RsaPublicKey = DecodeRsaPublicKey::from_pkcs1_pem(public_key).map_err(erx::smp)?;
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 let result = key.encrypt(&mut rng, Pkcs1v15Encrypt, payload).map_err(erx::smp)?;
                 Ok(result)
             }
@@ -332,7 +332,7 @@ pub struct RSAUtils;
 
 impl RSAUtils {
     pub fn gen_key_pair(bits: RSABits) -> Result<(String, String), erx::Erx> {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let private_key = RsaPrivateKey::new(&mut rng, bits.bits()).map_err(erx::smp)?;
         let public_key = RsaPublicKey::from(&private_key);
 
