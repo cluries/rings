@@ -14,9 +14,17 @@ impl Obj {
     }
 }
 
+pub fn regex_match(regex: &str, string: &str) -> bool {
+    match regex::Regex::new(regex) {
+        Ok(re) => re.is_match(string),
+        Err(_) => false,
+    }
+}
+
 impl Net {
     pub fn email(email: &str) -> bool {
-        regex::Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap().is_match(email)
+        let r = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$";
+        regex_match(r, email)
     }
 
     pub fn china_mobile(mobile: &str) -> bool {
@@ -24,38 +32,28 @@ impl Net {
     }
 
     pub fn chinese(s: &str) -> bool {
-        match regex::Regex::new(r"[\u4e00-\u9fa5]") {
-            Ok(regex) => regex.is_match(s),
-            Err(_) => false,
-        }
+        let r = r"[\u4e00-\u9fa5]";
+        regex_match(r, s)
     }
 
     pub fn url(s: &str) -> bool {
-        match regex::Regex::new(r"^(http|https|ftp)://[^\s]+$") {
-            Ok(regex) => regex.is_match(s),
-            Err(_) => false,
-        }
+        let r = r"^(http|https|ftp)://[^\s]+$";
+        regex_match(r, s)
     }
 
     pub fn ip4(s: &str) -> bool {
-        match regex::Regex::new(r"^\d+\.\d+\.\d+\.\d+$") {
-            Ok(regex) => regex.is_match(s),
-            Err(_) => false,
-        }
+        let r = r"^\d+\.\d+\.\d+\.\d+$";
+        regex_match(r, s)
     }
 
     pub fn ip6(s: &str) -> bool {
-        match regex::Regex::new(r"^\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}$") {
-            Ok(regex) => regex.is_match(s),
-            Err(_) => false,
-        }
+        let r = r"^\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}\:\d{1,4}$";
+        regex_match(r, s)
     }
 
     pub fn mac(s: &str) -> bool {
-        match regex::Regex::new(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$") {
-            Ok(regex) => regex.is_match(s),
-            Err(_) => false,
-        }
+        let r = r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$";
+        regex_match(r, s)
     }
 }
 
@@ -112,24 +110,16 @@ impl Enc {
     }
 
     pub fn alpha(s: &str) -> bool {
-        match regex::Regex::new(r"^[a-zA-Z]+$") {
-            Ok(regex) => regex.is_match(s),
-            Err(_) => false,
-        }
+        const R: &str = r"^[a-zA-Z]+$";
+        regex_match(R, s)
     }
 
     pub fn alphanumeric(s: &str) -> bool {
-        match regex::Regex::new(r"^[a-zA-Z0-9]+$") {
-            Ok(regex) => regex.is_match(s),
-            Err(_) => false,
-        }
+        regex_match(r"^[a-zA-Z0-9]+$", s)
     }
 
     pub fn base64(s: &str) -> bool {
-        match regex::Regex::new(r"^[A-Za-z0-9+/=]+$") {
-            Ok(regex) => regex.is_match(s),
-            Err(_) => false,
-        }
+        regex_match(r"^[A-Za-z0-9+/=]+$", s)
     }
 }
 

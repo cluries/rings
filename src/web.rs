@@ -5,7 +5,6 @@ pub mod api;
 pub mod signature;
 pub mod tools;
 pub mod context;
-pub mod client;
 pub mod request;
 pub mod validator;
 pub mod url;

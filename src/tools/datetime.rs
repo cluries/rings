@@ -24,13 +24,10 @@ pub static WEEKDAYS_LONG: [&'static str; 7] = [
 ];
 
 
-
-
 pub static FORMAT_DATE: &'static str = "%Y-%m-%d";
 pub static FORMAT_TIME: &'static str = "%H:%M:%S";
 pub static FORMAT_DATETIME: &'static str = "%Y-%m-%d %H:%M:%S";
 pub static FORMAT_DATETIME_WITH_TIMEZONE: &'static str = "%Y-%m-%d %H:%M:%S %Z";
-
 
 
 impl Format {

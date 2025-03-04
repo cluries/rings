@@ -1,9 +1,5 @@
 use std::collections::HashMap;
-
 use tracing::error;
-
-
-
 
 pub fn join(base:&str, other:&str)->String{
 
@@ -42,7 +38,6 @@ pub fn parse_url_query(url: &str) -> HashMap<String, String> {
         }
     }
 }
-
 
 // parse querystring
 pub fn parse_query(query: &str) -> HashMap<String, String> {

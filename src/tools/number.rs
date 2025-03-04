@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 #[derive(Debug)]
-pub enum Numbers {
+pub enum Number {
     I8(i8),
     I16(i16),
     I32(i32),
@@ -17,9 +17,10 @@ pub enum Numbers {
 }
 
 
-pub struct Conv;
+// String Convert
+pub struct StrC;
 
-impl Conv {
+impl StrC {
     pub fn i(value: &str) -> i64 {
         i64::from_str_radix(value, 10).unwrap_or_default()
     }
@@ -36,3 +37,4 @@ impl Conv {
         f64::from_str(value).unwrap_or(d)
     }
 }
+

@@ -6,4 +6,5 @@ pub mod number;
 pub mod strings;
 pub mod datetime;
 pub mod encrypt;
-pub mod i;
+pub mod httpclient;
+ 
