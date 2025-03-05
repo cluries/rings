@@ -229,12 +229,39 @@ mod tests {
         }
     }
 
+    fn vol_doubao_vision_15_pro() -> Provider {
+        Provider {
+            base: "https://ark.cn-beijing.volces.com/api/v3".to_string(),
+            model: "doubao-1-5-vision-pro-32k-250115".to_string(),
+            key: "216bf172-5bda-4479-93f5-04bf683c87dd".to_string(),
+        }
+    }
+
     #[tokio::test]
     async fn test_chat_single() {
         let mut b = PromptsBuilder::default();
         b.user("孟加拉国和印度有世仇？主要争端是什么？用中文和英文分别回答。");
 
         let r = LLM::with_provider(vol_deepseek_v3()).chat_single(b.into()).await.unwrap();
+        println!("{}", r.response_string());
+    }
+
+    #[tokio::test]
+    async fn test_chat_single_with_vision() {
+        let mut b = PromptsBuilder::default();
+        let prompt = "推理这个图片是一个机构的有效证件不？ 如果是，JSON输出以下字段：\
+    有效日期开始时间(date_start)，\
+    有效日期结束时间(date_end)，\
+    代码(code)，\
+    代码类型(code_type)，\
+    证书名称(license_name)，\
+    证书类型(license_type)，\
+    组织名称(org_name)，\
+    组织类型(org_type).  时间字段格式化为2025-04-09这种格式";
+        let url = "https://horizonpublicstorage.bangbangwang.cn/horizon/img/202311/11/mKhA3fBfpsbsaCNWSZF4PdONi8bdNrNehYGa77d2.jpg";
+        b.image(prompt, url);
+
+        let r = LLM::with_provider(vol_doubao_vision_15_pro()).chat_single(b.into()).await.unwrap();
         println!("{}", r.response_string());
     }
 }
