@@ -157,9 +157,7 @@ impl PromptsBuilder {
                     ChatCompletionRequestMessageContentPartImage {
                         image_url: ImageUrl {
                             url: url.to_string(),
-                            detail: Some(
-                                ImageDetail::Auto
-                            ),
+                            detail: Some(ImageDetail::Auto),
                         }
                     }
                 ),

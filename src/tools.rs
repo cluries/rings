@@ -9,4 +9,8 @@ pub mod encrypt;
 pub mod httpclient;
 pub mod openai;
 pub mod aiprovider;
+pub mod image;
+mod mcp;
+mod audio;
+mod video;
  

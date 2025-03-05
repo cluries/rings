@@ -2,14 +2,18 @@ pub mod conf;
 pub mod sql;
 pub mod status;
 
-use tracing::{info, warn, span};
 use redis;
 use std::sync::RwLock;
 use std::time::Duration;
 use tokio::sync::OnceCell;
+use tracing::{info, span, warn};
 
 
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use sea_orm::{
+    ConnectOptions,
+    Database,
+    DatabaseConnection,
+};
 
 use crate::conf::{Backend, BackendKind};
 use crate::web::url;
@@ -22,8 +26,7 @@ static SHARED_REDIS_CONNECT_STRING: RwLock<String> = RwLock::new(String::new());
 pub type DBResult<T> = Result<T, crate::erx::Erx>;
 pub type DBResults<T> = Result<Vec<T>, crate::erx::Erx>;
 
-
-pub struct DBResultsExtra<T> {
+pub struct DBResultsRelated<T> {
     results: Vec<T>,
     total: usize,
     offset: usize,
@@ -34,10 +37,7 @@ pub fn shared() -> &'static DatabaseConnection {
 }
 
 pub fn make_redis_client() -> Result<redis::Client, String> {
-    let s = SHARED_REDIS_CONNECT_STRING
-        .read()
-        .map_err(|e| e.to_string())?
-        .clone();
+    let s = SHARED_REDIS_CONNECT_STRING.read().map_err(|e| e.to_string())?.clone();
     redis::Client::open(s).map_err(|e| e.to_string())
 }
 
@@ -104,18 +104,7 @@ pub async fn new_database_connection(backend: &Backend) -> DatabaseConnection {
 
     use log;
 
-    opt.max_connections(MAX_CONNECTIONS)
-        .min_connections(MIN_CONNECTIONS)
-        .connect_timeout(CONNECT_TIMEOUT)
-        .acquire_timeout(ACQUIRE_TIMEOUT)
-        .idle_timeout(IDLE_TIMEOUT)
-        .max_lifetime(MAX_LIFETIME)
-        .connect_lazy(false)
-        .sqlx_logging(true)
-        .sqlx_logging_level(log::LevelFilter::Info)
-        .sqlx_logging(true)
-        .sqlx_logging_level(log::LevelFilter::Info)
-        .sqlx_slow_statements_logging_settings(log::LevelFilter::Warn, Duration::from_secs(2));
+    opt.max_connections(MAX_CONNECTIONS).min_connections(MIN_CONNECTIONS).connect_timeout(CONNECT_TIMEOUT).acquire_timeout(ACQUIRE_TIMEOUT).idle_timeout(IDLE_TIMEOUT).max_lifetime(MAX_LIFETIME).connect_lazy(false).sqlx_logging(true).sqlx_logging_level(log::LevelFilter::Info).sqlx_logging(true).sqlx_logging_level(log::LevelFilter::Info).sqlx_slow_statements_logging_settings(log::LevelFilter::Warn, Duration::from_secs(2));
 
     if backend.kind == BackendKind::Postgres && connection_string.contains("currentSchema") {
         let params = url::parse_url_query(connection_string.as_str());
@@ -125,12 +114,10 @@ pub async fn new_database_connection(backend: &Backend) -> DatabaseConnection {
         }
     }
 
-    Database::connect(opt)
-        .await
-        .expect("Database connection failed")
+    Database::connect(opt).await.expect("Database connection failed")
 }
 
-impl<T> DBResultsExtra<T> {
+impl<T> DBResultsRelated<T> {
     pub fn results(&self) -> &Vec<T> {
         &self.results
     }
