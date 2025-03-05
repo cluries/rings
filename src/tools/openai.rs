@@ -34,7 +34,7 @@ pub struct ChatResponse {
 }
 
 
-pub struct MessageBuilder {
+pub struct PromptsBuilder {
     messages: Vec<ChatCompletionRequestMessage>,
 }
 
@@ -78,7 +78,7 @@ impl ChatResponse {
     }
 }
 
-impl MessageBuilder {
+impl PromptsBuilder {
     pub fn default() -> Self {
         Self {
             messages: Vec::new(),
@@ -88,6 +88,10 @@ impl MessageBuilder {
     pub fn add(&mut self, message: ChatCompletionRequestMessage) -> &mut Self {
         self.messages.push(message);
         self
+    }
+
+    pub fn messages(&self) -> Vec<ChatCompletionRequestMessage> {
+        self.messages.clone()
     }
 
     pub fn user(&mut self, message: &str) -> &mut Self {
@@ -161,18 +165,18 @@ impl MessageBuilder {
                 ),
             ]
         );
-        
+
         self.messages.push(
             async_openai::types::ChatCompletionRequestUserMessage::from(m).into(),
         );
-        
+
         self
     }
 }
 
-impl Into<Vec<ChatCompletionRequestMessage>> for MessageBuilder {
+impl Into<Vec<ChatCompletionRequestMessage>> for PromptsBuilder {
     fn into(self) -> Vec<ChatCompletionRequestMessage> {
-        self.messages
+        self.messages()
     }
 }
 
@@ -213,4 +217,24 @@ impl LLM {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
 
+    fn vol_deepseek_v3() -> Provider {
+        Provider {
+            base: "https://ark.cn-beijing.volces.com/api/v3".to_string(),
+            model: "ep-20250213220927-z6vhn".to_string(),
+            key: "216bf172-5bda-4479-93f5-04bf683c87dd".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_chat_single() {
+        let mut b = PromptsBuilder::default();
+        b.user("孟加拉国和印度有世仇？主要争端是什么？用中文和英文分别回答。");
+
+        let r = LLM::with_provider(vol_deepseek_v3()).chat_single(b.into()).await.unwrap();
+        println!("{}", r.response_string());
+    }
+}
