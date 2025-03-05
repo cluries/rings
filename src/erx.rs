@@ -147,6 +147,13 @@ impl Into<(String, String)> for Erx {
 }
 
 
+impl From<&str> for Erx {
+    fn from(s: &str) -> Self {
+        s.to_string().into()
+    }
+}
+
+
 impl From<String> for Erx {
     fn from(str: String) -> Erx {
         serde_json::from_str(&str).unwrap_or_default()

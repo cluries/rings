@@ -2,9 +2,19 @@
 
 use crate::erx;
 use async_openai::config::OpenAIConfig;
-use async_openai::types::{ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs, CreateChatCompletionRequestArgs, CreateChatCompletionResponse, ImageDetail};
+use async_openai::types::{
+    ChatCompletionRequestMessage,
+    ChatCompletionRequestMessageContentPartImage,
+    ChatCompletionRequestMessageContentPartText,
+    ChatCompletionRequestUserMessageContent,
+    ChatCompletionRequestUserMessageContentPart,
+    CreateChatCompletionRequestArgs,
+    CreateChatCompletionResponse,
+    ImageDetail,
+    ImageUrl,
+};
 use async_openai::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
 #[derive(Debug)]
@@ -49,7 +59,8 @@ impl ChatResponse {
         }
 
         self.response.choices.iter().fold(
-            Vec::new(), |mut acc, choice| {
+            Vec::new(),
+            |mut acc, choice| {
                 if let Some(_reason) = choice.finish_reason {}
                 acc.push(choice.message.content.clone().unwrap_or_default());
                 acc
@@ -128,16 +139,33 @@ impl MessageBuilder {
         self
     }
 
-    pub fn image(&mut self, url: &str) -> &mut Self {
-        use async_openai::types::ChatCompletionRequestMessageContentPartImageArgs;
-        self.messages.push(
-            ChatCompletionRequestMessageContentPartImageArgs::default().image_url(
-                async_openai::types::ImageUrl {
-                    url: url.into(),
-                    detail: Some(ImageDetail::Auto),
-                }
-            ).build().unwrap().into()
+    pub fn image(&mut self, message: &str, url: &str) -> &mut Self {
+        // use async_openai::types::ChatCompletionRequestMessageContentPartImageArgs;
+
+        let m = ChatCompletionRequestUserMessageContent::Array(
+            vec![
+                ChatCompletionRequestUserMessageContentPart::Text(
+                    ChatCompletionRequestMessageContentPartText {
+                        text: message.to_string(),
+                    }
+                ),
+                ChatCompletionRequestUserMessageContentPart::ImageUrl(
+                    ChatCompletionRequestMessageContentPartImage {
+                        image_url: ImageUrl {
+                            url: url.to_string(),
+                            detail: Some(
+                                ImageDetail::Auto
+                            ),
+                        }
+                    }
+                ),
+            ]
         );
+        
+        self.messages.push(
+            async_openai::types::ChatCompletionRequestUserMessage::from(m).into(),
+        );
+        
         self
     }
 }
@@ -147,7 +175,6 @@ impl Into<Vec<ChatCompletionRequestMessage>> for MessageBuilder {
         self.messages
     }
 }
-
 
 
 impl LLM {
@@ -162,7 +189,7 @@ impl LLM {
         Client::with_config(config)
     }
 
-    pub async fn single(&self, prompt: Vec<ChatCompletionRequestMessage>) -> Result<ChatResponse, erx::Erx> {
+    pub async fn chat_single(&self, prompt: Vec<ChatCompletionRequestMessage>) -> Result<ChatResponse, erx::Erx> {
         let request = CreateChatCompletionRequestArgs::default().stream(
             false
         ).model(
@@ -178,6 +205,11 @@ impl LLM {
         let response = self.cli().chat().create(request).await.map_err(erx::smp)?;
         let duration = SystemTime::now().duration_since(start).unwrap_or_default();
         Ok(ChatResponse::new(duration, response))
+    }
+
+
+    pub async fn chat_own_type<T: Serialize>(&self, own: T) -> Result<ChatResponse, erx::Erx> {
+        Err("OpenAI does not support this chat".into())
     }
 }
 
