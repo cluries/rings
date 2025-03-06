@@ -2,6 +2,8 @@ use crate::erx::{Erx, LayoutedC};
 use crate::web::except::Except;
 use axum::http::StatusCode;
 use axum::response::Response;
+use axum::http::header::{CONTENT_TYPE};
+
 use serde::{Deserialize, Serialize};
 
 pub type OutAny = Out<serde_json::Value>;
@@ -104,23 +106,34 @@ impl<T: Serialize, E: ToString> From<Result<T, E>> for Out<T> {
 impl<T: Serialize> axum::response::IntoResponse for Out<T> {
     fn into_response(self) -> Response {
         let body = serde_json::to_string(&self);
-        const API_HEADERS: [(&str, &str); 2] = [
-            ("Content-Type", "application/json"),
-            ("Powered-By", "rebit"),
-        ];
+        // const API_HEADERS: [(&str, &str); 2] = [
+        //     ("Content-Type", "application/json"),
+        //     ("Powered-By", "rebit"),
+        // ];
 
-        match body {
+
+        let (status, body) = match body {
             Ok(body) => {
-                let status = StatusCode::OK;
-                (status, API_HEADERS, body).into_response()
+                (StatusCode::OK, body)
             }
             Err(err) => {
-                let status = StatusCode::INTERNAL_SERVER_ERROR;
-
-                let body = Except::Unknown(err.to_string()).out::<()>();
-                let body = serde_json::to_string(&body).unwrap_or(String::from("json serialization error"));
-                (status, API_HEADERS, body).into_response()
+                static JSE: &str = "json serialization error";
+                let body = serde_json::to_string(
+                    &Except::Unknown(
+                        err.to_string()
+                    ).out::<()>()
+                ).unwrap_or(JSE.to_string());
+                (StatusCode::INTERNAL_SERVER_ERROR, body)
             }
-        }
+        };
+
+        let mut response = Response::new(body);
+        *response.status_mut() = status;
+
+        //TODO add headers
+
+        response.into_response()
     }
 }
+
+
