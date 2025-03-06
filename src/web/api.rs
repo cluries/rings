@@ -1,4 +1,4 @@
-use crate::erx::LayoutedC;
+use crate::erx::{Erx, LayoutedC};
 use crate::web::except::Except;
 use axum::http::StatusCode;
 use axum::response::Response;
@@ -61,6 +61,45 @@ impl<T: Serialize> Out<T> {
     }
 }
 
+impl<T: Serialize> From<Except> for Out<T> {
+    fn from(except: Except) -> Self {
+        except.out()
+    }
+}
+
+
+impl<T: Serialize> From<Erx> for Out<T> {
+    fn from(value: Erx) -> Self {
+        Except::Fuzzy(
+            value.code().layout_string(),
+            value.message().to_string(),
+        ).into()
+    }
+}
+
+impl<T: Serialize> From<Option<T>> for Out<T> {
+    fn from(value: Option<T>) -> Self {
+        static OPTION_NONE_MESSAGE: &str = "sorry, some error occurred, but no message was provided";
+        match value {
+            Some(data) => Out::ok(data),
+            None => Except::Unknown(OPTION_NONE_MESSAGE.to_string()).into()
+        }
+    }
+}
+
+impl<T: Serialize, E: ToString> From<Result<T, E>> for Out<T> {
+    fn from(value: Result<T, E>) -> Self {
+        match value {
+            Ok(v) => {
+                Out::ok(v)
+            }
+            Err(e) => {
+                let message = e.to_string();
+                Except::Unknown(message).into()
+            }
+        }
+    }
+}
 
 impl<T: Serialize> axum::response::IntoResponse for Out<T> {
     fn into_response(self) -> Response {
