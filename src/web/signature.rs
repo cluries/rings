@@ -271,6 +271,22 @@ struct Debug {
     client: String,
 }
 
+
+static XU: &str = "XU";
+static XT: &str = "XT";
+static XR: &str = "XR";
+static XS: &str = "XS";
+static DS: &str = "X-DEVELOPMENT-SKIP";
+
+static POST: &str = "POST";
+static PUT: &str = "PUT";
+static DELETE: &str = "DELETE";
+static GET: &str = "GET";
+static HEAD: &str = "HEAD";
+static PATCH: &str = "PATCH";
+static OPTIONS: &str = "OPTIONS";
+
+
 impl Payload {
     async fn from_request(req: axum::extract::Request) -> Result<Self, String> {
         let (parts, body) = req.into_parts();
@@ -280,19 +296,19 @@ impl Payload {
             headers.get(n).and_then(|value| value.to_str().ok()).map(String::from)
         };
 
-        let xu = header("X-U");
-        let xt = header("X-T");
-        let xr = header("X-R");
-        let xs = header("X-S");
-        let ds = header("X-DEVELOPMENT-SKIP");
+        let xu = header(XU);
+        let xt = header(XT);
+        let xr = header(XR);
+        let xs = header(XS);
+        let ds = header(DS);
 
         let path = parts.uri.path().to_string();
         let method = parts.method.as_str().to_uppercase();
 
-        let queries = parse_query(parts.uri.query().unwrap_or(""));
+        let queries = parse_query(parts.uri.query().unwrap_or_default());
 
         let mut bd: Option<serde_json::Value> = None;
-        if method == "POST" || method == "PUT" || method == "DELETE" || method == "OPTIONS" || method == "PATCH" {
+        if method == POST || method == PUT || method == DELETE || method == OPTIONS || method == PATCH {
             const LIMIT: usize = 1024 * 1024 * 32;
             let body: Result<serde_json::Value, String> =
                 match axum::body::to_bytes(body, LIMIT).await {
@@ -320,24 +336,15 @@ impl Payload {
     }
 
     pub fn val_xu(&self) -> String {
-        match &self.xu {
-            None => String::from(""),
-            Some(v) => v.clone(),
-        }
+        self.xu.clone().unwrap_or_default()
     }
 
     pub fn val_xr(&self) -> String {
-        match &self.xr {
-            None => String::from(""),
-            Some(v) => v.clone(),
-        }
+        self.xr.clone().unwrap_or_default()
     }
 
     pub fn val_ds(&self) -> String {
-        match &self.ds {
-            None => String::from(""),
-            Some(v) => v.clone(),
-        }
+        self.ds.clone().unwrap_or_default()
     }
 
     fn valid(&self, key: String) -> Result<(), (String, Debug)> {
