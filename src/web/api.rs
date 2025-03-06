@@ -1,6 +1,6 @@
 use crate::erx::{Erx, LayoutedC};
 use crate::web::except::Except;
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::http::header::{CONTENT_TYPE};
 
@@ -129,8 +129,10 @@ impl<T: Serialize> axum::response::IntoResponse for Out<T> {
 
         let mut response = Response::new(body);
         *response.status_mut() = status;
-
-        //TODO add headers
+        
+        let headers = response.headers_mut();
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        headers.insert("Powered-By", HeaderValue::from_static("REBIT"));
 
         response.into_response()
     }
