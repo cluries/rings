@@ -1,4 +1,13 @@
+use chrono::TimeZone;
+
+use crate::erx;
+
 pub struct Now;
+pub struct Is;
+
+pub struct Timestamp {
+    pub nanos: i64,
+}
 
 pub enum Format {
     Date,
@@ -47,46 +56,156 @@ impl Into<&'static str> for Format {
     }
 }
 
+impl Into<String> for Format {
+    fn into(self) -> String {
+        self.layout().to_string()
+    }
+}
+
+impl Format {
+    //utc timestamp nanos to datetime string
+    pub fn format(&self, timestamp_nanos: i64) -> String {
+        let datetime = chrono::Utc.timestamp_nanos(timestamp_nanos);
+        datetime.format(self.layout()).to_string()
+    }
+
+    // parse datetime string to utc timestamp nanos
+    pub fn parse(&self, datetime: &str) -> i64 {
+        let datetime = chrono::DateTime::parse_from_str(datetime, self.layout());
+        match datetime {
+            Ok(datetime) => datetime.timestamp(),
+            Err(_) => 0,
+        }
+    }
+
+    pub fn parse_to_utc(&self, datetime: &str) -> erx::ResultE<chrono::DateTime<chrono::Utc>> {
+        let datetime = chrono::DateTime::parse_from_str(datetime, self.layout());
+        match datetime {
+            Ok(datetime) => Ok(datetime.with_timezone(&chrono::Utc)),
+            Err(e) => Err(e.to_string().into()),
+        }
+    }
+
+    pub fn parse_to_local(&self, datetime: &str) -> erx::ResultE<chrono::DateTime<chrono::Local>> {
+        let datetime = chrono::DateTime::parse_from_str(datetime, self.layout());
+        match datetime {
+            Ok(datetime) => Ok(datetime.with_timezone(&chrono::Local)),
+            Err(e) => Err(e.to_string().into()),
+        }
+    }
+}
 
 impl Now {
-    pub fn timestamp() -> i64 {
-        chrono::Utc::now().timestamp()
+    pub fn timestamp() -> Timestamp {
+        Timestamp { nanos: chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default() }
     }
 
-    pub fn timestamp_nanos() -> i64 {
-        chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+    pub fn utc() -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc::now()
     }
 
-    pub fn timestamp_milliseconds() -> i64 {
-        chrono::Utc::now().timestamp_millis()
+    pub fn local() -> chrono::DateTime<chrono::Local> {
+        chrono::Local::now()
     }
 
-    pub fn timestamp_microseconds() -> i64 {
-        chrono::Utc::now().timestamp_micros()
-    }
-
-    pub fn local_date_string() -> String {
-        chrono::Local::now().format(Format::Date.into()).to_string()
-    }
-
-    pub fn local_time_string() -> String {
-        chrono::Local::now().format(Format::Time.into()).to_string()
-    }
-
-    pub fn local_datetime_string() -> String {
-        chrono::Local::now().format(Format::DateTime.into()).to_string()
-    }
-
-    pub fn local_datetime_with_zone_string() -> String {
-        chrono::Local::now().format(Format::DatetimeWithTimeZone.into()).to_string()
+    pub fn fixed(z: i32) -> chrono::DateTime<chrono::FixedOffset> {
+        let offset_seconds = z.clamp(-12, 12) * 3600; // 将时区转换为秒数，并限制在-12到12之间
+        let zone = if offset_seconds >= 0 {
+            chrono::FixedOffset::east_opt(offset_seconds).unwrap()
+        } else {
+            chrono::FixedOffset::west_opt(-offset_seconds).unwrap()
+        };
+        chrono::Utc::now().with_timezone(&zone)
     }
 }
 
 
+impl Timestamp {
+    pub fn with(timestamp: i64) -> Self {
+        // 根据timestamp的大小推断时间单位并转换为纳秒
+        let nanos = if timestamp > 1_000_000_000_000_000_000 {
+            // 已经是纳秒
+            timestamp
+        } else if timestamp > 1_000_000_000_000_000 {
+            // 微秒
+            timestamp * 1_000
+        } else if timestamp > 1_000_000_000_000 {
+            // 毫秒
+            timestamp * 1_000_000
+        } else {
+            // 秒
+            timestamp
+        };
+
+        Self {
+            nanos,
+        }
+    }
+
+    pub fn with_now() -> Self {
+        Self {
+            nanos: chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        }
+    }
+
+    // pub fn with_nanos(nanos: i64) -> Self {
+    //     Self {
+    //         nanos,
+    //     }
+    // }
+    //
+    // pub fn with_micros(micros: i64) -> Self {
+    //     Self {
+    //         nanos: micros * 1000,
+    //     }
+    // }
+    //
+    // pub fn with_millis(millis: i64) -> Self {
+    //     Self {
+    //         nanos: millis * 1000 * 1000,
+    //     }
+    // }
+    //
+    // pub fn with_seconds(seconds: i64) -> Self {
+    //     Self {
+    //         nanos: seconds * 1000 * 1000 * 1000,
+    //     }
+    // }
+
+    pub fn micros(&self) -> i64 {
+        self.nanos / 1000
+    }
+
+    pub fn millis(&self) -> i64 {
+        self.nanos / 1000 / 1000
+    }
+    pub fn seconds(&self) -> i64 {
+        self.nanos / 1000 / 1000 / 1000
+    }
+
+    pub fn date_utc(&self) -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc.timestamp_nanos(self.nanos)
+    }
+
+    pub fn date_local(&self) -> chrono::DateTime<chrono::Local> {
+        chrono::Local.timestamp_nanos(self.nanos)
+    }
+}
+
+
+impl Is {
+    pub fn leap(year: i32) -> bool {
+        // 判断是否为闰年:
+        // 1. 能被4整除但不能被100整除
+        // 2. 能被400整除
+        (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+    }
+}
+
 #[cfg(test)]
 #[test]
 fn test_local_datetime() {
-    println!("{}", Now::local_datetime_with_zone_string());
+    // println!("{}", Now::local_datetime_with_zone_string());
 }
 
 

@@ -2,6 +2,8 @@ pub mod conf;
 pub mod sql;
 pub mod status;
 
+use crate::erx;
+
 use redis;
 use std::sync::RwLock;
 use std::time::Duration;
@@ -20,11 +22,10 @@ use crate::web::url;
 
 static SHARED_DB_CONNECTION: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
-// static mut SHARED_REDIS_CONNECT_STRING: String = String::new();
 static SHARED_REDIS_CONNECT_STRING: RwLock<String> = RwLock::new(String::new());
 
-pub type DBResult<T> = Result<T, crate::erx::Erx>;
-pub type DBResults<T> = Result<Vec<T>, crate::erx::Erx>;
+pub type DBResult<T> = erx::ResultE<T>;
+pub type DBResults<T> = erx::ResultE<Vec<T>>;
 
 pub struct DBResultsRelated<T> {
     results: Vec<T>,
@@ -32,16 +33,20 @@ pub struct DBResultsRelated<T> {
     offset: usize,
 }
 
-pub fn shared() -> &'static DatabaseConnection {
+pub fn shared_must() -> &'static DatabaseConnection {
     SHARED_DB_CONNECTION.get().expect("SHARED_DB_CONNECTION get failed")
 }
 
-pub fn make_redis_client() -> Result<redis::Client, String> {
-    let s = SHARED_REDIS_CONNECT_STRING.read().map_err(|e| e.to_string())?.clone();
-    redis::Client::open(s).map_err(|e| e.to_string())
+pub fn shared() -> erx::ResultE<&'static DatabaseConnection> {
+    SHARED_DB_CONNECTION.get().ok_or("SHARED_DB_CONNECTION get failed".into())
 }
 
-pub async fn init_model(backends: &Vec<Backend>) {
+pub fn create_redis_client() -> erx::ResultE<redis::Client> {
+    let s = SHARED_REDIS_CONNECT_STRING.read().map_err(erx::smp)?.clone();
+    redis::Client::open(s).map_err(erx::smp)
+}
+
+pub async fn initialize_model_connection(backends: &Vec<Backend>) {
     let span = span!(tracing::Level::INFO, "INITIALIZE MODEL");
     let _guard = span.enter();
 
@@ -104,7 +109,18 @@ pub async fn new_database_connection(backend: &Backend) -> DatabaseConnection {
 
     use log;
 
-    opt.max_connections(MAX_CONNECTIONS).min_connections(MIN_CONNECTIONS).connect_timeout(CONNECT_TIMEOUT).acquire_timeout(ACQUIRE_TIMEOUT).idle_timeout(IDLE_TIMEOUT).max_lifetime(MAX_LIFETIME).connect_lazy(false).sqlx_logging(true).sqlx_logging_level(log::LevelFilter::Info).sqlx_logging(true).sqlx_logging_level(log::LevelFilter::Info).sqlx_slow_statements_logging_settings(log::LevelFilter::Warn, Duration::from_secs(2));
+    opt.max_connections(MAX_CONNECTIONS)
+        .min_connections(MIN_CONNECTIONS)
+        .connect_timeout(CONNECT_TIMEOUT)
+        .acquire_timeout(ACQUIRE_TIMEOUT)
+        .idle_timeout(IDLE_TIMEOUT)
+        .max_lifetime(MAX_LIFETIME)
+        .connect_lazy(false)
+        .sqlx_logging(true)
+        .sqlx_logging_level(log::LevelFilter::Info)
+        .sqlx_logging(true)
+        .sqlx_logging_level(log::LevelFilter::Info)
+        .sqlx_slow_statements_logging_settings(log::LevelFilter::Warn, Duration::from_secs(2));
 
     if backend.kind == BackendKind::Postgres && connection_string.contains("currentSchema") {
         let params = url::parse_url_query(connection_string.as_str());

@@ -1,6 +1,7 @@
 // https://github.com/64bit/async-openai
 
 use crate::erx;
+use crate::tools::strings::IgnoreCase;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::{
     ChatCompletionRequestMessage,
@@ -74,7 +75,26 @@ impl ChatResponse {
 
     pub fn response_json<T: for<'a> Deserialize<'a>>(&self) -> Result<T, erx::Erx> {
         let c = self.response_string();
-        serde_json::from_str::<T>(&c).map_err(erx::smp)
+        Self::try_parse_json(&c)
+    }
+
+    fn try_parse_json<T: for<'a> Deserialize<'a>>(content: &str) -> Result<T, erx::Erx> {
+        let mut c = content.trim();
+        if c.is_empty() {
+            return Err("invalid content length".into());
+        }
+
+        const PREFIX: &str = "```json";
+        const SUFFIX: &str = "```";
+
+        if IgnoreCase::Prefix(PREFIX.into()).matches(c) {
+            c = &c[PREFIX.len()..];
+        }
+        if IgnoreCase::Suffix(c.into()).matches(c) {
+            c = &c[..c.len() - SUFFIX.len()];
+        }
+
+        serde_json::from_str::<T>(c).map_err(erx::smp)
     }
 }
 
@@ -210,9 +230,9 @@ impl LLM {
     }
 
 
-    pub async fn chat_own_type<T: Serialize>(&self, own: T) -> Result<ChatResponse, erx::Erx> {
-        Err("OpenAI does not support this chat".into())
-    }
+    // pub async fn chat_own_type<T: Serialize>(&self, own: T) -> Result<ChatResponse, erx::Erx> {
+    //     Err("OpenAI does not support this chat".into())
+    // }
 }
 
 #[cfg(test)]

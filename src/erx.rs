@@ -4,6 +4,13 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 
+// Layouted: 预设好的一些Layout快速方法
+// ResultE<T> = Result<T, Erx>;
+// ResultEX = ResultE<()>;
+// fn smp<T: ToString>(error: T) -> Erx
+// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
+//
+
 lazy_static! {
     static ref APP_SHORT: String = {
         conf::rebit().read().unwrap().short.clone()
@@ -20,23 +27,8 @@ pub struct Erx {
     extra: Vec<(String, String)>,
 }
 
-// Code code format
-// aaaa-xxxx-yyyy-zzzz
-//
-//	aaaa : 应用标示，建议4位长度
-//	xxxx : 单词字母，建议4位长度，用于区分大类（功能域）
-//	yyyy : 字母或者数字，建议4位长度，用于区分子类
-//	zzzz : 字母或者数字，建议4位长度，具体错误
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct LayoutedC {
-    application: String,
-    domain: String,
-    category: String,
-    detail: String,
-}
 pub static LAYOUTED_C_ZERO: &'static str = "0000";
 
-pub struct Layouted;
 
 pub fn smp<T: ToString>(error: T) -> Erx {
     Erx {
@@ -55,7 +47,6 @@ pub fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
     }
 }
 
-
 pub static FUZZ: &str = "FUZZ";
 pub static COMM: &str = "COMM";
 pub static MIDL: &str = "MIDL";
@@ -63,6 +54,55 @@ pub static SERV: &str = "SERV";
 pub static MODE: &str = "MODE";
 pub static ACTN: &str = "ACTN";
 pub static UNDF: &str = "UNDF";
+
+pub struct Layouted;
+
+impl Layouted {
+    pub fn fuzz_udf(detail: &str) -> LayoutedC {
+        LayoutedC::new(FUZZ, UNDF, detail)
+    }
+
+    pub fn fuzz(category: &str, detail: &str) -> LayoutedC {
+        LayoutedC::new(FUZZ, category, detail)
+    }
+
+    pub fn common(category: &str, detail: &str) -> LayoutedC {
+        LayoutedC::new(COMM, category, detail)
+    }
+
+    pub fn middleware(category: &str, detail: &str) -> LayoutedC {
+        LayoutedC::new(MIDL, category, detail)
+    }
+
+    pub fn service(category: &str, detail: &str) -> LayoutedC {
+        LayoutedC::new(SERV, category, detail)
+    }
+
+    pub fn model(category: &str, detail: &str) -> LayoutedC {
+        LayoutedC::new(MODE, category, detail)
+    }
+
+    pub fn action(category: &str, detail: &str) -> LayoutedC {
+        LayoutedC::new(ACTN, category, detail)
+    }
+}
+
+
+// Code code format
+// aaaa-xxxx-yyyy-zzzz
+//
+//	aaaa : 应用标示，建议4位长度
+//	xxxx : 单词字母，建议4位长度，用于区分大类（功能域）
+//	yyyy : 字母或者数字，建议4位长度，用于区分子类
+//	zzzz : 字母或者数字，建议4位长度，具体错误
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LayoutedC {
+    application: String,
+    domain: String,
+    category: String,
+    detail: String,
+}
+
 
 impl Erx {
     pub fn new(message: &str) -> Erx {
@@ -160,12 +200,17 @@ impl From<String> for Erx {
     }
 }
 
-
 impl From<Box<dyn std::error::Error>> for Erx {
     fn from(value: Box<dyn std::error::Error>) -> Self {
         Erx::new(
             &value.to_string(),
         )
+    }
+}
+
+impl From<(&str, &str)> for Erx {
+    fn from((code, message): (&str, &str)) -> Self {
+        (code.to_string(), message.to_string()).into()
     }
 }
 
@@ -176,6 +221,35 @@ impl From<(String, String)> for Erx {
             code,
             message,
             extra: Default::default(),
+        }
+    }
+}
+
+impl<T: ToString + Default> From<Vec<T>> for Erx {
+    fn from(value: Vec<T>) -> Self {
+        let len = value.len();
+        if len == 0 {
+            Erx::default()
+        } else if len == 1 {
+            value[0].to_string().into()
+        } else if len == 2 {
+            (value[0].to_string(), value[1].to_string()).into()
+        } else {
+            let code = value[0].to_string();
+            let message = value[1].to_string();
+
+            let mut iter = value.into_iter();
+            let mut extra: Vec<(String, String)> = Vec::new();
+            while let Some(first) = iter.next() {
+                let second = iter.next().unwrap_or_default();
+                extra.push((first.to_string(), second.to_string()));
+            }
+
+            Erx {
+                code: code.into(),
+                message,
+                extra,
+            }
         }
     }
 }
@@ -218,6 +292,22 @@ impl Into<String> for LayoutedC {
     }
 }
 
+impl Into<bool> for LayoutedC {
+    fn into(self) -> bool {
+        self.is_okc()
+    }
+}
+
+impl Into<(String, String, String, String)> for LayoutedC {
+    fn into(self) -> (String, String, String, String) {
+        (
+            self.application,
+            self.domain,
+            self.category,
+            self.detail,
+        )
+    }
+}
 
 impl Default for LayoutedC {
     fn default() -> Self {
@@ -230,6 +320,22 @@ impl Default for LayoutedC {
     }
 }
 
+impl From<&str> for LayoutedC {
+    fn from(s: &str) -> Self {
+        s.to_string().into()
+    }
+}
+
+impl From<(&str, &str, &str, &str)> for LayoutedC {
+    fn from(value: (&str, &str, &str, &str)) -> Self {
+        LayoutedC {
+            application: value.0.to_string(),
+            domain: value.1.to_string(),
+            category: value.2.to_string(),
+            detail: value.3.to_string(),
+        }
+    }
+}
 
 impl From<String> for LayoutedC {
     fn from(value: String) -> Self {
@@ -251,33 +357,13 @@ impl From<String> for LayoutedC {
     }
 }
 
-impl Layouted {
-    pub fn fuzz_udf(detail: &str) -> LayoutedC {
-        LayoutedC::new(FUZZ, UNDF, detail)
-    }
-
-    pub fn fuzz(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(FUZZ, category, detail)
-    }
-
-    pub fn common(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(COMM, category, detail)
-    }
-
-    pub fn middleware(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(MIDL, category, detail)
-    }
-
-    pub fn service(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(SERV, category, detail)
-    }
-
-    pub fn model(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(MODE, category, detail)
-    }
-
-    pub fn action(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(ACTN, category, detail)
+impl From<(String, String, String, String)> for LayoutedC {
+    fn from(value: (String, String, String, String)) -> Self {
+        LayoutedC {
+            application: value.0,
+            domain: value.1,
+            category: value.2,
+            detail: value.3,
+        }
     }
 }
- 

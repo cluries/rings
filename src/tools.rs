@@ -10,7 +10,8 @@ pub mod httpclient;
 pub mod openai;
 pub mod aiprovider;
 pub mod image;
-mod mcp;
-mod audio;
-mod video;
+pub mod captcha;
+pub mod mcp;
+pub mod audio;
+pub mod video;
  

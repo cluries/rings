@@ -1,3 +1,4 @@
+//IgnoreCase::Prefix("prefix").matches("content")
 pub enum IgnoreCase {
     Contain(String),
     Prefix(String),
@@ -5,6 +6,8 @@ pub enum IgnoreCase {
 }
 
 pub struct Sub;
+pub struct Word;
+ 
 
 impl IgnoreCase {
     pub fn matches(&self, s: &str) -> bool {
@@ -66,6 +69,92 @@ impl Sub {
     }
 }
 
+impl Word {
+    pub fn count(s: &str) -> usize {
+        s.split_whitespace().count()
+    }
+
+    pub fn head(s: &str, size: usize) -> String {
+        let mut count = 0;
+        let mut start = 0;
+        for (i, c) in s.char_indices() {
+            if c.is_whitespace() {
+                count += 1;
+                if count >= size {
+                    return s[start..i].to_string();
+                }
+                start = i + 1;
+            }
+        }
+        s[start..].to_string()
+    }
+
+    pub fn tail(s: &str, size: usize) -> String {
+        let mut count = 0;
+        let mut end = s.len();
+        for (i, c) in s.char_indices().rev() {
+            if c.is_whitespace() {
+                count += 1;
+                if count >= size {
+                    return s[i..end].to_string();
+                }
+                end = i;
+            }
+        }
+        s[..end].to_string()
+    }
+    
+    pub fn ucfirst(s: &str) -> String {
+        let mut chars = s.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(f) => f.to_uppercase().collect::<String>() + &chars.as_str(),
+        }
+    }
+
+    pub fn lcfirst(s: &str) -> String {
+        let mut chars = s.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(f) => f.to_lowercase().collect::<String>() + &chars.as_str(),
+        }
+    }
+
+    pub fn ucwords(s: &str) -> String {
+        let mut chars = s.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(f) => f.to_uppercase().collect::<String>() + &chars.as_str(),
+        }
+    }
+
+    pub fn lcwords(s: &str) -> String {
+        let mut chars = s.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(f) => f.to_lowercase().collect::<String>() + &chars.as_str(),
+        }
+    }
+
+    pub fn format(s: &str, size: usize) -> String {
+        let mut count = 0;
+        let mut start = 0;
+        let mut end = s.len();
+        for (i, c) in s.char_indices() {
+            if c.is_whitespace() {
+                count += 1;
+                if count >= size {
+                    end = i;
+                    break;
+                }
+                start = i + 1;
+            }
+        }
+        s[start..end].to_string()
+    }
+}
+
+ 
 
 #[test]
 fn test_start_with_ignore_case() {
