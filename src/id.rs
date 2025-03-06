@@ -1,5 +1,5 @@
+use crate::erx;
 use lazy_static::lazy_static;
-use tracing::error;
 use std::fmt::Display;
 use std::sync::RwLock;
 
@@ -20,7 +20,7 @@ lazy_static! {
 #[macro_export]
 macro_rules! id {
     () => {
-        shared().make().unwrap()
+        shared().make()
     };
 }
 
@@ -70,7 +70,7 @@ impl Factory {
         self.sequence.read().unwrap().0
     }
 
-    pub fn make(&self) -> Option<Id> {
+    pub fn make(&self) -> erx::ResultE<Id> {
         let millis = chrono::Local::now().timestamp_millis();
         let mut seq: i64 = 0;
         let mut sequence = self.sequence.write().unwrap();
@@ -83,12 +83,11 @@ impl Factory {
         }
 
         if seq > MAX_SEQUENCE {
-            error!("out of sequence range");
-            return None;
+            return Err("out of sequence range".into());
         }
 
         let val = MILLIS_BASE * millis + seq * SEQUENCE_BASE + self.sharding;
-        Some(Id { val })
+        Ok(Id { val })
     }
 }
 
@@ -100,7 +99,7 @@ impl Display for Id {
 
 impl From<String> for Id {
     fn from(value: String) -> Self {
-        let val: i64 = value.parse().unwrap();
+        let val: i64 = value.parse().unwrap_or(0);
         val.into()
     }
 }
@@ -115,15 +114,16 @@ impl From<i64> for Id {
     }
 }
 
-impl From<Id> for i64 {
-    fn from(value: Id) -> Self {
-        value.val
+
+impl Into<i64> for Id {
+    fn into(self) -> i64 {
+        self.val
     }
 }
 
-impl From<Id> for String {
-    fn from(value: Id) -> Self {
-        value.val.to_string()
+impl Into<String> for Id {
+    fn into(self) -> String {
+        self.val.to_string()
     }
 }
 
@@ -152,6 +152,10 @@ impl Id {
             self.sequence(),
             self.millis()
         )
+    }
+
+    pub fn valid(&self) -> bool {
+        self.val > MIN_VALUE
     }
 
     pub fn value(self) -> i64 {
