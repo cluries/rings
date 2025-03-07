@@ -29,15 +29,6 @@ pub struct ExceptGrow {
     grows: HashMap<String, String>,
 }
 
-impl<T> Into<Out<T>> for Except
-where
-    T: Serialize,
-{
-    fn into(self) -> Out<T> {
-        self.out()
-    }
-}
-
 
 impl Except {
     pub fn out<T>(&self) -> Out<T>

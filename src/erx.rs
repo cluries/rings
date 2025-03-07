@@ -124,6 +124,10 @@ impl Erx {
     pub fn message(&self) -> &str {
         &self.message
     }
+    
+    pub fn message_string(&self) -> String {
+        self.message.clone()
+    }
 
     pub fn message_mut(&mut self) -> &mut String {
         &mut self.message

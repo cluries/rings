@@ -1,0 +1,4 @@
+[reading]
+frunk = "https://github.com/lloydmeta/frunk"
+moka = "https://github.com/moka-rs/moka"
+

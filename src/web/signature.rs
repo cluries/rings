@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
 use tracing::info;
+use crate::erx;
 
 static DEFAULT_RAND_LIFE: i64 = 300;
 
@@ -129,7 +130,7 @@ impl Signator {
         }
 
         if let Err(reason) = self.rand_guard(payload.val_xu(), payload.val_xr()).await {
-            return Err(make_err_res!("RAND", reason));
+            return Err(make_err_res!("RAND", reason.message_string()));
         }
 
         use crate::web::context::Context;
@@ -139,18 +140,15 @@ impl Signator {
         Ok(request)
     }
 
-    async fn rand_guard(&self, xu: String, xr: String) -> Result<(), String> {
-        let mut conn = match self.redis_client.get_connection() {
-            Ok(conn) => conn,
-            Err(err) => return Err(format!("redis connect error: {}", err)),
-        };
+    async fn rand_guard(&self, xu: String, xr: String) -> erx::ResultEX {
+        let mut conn = self.redis_client.get_connection().map_err(erx::smp)?;
 
         let name = format!("XR:{}", xu);
         let score: i64 = conn.zscore(name.as_str(), xr.as_str()).unwrap_or(0);
         let current: i64 = chrono::Local::now().timestamp();
 
         if (current - score).abs() < self.nonce_lifetime {
-            return Err("duplicate rand value".to_string());
+            return Err("duplicate rand value".into());
         }
 
         let mut pipe = redis::pipe();
