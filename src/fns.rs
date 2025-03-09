@@ -1,5 +1,6 @@
 use std::ops::Fn;
 
+
 /// 对函数进行组合，返回一个新的函数 f(g(x))
 pub fn compose<F, G, A, B, C>(f: F, g: G) -> impl Fn(A) -> C
 where
@@ -54,7 +55,7 @@ where
 }
 
 /// 将函数转换为单例函数，确保只会被调用一次
-pub fn singleton<F, A, B>(f: F) -> impl Fn(A) -> B 
+pub fn singleton<F, A, B>(f: F) -> impl Fn(A) -> B
 where
     F: Fn(A) -> B,
     A: Clone,
