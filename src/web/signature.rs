@@ -1,9 +1,10 @@
-use crate::erx::{Layouted, LayoutedC, Erx};
+use crate::erx::{Erx, Layouted, LayoutedC};
 use crate::tools::hash;
 use crate::web::api::Out;
 use crate::web::request::clone_request;
 use crate::web::url::parse_query;
 
+use crate::erx;
 use axum::response::IntoResponse;
 use futures_util::future::BoxFuture;
 use redis::Commands;
@@ -15,7 +16,6 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
 use tracing::info;
-use crate::erx;
 
 static DEFAULT_RAND_LIFE: i64 = 300;
 
@@ -276,14 +276,6 @@ static XR: &str = "XR";
 static XS: &str = "XS";
 static DS: &str = "X-DEVELOPMENT-SKIP";
 
-static POST: &str = "POST";
-static PUT: &str = "PUT";
-static DELETE: &str = "DELETE";
-static GET: &str = "GET";
-static HEAD: &str = "HEAD";
-static PATCH: &str = "PATCH";
-static OPTIONS: &str = "OPTIONS";
-
 
 impl Payload {
     async fn from_request(req: axum::extract::Request) -> Result<Self, String> {
@@ -301,12 +293,22 @@ impl Payload {
         let ds = header(DS);
 
         let path = parts.uri.path().to_string();
-        let method = parts.method.as_str().to_uppercase();
+        let method = parts.method.as_str();
 
         let queries = parse_query(parts.uri.query().unwrap_or_default());
 
         let mut bd: Option<serde_json::Value> = None;
-        if method == POST || method == PUT || method == DELETE || method == OPTIONS || method == PATCH {
+
+        use crate::web::define::HttpMethod;
+
+        let body_guard = HttpMethod::POST.is(method)
+            || HttpMethod::PUT.is(method)
+            || HttpMethod::DELETE.is(method)
+            || HttpMethod::OPTIONS.is(method)
+            || HttpMethod::PATCH.is(method)
+            || HttpMethod::PATCH.is(method);
+
+        if body_guard {
             const LIMIT: usize = 1024 * 1024 * 32;
             let body: Result<serde_json::Value, String> =
                 match axum::body::to_bytes(body, LIMIT).await {
@@ -329,7 +331,9 @@ impl Payload {
             bd = body.ok();
         }
 
+        let method = method.to_uppercase().to_string();
         let payload = Payload { method, path, xu, xt, xr, xs, ds, queries, body: bd };
+        
         Ok(payload)
     }
 

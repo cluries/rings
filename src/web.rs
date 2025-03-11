@@ -11,8 +11,9 @@ pub mod url;
 pub mod types;
 pub mod except;
 pub mod session;
-mod cookie;
-mod javascript;
+pub mod cookie;
+pub mod javascript;
+pub mod define;
 
 use crate::rings::{RingState, SafeRS, RingsMod};
 use async_trait::async_trait;
