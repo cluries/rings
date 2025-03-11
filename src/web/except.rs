@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use crate::erx::Layouted;
 use crate::tos;
 use crate::web::api::Out;
-
+use crate::web::define;
 
 // Except is use in controller/action.
 // wrapper some defined error.
@@ -37,22 +37,30 @@ impl Except {
     {
         use crate::erx::{COMM, FUZZ};
 
+        let defined_wrapper = |c: define::HttpCode| {
+            Out::<T> {
+                code: Layouted::common(COMM, &format!("{:04}", c.code())).into(),
+                message: Some(c.message().into()),
+                data: None,
+            }
+        };
+
         match self {
             Except::Unauthorized => {
-                Out::<T> { code: Layouted::common(COMM, "0401").into(), message: tos!("unauthorized"), data: None }
+                defined_wrapper(define::HttpCode::Unauthorized)
             }
             Except::Forbidden => {
-                Out::<T> { code: Layouted::common(COMM, "0400").into(), message: tos!("forbidden"), data: None }
+                defined_wrapper(define::HttpCode::Forbidden)
             }
             Except::NotFound => {
-                Out::<T> { code: Layouted::common(COMM, "0404").into(), message: tos!("resource not found"), data: None }
+                defined_wrapper(define::HttpCode::NotFound)
             }
             Except::InternalServerError => {
-                Out::<T> { code: Layouted::common(COMM, "0500").into(), message: tos!("internal server error"), data: None }
+                defined_wrapper(define::HttpCode::InternalServerError)
             }
             Except::Unknown(m) => {
                 let m = if m.is_empty() {
-                    "unknown error"
+                    "Hi there! Something unexpected happened, but our engineers have already been notified."
                 } else {
                     m
                 };

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use lazy_static::lazy_static;
 
 pub enum HttpMethod {
     GET,
@@ -134,6 +135,76 @@ impl HttpMethod {
 }
 
 
+lazy_static!(
+    static ref HTTP_CODES: HashMap<i32, String> = {
+        let mut map = HashMap::new();
+        map.insert(HttpCode::UnDefined.code(), HttpCode::UnDefined.message().into());
+        map.insert(HttpCode::Continue.code(), HttpCode::Continue.message().into());
+        map.insert(HttpCode::SwitchingProtocols.code(), HttpCode::SwitchingProtocols.message().into());
+        map.insert(HttpCode::Processing.code(), HttpCode::Processing.message().into());
+        map.insert(HttpCode::EarlyHints.code(), HttpCode::EarlyHints.message().into());
+        map.insert(HttpCode::OK.code(), HttpCode::OK.message().into());
+        map.insert(HttpCode::Created.code(), HttpCode::Created.message().into());
+        map.insert(HttpCode::Accepted.code(), HttpCode::Accepted.message().into());
+        map.insert(HttpCode::NonAuthoritativeInformation.code(), HttpCode::NonAuthoritativeInformation.message().into());
+        map.insert(HttpCode::NoContent.code(), HttpCode::NoContent.message().into());
+        map.insert(HttpCode::ResetContent.code(), HttpCode::ResetContent.message().into());
+        map.insert(HttpCode::PartialContent.code(), HttpCode::PartialContent.message().into());
+        map.insert(HttpCode::MultiStatus.code(), HttpCode::MultiStatus.message().into());
+        map.insert(HttpCode::AlreadyReported.code(), HttpCode::AlreadyReported.message().into());
+        map.insert(HttpCode::IMUsed.code(), HttpCode::IMUsed.message().into());
+        map.insert(HttpCode::MultipleChoices.code(), HttpCode::MultipleChoices.message().into());
+        map.insert(HttpCode::MovedPermanently.code(), HttpCode::MovedPermanently.message().into());
+        map.insert(HttpCode::Found.code(), HttpCode::Found.message().into());
+        map.insert(HttpCode::SeeOther.code(), HttpCode::SeeOther.message().into());
+        map.insert(HttpCode::NotModified.code(), HttpCode::NotModified.message().into());
+        map.insert(HttpCode::UseProxy.code(), HttpCode::UseProxy.message().into());
+        map.insert(HttpCode::TemporaryRedirect.code(), HttpCode::TemporaryRedirect.message().into());
+        map.insert(HttpCode::PermanentRedirect.code(), HttpCode::PermanentRedirect.message().into());
+        map.insert(HttpCode::BadRequest.code(), HttpCode::BadRequest.message().into());
+        map.insert(HttpCode::Unauthorized.code(), HttpCode::Unauthorized.message().into());
+        map.insert(HttpCode::PaymentRequired.code(), HttpCode::PaymentRequired.message().into());
+        map.insert(HttpCode::Forbidden.code(), HttpCode::Forbidden.message().into());
+        map.insert(HttpCode::NotFound.code(), HttpCode::NotFound.message().into());
+        map.insert(HttpCode::MethodNotAllowed.code(), HttpCode::MethodNotAllowed.message().into());
+        map.insert(HttpCode::NotAcceptable.code(), HttpCode::NotAcceptable.message().into());
+        map.insert(HttpCode::ProxyAuthenticationRequired.code(), HttpCode::ProxyAuthenticationRequired.message().into());
+        map.insert(HttpCode::RequestTimeout.code(), HttpCode::RequestTimeout.message().into());
+        map.insert(HttpCode::Conflict.code(), HttpCode::Conflict.message().into());
+        map.insert(HttpCode::Gone.code(), HttpCode::Gone.message().into());
+        map.insert(HttpCode::LengthRequired.code(), HttpCode::LengthRequired.message().into());
+        map.insert(HttpCode::PreconditionFailed.code(), HttpCode::PreconditionFailed.message().into());
+        map.insert(HttpCode::PayloadTooLarge.code(), HttpCode::PayloadTooLarge.message().into());
+        map.insert(HttpCode::URITooLong.code(), HttpCode::URITooLong.message().into());
+        map.insert(HttpCode::UnsupportedMediaType.code(), HttpCode::UnsupportedMediaType.message().into());
+        map.insert(HttpCode::RangeNotSatisfiable.code(), HttpCode::RangeNotSatisfiable.message().into());
+        map.insert(HttpCode::ExpectationFailed.code(), HttpCode::ExpectationFailed.message().into());
+        map.insert(HttpCode::ImATeapot.code(), HttpCode::ImATeapot.message().into());
+        map.insert(HttpCode::MisdirectedRequest.code(), HttpCode::MisdirectedRequest.message().into());
+        map.insert(HttpCode::UnprocessableEntity.code(), HttpCode::UnprocessableEntity.message().into());
+        map.insert(HttpCode::Locked.code(), HttpCode::Locked.message().into());
+        map.insert(HttpCode::FailedDependency.code(), HttpCode::FailedDependency.message().into());
+        map.insert(HttpCode::TooEarly.code(), HttpCode::TooEarly.message().into());
+        map.insert(HttpCode::UpgradeRequired.code(), HttpCode::UpgradeRequired.message().into());
+        map.insert(HttpCode::PreconditionRequired.code(), HttpCode::PreconditionRequired.message().into());
+        map.insert(HttpCode::TooManyRequests.code(), HttpCode::TooManyRequests.message().into());
+        map.insert(HttpCode::RequestHeaderFieldsTooLarge.code(), HttpCode::RequestHeaderFieldsTooLarge.message().into());
+        map.insert(HttpCode::UnavailableForLegalReasons.code(), HttpCode::UnavailableForLegalReasons.message().into());
+        map.insert(HttpCode::InternalServerError.code(), HttpCode::InternalServerError.message().into());
+        map.insert(HttpCode::NotImplemented.code(), HttpCode::NotImplemented.message().into());
+        map.insert(HttpCode::BadGateway.code(), HttpCode::BadGateway.message().into());
+        map.insert(HttpCode::ServiceUnavailable.code(), HttpCode::ServiceUnavailable.message().into());
+        map.insert(HttpCode::GatewayTimeout.code(), HttpCode::GatewayTimeout.message().into());
+        map.insert(HttpCode::HTTPVersionNotSupported.code(), HttpCode::HTTPVersionNotSupported.message().into());
+        map.insert(HttpCode::VariantAlsoNegotiates.code(), HttpCode::VariantAlsoNegotiates.message().into());
+        map.insert(HttpCode::InsufficientStorage.code(), HttpCode::InsufficientStorage.message().into());
+        map.insert(HttpCode::LoopDetected.code(), HttpCode::LoopDetected.message().into());
+        map.insert(HttpCode::NotExtended.code(), HttpCode::NotExtended.message().into());
+        map.insert(HttpCode::NetworkAuthenticationRequired.code(), HttpCode::NetworkAuthenticationRequired.message().into());
+        map
+    };
+);
+
 impl HttpCode {
     pub fn from_code(code: i32) -> Self {
         match code {
@@ -203,76 +274,8 @@ impl HttpCode {
         }
     }
 
-    pub fn code_message_pair() -> std::collections::HashMap<i32, String> {
-        // 预分配足够大小的容量以避免重新分配
-        // 使用 lazy_static 来创建一个静态的 HashMap，避免重复构造
-        const CAPACITY: usize = 64;
-        let mut map = HashMap::with_capacity(CAPACITY);
-        map.insert(HttpCode::UnDefined.code(), HttpCode::UnDefined.message().into());
-        map.insert(HttpCode::Continue.code(), HttpCode::Continue.message().into());
-        map.insert(HttpCode::SwitchingProtocols.code(), HttpCode::SwitchingProtocols.message().into());
-        map.insert(HttpCode::Processing.code(), HttpCode::Processing.message().into());
-        map.insert(HttpCode::EarlyHints.code(), HttpCode::EarlyHints.message().into());
-        map.insert(HttpCode::OK.code(), HttpCode::OK.message().into());
-        map.insert(HttpCode::Created.code(), HttpCode::Created.message().into());
-        map.insert(HttpCode::Accepted.code(), HttpCode::Accepted.message().into());
-        map.insert(HttpCode::NonAuthoritativeInformation.code(), HttpCode::NonAuthoritativeInformation.message().into());
-        map.insert(HttpCode::NoContent.code(), HttpCode::NoContent.message().into());
-        map.insert(HttpCode::ResetContent.code(), HttpCode::ResetContent.message().into());
-        map.insert(HttpCode::PartialContent.code(), HttpCode::PartialContent.message().into());
-        map.insert(HttpCode::MultiStatus.code(), HttpCode::MultiStatus.message().into());
-        map.insert(HttpCode::AlreadyReported.code(), HttpCode::AlreadyReported.message().into());
-        map.insert(HttpCode::IMUsed.code(), HttpCode::IMUsed.message().into());
-        map.insert(HttpCode::MultipleChoices.code(), HttpCode::MultipleChoices.message().into());
-        map.insert(HttpCode::MovedPermanently.code(), HttpCode::MovedPermanently.message().into());
-        map.insert(HttpCode::Found.code(), HttpCode::Found.message().into());
-        map.insert(HttpCode::SeeOther.code(), HttpCode::SeeOther.message().into());
-        map.insert(HttpCode::NotModified.code(), HttpCode::NotModified.message().into());
-        map.insert(HttpCode::UseProxy.code(), HttpCode::UseProxy.message().into());
-        map.insert(HttpCode::TemporaryRedirect.code(), HttpCode::TemporaryRedirect.message().into());
-        map.insert(HttpCode::PermanentRedirect.code(), HttpCode::PermanentRedirect.message().into());
-        map.insert(HttpCode::BadRequest.code(), HttpCode::BadRequest.message().into());
-        map.insert(HttpCode::Unauthorized.code(), HttpCode::Unauthorized.message().into());
-        map.insert(HttpCode::PaymentRequired.code(), HttpCode::PaymentRequired.message().into());
-        map.insert(HttpCode::Forbidden.code(), HttpCode::Forbidden.message().into());
-        map.insert(HttpCode::NotFound.code(), HttpCode::NotFound.message().into());
-        map.insert(HttpCode::MethodNotAllowed.code(), HttpCode::MethodNotAllowed.message().into());
-        map.insert(HttpCode::NotAcceptable.code(), HttpCode::NotAcceptable.message().into());
-        map.insert(HttpCode::ProxyAuthenticationRequired.code(), HttpCode::ProxyAuthenticationRequired.message().into());
-        map.insert(HttpCode::RequestTimeout.code(), HttpCode::RequestTimeout.message().into());
-        map.insert(HttpCode::Conflict.code(), HttpCode::Conflict.message().into());
-        map.insert(HttpCode::Gone.code(), HttpCode::Gone.message().into());
-        map.insert(HttpCode::LengthRequired.code(), HttpCode::LengthRequired.message().into());
-        map.insert(HttpCode::PreconditionFailed.code(), HttpCode::PreconditionFailed.message().into());
-        map.insert(HttpCode::PayloadTooLarge.code(), HttpCode::PayloadTooLarge.message().into());
-        map.insert(HttpCode::URITooLong.code(), HttpCode::URITooLong.message().into());
-        map.insert(HttpCode::UnsupportedMediaType.code(), HttpCode::UnsupportedMediaType.message().into());
-        map.insert(HttpCode::RangeNotSatisfiable.code(), HttpCode::RangeNotSatisfiable.message().into());
-        map.insert(HttpCode::ExpectationFailed.code(), HttpCode::ExpectationFailed.message().into());
-        map.insert(HttpCode::ImATeapot.code(), HttpCode::ImATeapot.message().into());
-        map.insert(HttpCode::MisdirectedRequest.code(), HttpCode::MisdirectedRequest.message().into());
-        map.insert(HttpCode::UnprocessableEntity.code(), HttpCode::UnprocessableEntity.message().into());
-        map.insert(HttpCode::Locked.code(), HttpCode::Locked.message().into());
-        map.insert(HttpCode::FailedDependency.code(), HttpCode::FailedDependency.message().into());
-        map.insert(HttpCode::TooEarly.code(), HttpCode::TooEarly.message().into());
-        map.insert(HttpCode::UpgradeRequired.code(), HttpCode::UpgradeRequired.message().into());
-        map.insert(HttpCode::PreconditionRequired.code(), HttpCode::PreconditionRequired.message().into());
-        map.insert(HttpCode::TooManyRequests.code(), HttpCode::TooManyRequests.message().into());
-        map.insert(HttpCode::RequestHeaderFieldsTooLarge.code(), HttpCode::RequestHeaderFieldsTooLarge.message().into());
-        map.insert(HttpCode::UnavailableForLegalReasons.code(), HttpCode::UnavailableForLegalReasons.message().into());
-        map.insert(HttpCode::InternalServerError.code(), HttpCode::InternalServerError.message().into());
-        map.insert(HttpCode::NotImplemented.code(), HttpCode::NotImplemented.message().into());
-        map.insert(HttpCode::BadGateway.code(), HttpCode::BadGateway.message().into());
-        map.insert(HttpCode::ServiceUnavailable.code(), HttpCode::ServiceUnavailable.message().into());
-        map.insert(HttpCode::GatewayTimeout.code(), HttpCode::GatewayTimeout.message().into());
-        map.insert(HttpCode::HTTPVersionNotSupported.code(), HttpCode::HTTPVersionNotSupported.message().into());
-        map.insert(HttpCode::VariantAlsoNegotiates.code(), HttpCode::VariantAlsoNegotiates.message().into());
-        map.insert(HttpCode::InsufficientStorage.code(), HttpCode::InsufficientStorage.message().into());
-        map.insert(HttpCode::LoopDetected.code(), HttpCode::LoopDetected.message().into());
-        map.insert(HttpCode::NotExtended.code(), HttpCode::NotExtended.message().into());
-        map.insert(HttpCode::NetworkAuthenticationRequired.code(), HttpCode::NetworkAuthenticationRequired.message().into());
-
-        map
+    pub fn code_message_pair() -> HashMap<i32, String> {
+        HTTP_CODES.clone()
     }
 
     pub fn code(&self) -> i32 {
