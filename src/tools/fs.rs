@@ -1,5 +1,5 @@
 use serde::de::DeserializeOwned;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 use crate::erx;
 use std::env;
@@ -119,16 +119,59 @@ impl Content {
         Ok(tokio::fs::metadata(&self.0).await.map_err(erx::smp)?.len())
     }
 
+    pub async fn head(&self, size: usize) -> Result<Vec<u8>, erx::Erx> {
+        let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+        let mut buffer = vec![0; size];
+        fd.read_exact(&mut buffer).await.map_err(erx::smp)?;
+        Ok(buffer)
+    }
+
+
+    pub async fn head_lines(&self, lines: usize) -> Result<Vec<String>, erx::Erx> {
+        let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+        let mut result = Vec::new();
+        
+        
+
+        Ok(result)
+    }
+
+
+    pub async fn head_string(&self, size: usize) -> Result<String, erx::Erx> {
+        let v8 = self.head(size).await?;
+        Ok(String::from_utf8_lossy(&v8).into_owned())
+    }
+
+
+    pub async fn tail(&self, size: usize) -> Result<Vec<u8>, erx::Erx> {
+        //TOD 补全
+
+        let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+        let mut buffer = vec![0; size];
+
+        let len = fd.metadata().await.map_err(erx::smp)?.len();
+        if len>size as u64 {
+            fd.seek(len-size).await.map_err(erx::smp)?;
+        }  
+        
+        fd.read_to_end(&mut buffer).await.map_err(erx::smp)?;
+    }
+
+    pub async fn tail_lines(&self, lines: usize) -> Result<Vec<String>, erx::Erx> {
+        //TOD 补全
+    }
+
+
+    pub async fn tail_string(&self, size: usize) -> Result<String, erx::Erx> {
+        let v8 = self.tail(size).await?;
+        Ok(String::from_utf8_lossy(&v8).into_owned())
+    }
+
     pub async fn vec8(&self) -> Result<Vec<u8>, erx::Erx> {
         let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
         let mut buffer = Vec::new();
         fd.read_to_end(&mut buffer).await.map_err(erx::smp)?;
         Ok(buffer)
-    }
-
-    pub async fn utf8_string(&self) -> Result<String, erx::Erx> {
-        let v8 = self.vec8().await?;
-        Ok(String::from_utf8_lossy(&v8).into_owned())
     }
 
     pub async fn lines(&self) -> Result<Vec<String>, erx::Erx> {
@@ -137,11 +180,24 @@ impl Content {
         fd.read_to_string(&mut buffer).await.map_err(erx::smp)?;
         Ok(buffer.lines().map(|s| s.to_string()).collect())
     }
+    
+    pub async fn utf8_string(&self) -> Result<String, erx::Erx> {
+        let v8 = self.vec8().await?;
+        Ok(String::from_utf8_lossy(&v8).into_owned())
+    }
+
 
     pub async fn truncate(&self, size: u64) -> Result<(), erx::Erx> {
         let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
         fd.set_len(size).await.map_err(erx::smp)
     }
+
+    pub async fn write(&self, contents: &str) -> Result<(), erx::Erx> {
+        let mut fd = tokio::fs::File::create(&self.0).await.map_err(erx::smp)?;
+        fd.write_all(contents.as_bytes()).await.map_err(erx::smp)?;
+        fd.flush().await.map_err(erx::smp)
+    }
+
 
     pub async fn append(&self, contents: &str) -> Result<(), erx::Erx> {
         let mut fd = tokio::fs::OpenOptions::new().append(true).open(&self.0).await.map_err(erx::smp)?;
@@ -163,12 +219,7 @@ impl Content {
         let json = serde_json::to_string(obj).map_err(erx::smp)?;
         self.write(&json).await
     }
-
-    pub async fn write(&self, contents: &str) -> Result<(), erx::Erx> {
-        let mut fd = tokio::fs::File::create(&self.0).await.map_err(erx::smp)?;
-        fd.write_all(contents.as_bytes()).await.map_err(erx::smp)?;
-        fd.flush().await.map_err(erx::smp)
-    }
+    
 }
 
 
