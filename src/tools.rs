@@ -1,7 +1,7 @@
 pub mod hash;
 pub mod validator;
 pub mod json;
-pub mod file;
+pub mod fs;
 pub mod number;
 pub mod strings;
 pub mod datetime;
@@ -14,4 +14,5 @@ pub mod captcha;
 pub mod mcp;
 pub mod audio;
 pub mod video;
- 
+pub mod tests;
+pub mod lua;

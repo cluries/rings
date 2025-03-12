@@ -24,7 +24,7 @@ impl Dec {
     }
 
     pub async fn file<T: DeserializeOwned>(filename: &str) -> Result<T, crate::erx::Erx> {
-        let fc = crate::tools::file::FileContent(filename.to_string());
+        let fc = crate::tools::fs::Content(filename.to_string());
         fc.json().await
     }
 }

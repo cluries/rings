@@ -1,6 +1,6 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign, Index, IndexMut};
 pub struct Object {
-     
+
 }
 
 impl Object {
@@ -18,7 +18,7 @@ impl Add for Object {
 }
 
 impl AddAssign for Object {
-    fn add_assign(&mut self, other: Object) {}
+    fn add_assign(&mut self, _other: Object) {}
 }
 
 impl Sub for Object {
@@ -29,7 +29,7 @@ impl Sub for Object {
 }
 
 impl SubAssign for Object {
-    fn sub_assign(&mut self, other: Object) {}
+    fn sub_assign(&mut self, _other: Object) {}
 }
 
 impl Mul for Object {
@@ -40,7 +40,7 @@ impl Mul for Object {
 }
 
 impl MulAssign for Object {
-    fn mul_assign(&mut self, other: Object) {}
+    fn mul_assign(&mut self, _other: Object) {}
 }
 
 impl Div for Object {
@@ -51,18 +51,18 @@ impl Div for Object {
 }
 
 impl DivAssign for Object {
-    fn div_assign(&mut self, other: Object) {}
+    fn div_assign(&mut self, _other: Object) {}
 }
 
 impl Index<&str> for Object {
     type Output = Object;
-    fn index(&self, index: &str) -> &Object {
+    fn index(&self, _index: &str) -> &Object {
         self
     }
 }
 
 impl IndexMut<&str> for Object {
-    fn index_mut(&mut self, index: &str) -> &mut Object {
+    fn index_mut(&mut self, _index: &str) -> &mut Object {
         self
     }
 }

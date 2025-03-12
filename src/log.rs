@@ -57,7 +57,7 @@ pub async fn logging_initialize() { //-> Vec<WorkerGuard> {
 
     let logs_dir = log_conf.dirs.trim();
     if logs_dir.len() > 0 {
-        if !crate::tools::file::File(logs_dir.to_string()).is_directory().await {
+        if !crate::tools::fs::Is(logs_dir.to_string()).dir().await {
             panic!("log dir is not a directory: {}", logs_dir);
         }
         let prefix = format!("{}_rings.log", app_name);

@@ -15,7 +15,10 @@ use async_openai::types::{
     ImageUrl,
 };
 use async_openai::Client;
+
+#[allow(unused)]
 use serde::{Deserialize, Serialize};
+
 use std::time::{Duration, SystemTime};
 
 #[derive(Debug)]

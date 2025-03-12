@@ -76,28 +76,36 @@ unsafe impl Send for LuaBridge {}
 unsafe impl Sync for LuaBridge {}
 
 
-#[test]
-fn test() {
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    // 从文件中读取Lua代码
-    let lua_code = std::fs::read_to_string("/Users/cluries/Workspace/iusworks/rings/src/lua.lua").unwrap();
+    fn get_name() -> String {
+        "lua-bridge".to_string()
+    }
 
-    // 创建LuaBridge实例
-    let mut bridge = LuaBridge::new(lua_code);
+    #[test]
+    fn test() {
+        use crate::tools::tests::tools as stools;
+        let lua_code = std::fs::read_to_string(stools::src_dir().join("tools/lua.lua").to_str().unwrap()).unwrap();
+        let mut bridge = LuaBridge::new(lua_code);
 
-    let _ = bridge.register_function("test_func", |lua| {
-        lua.create_function(|_, (a, b): (i64, i64)| {
-            let a = a + 200;
-            Ok(a * 200 + b)
-        })
-    });
+        let _ = bridge.register_function("test_func", |lua| {
+            lua.create_function(|_, (a, b): (i64, i64)| {
+                let a = a + 200;
+                let r = a * 2 + b;
+
+                Ok(format!("{} + {} + 2", get_name(), r))
+            })
+        });
 
 
-    // 执行Lua代码
-    bridge.execute().unwrap();
+        // 执行Lua代码
+        bridge.execute().unwrap();
 
 
-    // 测试调用函数
-    let sum: String = bridge.call_function("generateName", ("11", 22)).unwrap();
-    println!("{}", sum);
+        // 测试调用函数
+        let sum: String = bridge.call_function("generateName", ("11", 22)).unwrap();
+        println!("{}", sum);
+    }
 }
