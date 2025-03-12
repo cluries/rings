@@ -175,8 +175,47 @@ impl Content {
     }
 
     pub async fn tail_lines(&self, lines: usize) -> Result<Vec<String>, erx::Erx> {
-        //TODO
-        Ok(vec![])
+        let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+        let file_size = fd.metadata().await.map_err(erx::smp)?.len();
+        let mut reader = tokio::io::BufReader::new(fd);
+
+        // Use a circular buffer to store the last N lines
+        let mut line_buffer = Vec::with_capacity(lines);
+        let current_line = String::new();
+
+
+        // For very large files, read in chunks from the end
+        let chunk_size: usize = if lines < 16 { 2 } else if lines < 32 { 4 } else { 8 } * 1024;
+
+        let mut buffer = vec![0; chunk_size];
+        let mut position = file_size;
+        let mut found_lines = 0;
+
+        while position > 0 && found_lines < lines {
+            let read_size = std::cmp::min(chunk_size, position as usize);
+            position = position.saturating_sub(read_size as u64);
+
+            // Seek to the current position
+            reader.seek(std::io::SeekFrom::Start(position)).await.map_err(erx::smp)?;
+            let bytes_read = reader.read_exact(&mut buffer[..read_size]).await.map_err(erx::smp)?;
+
+            // Convert chunk to string and process lines in reverse
+            let chunk = String::from_utf8_lossy(&buffer[..bytes_read]);
+            let mut chunk_lines: Vec<&str> = chunk.lines().collect();
+            chunk_lines.reverse();
+
+            for line in chunk_lines {
+                if found_lines >= lines {
+                    break;
+                }
+                line_buffer.push(line.to_string());
+                found_lines += 1;
+            }
+        }
+
+        // Reverse the lines to maintain correct order
+        line_buffer.reverse();
+        Ok(line_buffer)
     }
 
 
@@ -258,7 +297,7 @@ mod tests {
     async fn test_tail_string() {
         let cargo = ts::project_dir().join("Cargo.toml").to_str().unwrap_or_default().to_string();
 
-        // println!("{:?}", Content(cargo).tail_lines(2).await.unwrap_or_default().join("\n"));
-        println!("{}", Content(cargo).tail_string(120).await.unwrap());
+        println!("{:?}", Content(cargo).tail_lines(2).await.unwrap_or_default());
+        // println!("{}", Content(cargo).tail_string(120).await.unwrap());
     }
 }
