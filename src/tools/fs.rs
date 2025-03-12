@@ -1,5 +1,5 @@
 use serde::de::DeserializeOwned;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 use crate::erx;
 use std::env;
@@ -102,9 +102,7 @@ impl Directory {
 
         while let Some(entry) = dir.next_entry().await.map_err(erx::smp)? {
             let ft = entry.file_type().await.map_err(erx::smp)?;
-            if (((1 << Self::BIT_FILE) & focus) != 0 && ft.is_file())
-                || (((1 << Self::BIT_DIR) & focus) != 0 && ft.is_dir())
-                || (((1 << Self::BIT_SYMLINK) & focus) != 0 && ft.is_symlink()) {
+            if (((1 << Self::BIT_FILE) & focus) != 0 && ft.is_file()) || (((1 << Self::BIT_DIR) & focus) != 0 && ft.is_dir()) || (((1 << Self::BIT_SYMLINK) & focus) != 0 && ft.is_symlink()) {
                 results.push(entry.file_name().to_string_lossy().into_owned());
             }
         }
@@ -128,10 +126,23 @@ impl Content {
 
 
     pub async fn head_lines(&self, lines: usize) -> Result<Vec<String>, erx::Erx> {
-        let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+        let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+        let mut reader = tokio::io::BufReader::new(fd);
+        let mut line = String::new();
         let mut result = Vec::new();
-        
-        
+        let mut count = 0;
+
+        while count < lines {
+            match reader.read_line(&mut line).await {
+                Ok(0) => break, // EOF reached
+                Ok(_) => {
+                    result.push(line.trim_end().to_string());
+                    count += 1;
+                    line.clear();
+                }
+                Err(e) => return Err(erx::smp(e)),
+            }
+        }
 
         Ok(result)
     }
@@ -144,21 +155,99 @@ impl Content {
 
 
     pub async fn tail(&self, size: usize) -> Result<Vec<u8>, erx::Erx> {
-        //TOD 补全
-
         let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
-        let mut buffer = vec![0; size];
+        let metadata = fd.metadata().await.map_err(erx::smp)?;
+        let file_size = metadata.len();
 
-        let len = fd.metadata().await.map_err(erx::smp)?.len();
-        if len>size as u64 {
-            fd.seek(len-size).await.map_err(erx::smp)?;
-        }  
-        
-        fd.read_to_end(&mut buffer).await.map_err(erx::smp)?;
+        if size as u64 > file_size {
+            // If requested size is larger than file size, read entire file
+            let mut buffer = Vec::new();
+            fd.read_to_end(&mut buffer).await.map_err(erx::smp)?;
+            return Ok(buffer);
+        }
+
+        // Seek to position where we should start reading
+        fd.seek(std::io::SeekFrom::End(-(size as i64))).await.map_err(erx::smp)?;
+
+        let mut buffer = vec![0; size];
+        fd.read_exact(&mut buffer).await.map_err(erx::smp)?;
+        Ok(buffer)
     }
 
     pub async fn tail_lines(&self, lines: usize) -> Result<Vec<String>, erx::Erx> {
-        //TOD 补全
+        let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+        let metadata = fd.metadata().await.map_err(erx::smp)?;
+        let file_size = metadata.len();
+
+        // Use a 64KB buffer for reading
+        const BUFFER_SIZE: usize = 64 * 1024;
+        let mut reader = tokio::io::BufReader::with_capacity(BUFFER_SIZE, fd);
+        let mut line_positions = Vec::new();
+        let mut buffer = Vec::new();
+        let mut current_pos: u64 = 0;
+
+        // Read from end of file in chunks
+        while current_pos < file_size {
+            let seek_pos = if file_size - current_pos >= BUFFER_SIZE as u64 {
+                file_size - current_pos - BUFFER_SIZE as u64
+            } else {
+                0
+            };
+
+            reader.seek(std::io::SeekFrom::Start(seek_pos)).await.map_err(erx::smp)?;
+            buffer.clear();
+            let bytes_read = reader.read_until(b'\n', &mut buffer).await.map_err(erx::smp)?;
+
+            if bytes_read == 0 {
+                break;
+            }
+
+            // Find all newline positions in the current buffer
+            let mut pos = bytes_read - 1;
+            while pos > 0 {
+                if buffer[pos] == b'\n' {
+                    line_positions.push(seek_pos + pos as u64);
+                }
+                pos -= 1;
+            }
+
+            if line_positions.len() >= lines {
+                break;
+            }
+
+            current_pos += bytes_read as u64;
+            if seek_pos == 0 {
+                break;
+            }
+        }
+
+        // Get the last 'lines' number of lines
+        let mut result = Vec::new();
+        let start_pos = if line_positions.len() > lines {
+            line_positions.len() - lines
+        } else {
+            0
+        };
+
+        // Read the actual lines
+        reader.seek(std::io::SeekFrom::Start(0)).await.map_err(erx::smp)?;
+        let mut line = String::new();
+        let mut current_line = 0;
+
+        while let Ok(bytes) = reader.read_line(&mut line).await {
+            if bytes == 0 {
+                break;
+            }
+
+            if current_line >= start_pos {
+                result.push(line.trim_end().to_string());
+            }
+
+            line.clear();
+            current_line += 1;
+        }
+
+        Ok(result.into_iter().take(lines).collect())
     }
 
 
@@ -180,7 +269,7 @@ impl Content {
         fd.read_to_string(&mut buffer).await.map_err(erx::smp)?;
         Ok(buffer.lines().map(|s| s.to_string()).collect())
     }
-    
+
     pub async fn utf8_string(&self) -> Result<String, erx::Erx> {
         let v8 = self.vec8().await?;
         Ok(String::from_utf8_lossy(&v8).into_owned())
@@ -219,7 +308,6 @@ impl Content {
         let json = serde_json::to_string(obj).map_err(erx::smp)?;
         self.write(&json).await
     }
-    
 }
 
 
