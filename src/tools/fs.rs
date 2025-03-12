@@ -185,7 +185,7 @@ impl Content {
 
 
         // For very large files, read in chunks from the end
-        let chunk_size: usize = if lines < 16 { 2 } else if lines < 32 { 4 } else { 8 } * 1024;
+        let chunk_size: usize = (lines / 32).clamp(2, 16) * 1024;
 
         let mut buffer = vec![0; chunk_size];
         let mut position = file_size;
