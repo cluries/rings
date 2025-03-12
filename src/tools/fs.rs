@@ -175,79 +175,8 @@ impl Content {
     }
 
     pub async fn tail_lines(&self, lines: usize) -> Result<Vec<String>, erx::Erx> {
-        let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
-        let metadata = fd.metadata().await.map_err(erx::smp)?;
-        let file_size = metadata.len();
-
-        // Use a 64KB buffer for reading
-        const BUFFER_SIZE: usize = 64 * 1024;
-        let mut reader = tokio::io::BufReader::with_capacity(BUFFER_SIZE, fd);
-        let mut line_positions = Vec::new();
-        let mut buffer = Vec::new();
-        let mut current_pos: u64 = 0;
-
-        // Read from end of file in chunks
-        while current_pos < file_size {
-            let seek_pos = if file_size - current_pos >= BUFFER_SIZE as u64 {
-                file_size - current_pos - BUFFER_SIZE as u64
-            } else {
-                0
-            };
-
-            reader.seek(std::io::SeekFrom::Start(seek_pos)).await.map_err(erx::smp)?;
-            buffer.clear();
-            let bytes_read = reader.read_until(b'\n', &mut buffer).await.map_err(erx::smp)?;
-
-            if bytes_read == 0 {
-                break;
-            }
-
-            // Find all newline positions in the current buffer
-            let mut pos = bytes_read - 1;
-            while pos > 0 {
-                if buffer[pos] == b'\n' {
-                    line_positions.push(seek_pos + pos as u64);
-                }
-                pos -= 1;
-            }
-
-            if line_positions.len() >= lines {
-                break;
-            }
-
-            current_pos += bytes_read as u64;
-            if seek_pos == 0 {
-                break;
-            }
-        }
-
-        // Get the last 'lines' number of lines
-        let mut result = Vec::new();
-        let start_pos = if line_positions.len() > lines {
-            line_positions.len() - lines
-        } else {
-            0
-        };
-
-        // Read the actual lines
-        reader.seek(std::io::SeekFrom::Start(0)).await.map_err(erx::smp)?;
-        let mut line = String::new();
-        let mut current_line = 0;
-
-        while let Ok(bytes) = reader.read_line(&mut line).await {
-            if bytes == 0 {
-                break;
-            }
-
-            if current_line >= start_pos {
-                result.push(line.trim_end().to_string());
-            }
-
-            line.clear();
-            current_line += 1;
-        }
-
-        Ok(result.into_iter().take(lines).collect())
+        //TODO
+        Ok(vec![])
     }
 
 
@@ -314,6 +243,7 @@ impl Content {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::tests::tools as ts;
 
     #[test]
     fn test_join_path() {
@@ -322,5 +252,13 @@ mod tests {
         ]);
 
         println!("{:?}", c);
+    }
+
+    #[tokio::test]
+    async fn test_tail_string() {
+        let cargo = ts::project_dir().join("Cargo.toml").to_str().unwrap_or_default().to_string();
+
+        // println!("{:?}", Content(cargo).tail_lines(2).await.unwrap_or_default().join("\n"));
+        println!("{}", Content(cargo).tail_string(120).await.unwrap());
     }
 }
