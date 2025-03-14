@@ -5,6 +5,7 @@ use mlua::{
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+
 pub struct LuaBridge {
     code: String,
     lua: Arc<Mutex<LuaLua>>,
@@ -29,11 +30,10 @@ impl LuaBridge {
     where
         F: Fn(&LuaLua) -> mlua::Result<LuaFunction> + Send + Sync + 'static,
     {
-        let _ = self.rust_functions
+        self.rust_functions
             .try_lock()
             .map_err(re)?
-            .insert(name.into(), Box::new(func))
-            .ok_or(re(format!("unable register rust function: {}", name)))?;
+            .insert(name.into(), Box::new(func));
         Ok(())
     }
 
@@ -90,22 +90,30 @@ mod tests {
         let lua_code = std::fs::read_to_string(stools::src_dir().join("tools/lua.lua").to_str().unwrap()).unwrap();
         let mut bridge = LuaBridge::new(lua_code);
 
-        let _ = bridge.register_function("test_func", |lua| {
+        let c = bridge.register_function("test_func", |lua| {
             lua.create_function(|_, (a, b): (i64, i64)| {
                 let a = a + 200;
                 let r = a * 2 + b;
+
 
                 Ok(format!("{} + {} + 2", get_name(), r))
             })
         });
 
 
+        c.unwrap();
+
+        // bridge.set_global("counter", 100).expect("TODO: panic message");
+
         // 执行Lua代码
         bridge.execute().unwrap();
 
 
         // 测试调用函数
-        let sum: String = bridge.call_function("generateName", ("11", 22)).unwrap();
-        println!("{}", sum);
+        for _ in 0..10 {
+            let sum: String = bridge.call_function("generateName", ("11", 22)).unwrap();
+            // bridge.set_global("counter", 100).expect("TODO: panic message");
+            println!("{}", sum);
+        }
     }
 }
