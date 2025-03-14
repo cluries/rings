@@ -22,6 +22,7 @@ use axum::Router;
 use std::sync::{Arc, RwLock};
 use tower_http::validate_request::ValidateRequestHeaderLayer;
 use tracing::{error, info};
+use crate::web::luaction::{LuaAction};
 
 #[macro_export]
 macro_rules! web_route_merge {
@@ -47,6 +48,7 @@ pub struct Web {
     bind: String,
     router: Router,
     stage: SafeRS,
+    luactions: Arc<RwLock<Vec<LuaAction>>>,
     routes_maker: fn() -> Vec<Router>,
     pub extra_router_config: Option<fn(router: Router) -> Router>,
 }
@@ -57,6 +59,7 @@ pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>) -> We
         bind: bind.to_string(),
         router: Router::default(),
         stage: RingState::srs_init(),
+        luactions: Default::default(),
         routes_maker: router_maker,
         extra_router_config: None,
     }
@@ -79,6 +82,8 @@ impl Web {
         if let Some(extra) = self.extra_router_config {
             router = extra(router);
         }
+
+        if self.luactions.read().unwrap().is_empty() {}
 
         self.router = router
     }

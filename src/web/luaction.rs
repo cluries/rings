@@ -5,9 +5,7 @@ pub struct LuaAction {
     init: Option<Box<dyn Fn()>>,
 }
 
-pub struct LuaActionContext {
-    
-}
+pub struct LuaActionContext {}
 
 
 impl LuaAction {
@@ -24,4 +22,6 @@ impl LuaActionContext {
     }
 }
 
+unsafe impl Sync for LuaAction {}
+unsafe impl Send for LuaAction {}
 
