@@ -83,6 +83,14 @@ impl Web {
             router = extra(router);
         }
 
+        let luactions = self.luactions.read().expect("luactions lock poisoned");
+        if luactions.len() > 0 {
+            info!("lua action found. adding lua [{}] actions", luactions.len());
+            for luaction in luactions.iter() {
+                router = router.merge(luaction.route());
+            }
+        }
+
         if self.luactions.read().unwrap().is_empty() {}
 
         self.router = router

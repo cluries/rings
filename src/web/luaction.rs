@@ -1,19 +1,38 @@
+use crate::tools::fs;
+// lua use  action_get_home, action_post_auth, action_put_update
 pub struct LuaAction {
-    methods: Vec<crate::web::define::HttpMethod>,
-    code: String,
-
-    init: Option<Box<dyn Fn()>>,
+    prefix: String,  // URL Prefix
+    scripts_location: String, // Lua scripts location
 }
+
+
+async fn a() {}
 
 pub struct LuaActionContext {}
 
 
 impl LuaAction {
-    pub fn new(methods: Vec<crate::web::define::HttpMethod>, code: String) -> LuaAction {
-        Self { methods, code, init: None }
+    pub async fn new(prefix: String, scripts_location: String) -> LuaAction {
+        if prefix.ends_with("*") {
+            panic!("prefix must not end with '*'");
+        }
+
+
+        let path = fs::join_path(vec![fs::working_dir().unwrap().to_str().unwrap(), scripts_location.as_str()]);
+        if !fs::Is(path.clone()).dir().await {
+            panic!("cannot read scripts dir: {}", path);
+        }
+
+
+        Self { prefix, scripts_location }
     }
 
-    pub fn run(&mut self) {}
+    pub fn route(&self) -> axum::Router {
+        let pattern = &format!("{}*", self.prefix);
+        axum::Router::new().route(pattern, axum::routing::any(a))
+    }
+
+    pub fn load(&mut self) {}
 }
 
 impl LuaActionContext {
