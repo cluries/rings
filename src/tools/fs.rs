@@ -181,7 +181,6 @@ impl Content {
 
         // Use a circular buffer to store the last N lines
         let mut line_buffer = Vec::with_capacity(lines);
-        let current_line = String::new();
 
 
         // For very large files, read in chunks from the end
@@ -275,6 +274,31 @@ impl Content {
     pub async fn write_json<T: serde::Serialize>(&self, obj: &T) -> Result<(), erx::Erx> {
         let json = serde_json::to_string(obj).map_err(erx::smp)?;
         self.write(&json).await
+    }
+}
+
+impl Into<Directory> for Is {
+    fn into(self) -> Directory {
+        Directory(self.0)
+    }
+}
+
+
+impl From<Directory> for Is {
+    fn from(dir: Directory) -> Self {
+        Is(dir.0)
+    }
+}
+
+impl Into<Content> for Is {
+    fn into(self) -> Content {
+        Content(self.0)
+    }
+}
+
+impl From<Content> for Is {
+    fn from(content: Content) -> Self {
+        Is(content.0)
     }
 }
 
