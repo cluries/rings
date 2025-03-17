@@ -1,9 +1,9 @@
-use redis::AsyncCommands;
 use crate::erx::{Erx, Layouted, LayoutedC};
 use crate::tools::hash;
 use crate::web::api::Out;
 use crate::web::request::clone_request;
 use crate::web::url::parse_query;
+use redis::AsyncCommands;
 
 use crate::erx;
 use axum::response::IntoResponse;
@@ -14,7 +14,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use futures_util::TryFutureExt;
 use tower::{Layer, Service};
 use tracing::info;
 
@@ -25,7 +24,7 @@ fn make_code(detail: &str) -> LayoutedC {
 }
 
 
-macro_rules! make_err_res {
+macro_rules! rout {
     ($x:expr) => {
         Out::<()>{
             code: make_code($x).into(),
@@ -107,31 +106,31 @@ impl Signator {
         let (payload_request, mut request) = clone_request(request).await;
         let payload = Payload::from_request(payload_request).await;
         if let Err(error) = payload {
-            return Err(make_err_res!("PASE", error));
+            return Err(rout!("PALD", error));
         }
 
         let payload = payload.unwrap();
         if let Err(reason) = payload.guard() {
-            return Err(make_err_res!("FMAT", reason.to_string()));
+            return Err(rout!("FMAT", reason.to_string()));
         }
 
         let loader = Arc::clone(&self.key_loader);
         let key = match loader(payload.val_xu()).await {
             Ok(key) => key,
             Err(erx) => {
-                return Err(make_err_res!("LDKY", erx.message().to_string()));
+                return Err(rout!("LOAD", erx.message_string()));
             }
         };
 
         if let Err((error, debug)) = payload.valid(key) {
             let skip = !self.rear.is_empty() && self.rear.eq(&payload.val_ds());
             if !skip {
-                return Err(make_err_res!("INVD", error, debug));
+                return Err(rout!("INVD", error, debug));
             }
         }
 
         if let Err(reason) = self.rand_guard(payload.val_xu(), payload.val_xr()).await {
-            return Err(make_err_res!("RAND", reason.message_string()));
+            return Err(rout!("RAND", reason.message_string()));
         }
 
         use crate::web::context::Context;
@@ -151,7 +150,6 @@ impl Signator {
         if (current - score).abs() < self.nonce_lifetime {
             return Err("duplicate rand value".into());
         }
-
 
         let mut pipe = redis::pipe();
         pipe.zadd(name.as_str(), xr.as_str(), current);
@@ -211,10 +209,7 @@ where
 
 impl<S> Service<axum::extract::Request> for SigMiddle<S>
 where
-    S: Service<axum::extract::Request, Response=axum::response::Response>
-    + Send
-    + Clone
-    + 'static,
+    S: Service<axum::extract::Request, Response=axum::response::Response> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
     type Response = S::Response;
@@ -303,29 +298,23 @@ impl Payload {
 
         use crate::web::define::HttpMethod;
 
-        let body_guard = HttpMethod::POST.is(method)
-            || HttpMethod::PUT.is(method)
-            || HttpMethod::DELETE.is(method)
-            || HttpMethod::OPTIONS.is(method)
-            || HttpMethod::PATCH.is(method)
-            || HttpMethod::PATCH.is(method);
+        let body_guard = HttpMethod::POST.is(method) || HttpMethod::PUT.is(method) || HttpMethod::DELETE.is(method) || HttpMethod::OPTIONS.is(method) || HttpMethod::PATCH.is(method) || HttpMethod::PATCH.is(method);
 
         if body_guard {
             const LIMIT: usize = 1024 * 1024 * 32;
-            let body: Result<serde_json::Value, String> =
-                match axum::body::to_bytes(body, LIMIT).await {
-                    Ok(bytes) => {
-                        if bytes.len() < 1 {
-                            Ok(serde_json::Value::default())
-                        } else {
-                            match serde_json::from_slice::<serde_json::Value>(&bytes) {
-                                Ok(json) => Ok(json),
-                                Err(err) => Err(err.to_string()),
-                            }
+            let body: Result<serde_json::Value, String> = match axum::body::to_bytes(body, LIMIT).await {
+                Ok(bytes) => {
+                    if bytes.len() < 1 {
+                        Ok(serde_json::Value::default())
+                    } else {
+                        match serde_json::from_slice::<serde_json::Value>(&bytes) {
+                            Ok(json) => Ok(json),
+                            Err(err) => Err(err.to_string()),
                         }
                     }
-                    Err(err) => Err(err.to_string()),
-                };
+                }
+                Err(err) => Err(err.to_string()),
+            };
 
             if let Err(err) = body {
                 return Err(err);

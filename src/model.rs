@@ -2,9 +2,9 @@ pub mod conf;
 pub mod sql;
 pub mod status;
 pub mod kv;
-mod nullable;
 pub mod zero;
 pub mod preset;
+pub mod jq;
 
 use crate::erx;
 
@@ -56,15 +56,16 @@ pub fn shared_must() -> &'static DatabaseConnection {
     SHARED_DB_CONNECTION.get().expect("SHARED_DB_CONNECTION get failed")
 }
 
+/// get shared DatabaseConnection
 pub fn shared() -> erx::ResultE<&'static DatabaseConnection> {
     SHARED_DB_CONNECTION.get().ok_or("SHARED_DB_CONNECTION get failed".into())
 }
 
 
-// For async connections, connection pooling isn't necessary, unless blocking commands are used.
-// The MultiplexedConnection is cloneable and can be used safely from multiple threads, so a single connection can be easily reused.
-// For automatic reconnections consider using ConnectionManager with the connection-manager feature.
-// Async cluster connections also don't require pooling and are thread-safe and reusable.
+/// For async connections, connection pooling isn't necessary, unless blocking commands are used.
+/// The MultiplexedConnection is cloneable and can be used safely from multiple threads, so a single connection can be easily reused.
+/// For automatic reconnections consider using ConnectionManager with the connection-manager feature.
+/// Async cluster connections also don't require pooling and are thread-safe and reusable.
 pub fn make_redis_client() -> erx::ResultE<redis::Client> {
     let s = SHARED_REDIS_CONNECT_STRING.read().map_err(erx::smp)?.clone();
     redis::Client::open(s).map_err(erx::smp)
@@ -146,18 +147,7 @@ pub async fn new_database_connection(backend: &Backend) -> DatabaseConnection {
 
     use log;
 
-    opt.max_connections(MAX_CONNECTIONS)
-        .min_connections(MIN_CONNECTIONS)
-        .connect_timeout(CONNECT_TIMEOUT)
-        .acquire_timeout(ACQUIRE_TIMEOUT)
-        .idle_timeout(IDLE_TIMEOUT)
-        .max_lifetime(MAX_LIFETIME)
-        .connect_lazy(false)
-        .sqlx_logging(true)
-        .sqlx_logging_level(log::LevelFilter::Info)
-        .sqlx_logging(true)
-        .sqlx_logging_level(log::LevelFilter::Info)
-        .sqlx_slow_statements_logging_settings(log::LevelFilter::Warn, Duration::from_secs(2));
+    opt.max_connections(MAX_CONNECTIONS).min_connections(MIN_CONNECTIONS).connect_timeout(CONNECT_TIMEOUT).acquire_timeout(ACQUIRE_TIMEOUT).idle_timeout(IDLE_TIMEOUT).max_lifetime(MAX_LIFETIME).connect_lazy(false).sqlx_logging(true).sqlx_logging_level(log::LevelFilter::Info).sqlx_logging(true).sqlx_logging_level(log::LevelFilter::Info).sqlx_slow_statements_logging_settings(log::LevelFilter::Warn, Duration::from_secs(2));
 
     if backend.kind == BackendKind::Postgres && connection_string.contains("currentSchema") {
         let params = url::parse_url_query(connection_string.as_str());
