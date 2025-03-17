@@ -10,16 +10,17 @@ use crate::erx;
 
 use redis;
 
-use deadpool_redis::{
-    redis::{
-        cmd as DeadPRCmd,
-        FromRedisValue,
-    },
-    Config as DeadPConfig,
-    Runtime as DeadPRuntime,
-};
 
-use futures_util::TryFutureExt;
+// use deadpool_redis::{
+//     redis::{
+//         FromRedisValue,
+//     },
+//     Config as DeadPConfig,
+//     Runtime as DeadPRuntime,
+// };
+
+// use futures_util::TryFutureExt;
+
 use std::sync::RwLock;
 use std::time::Duration;
 use tokio::sync::OnceCell;
@@ -39,7 +40,7 @@ static SHARED_DB_CONNECTION: OnceCell<DatabaseConnection> = OnceCell::const_new(
 
 static SHARED_REDIS_CONNECT_STRING: RwLock<String> = RwLock::new(String::new());
 
-static SHARED_REDIS_POOL: OnceCell<deadpool_redis::Pool> = OnceCell::const_new();
+// static SHARED_REDIS_POOL: OnceCell<deadpool_redis::Pool> = OnceCell::const_new();
 
 
 pub type DBResult<T> = erx::ResultE<T>;
@@ -59,23 +60,27 @@ pub fn shared() -> erx::ResultE<&'static DatabaseConnection> {
     SHARED_DB_CONNECTION.get().ok_or("SHARED_DB_CONNECTION get failed".into())
 }
 
+
+// For async connections, connection pooling isn't necessary, unless blocking commands are used.
+// The MultiplexedConnection is cloneable and can be used safely from multiple threads, so a single connection can be easily reused.
+// For automatic reconnections consider using ConnectionManager with the connection-manager feature.
+// Async cluster connections also don't require pooling and are thread-safe and reusable.
 pub fn make_redis_client() -> erx::ResultE<redis::Client> {
     let s = SHARED_REDIS_CONNECT_STRING.read().map_err(erx::smp)?.clone();
-
     redis::Client::open(s).map_err(erx::smp)
 }
 
 
 // get redis connection from pool
-pub async fn get_redis_client() -> erx::ResultE<deadpool_redis::Connection> {
-    let pool = SHARED_REDIS_POOL.get_or_init(|| async {
-        deadpool_redis::Config::from_url(SHARED_REDIS_CONNECT_STRING.read().unwrap().clone())
-            .create_pool(Some(DeadPRuntime::Tokio1))
-            .unwrap()
-    }).await;
-
-    Ok(pool.get().await.map_err(erx::smp)?)
-}
+// pub async fn get_redis_client() -> erx::ResultE<deadpool_redis::Connection> {
+//     let pool = SHARED_REDIS_POOL.get_or_init(|| async {
+//         deadpool_redis::Config::from_url(SHARED_REDIS_CONNECT_STRING.read().unwrap().clone())
+//             .create_pool(Some(DeadPRuntime::Tokio1))
+//             .unwrap()
+//     }).await;
+//
+//     Ok(pool.get().await.map_err(erx::smp)?)
+// }
 
 
 pub async fn initialize_model_connection(backends: &Vec<Backend>) {
