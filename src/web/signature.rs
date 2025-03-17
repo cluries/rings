@@ -1,3 +1,4 @@
+use redis::AsyncCommands;
 use crate::erx::{Erx, Layouted, LayoutedC};
 use crate::tools::hash;
 use crate::web::api::Out;
@@ -7,13 +8,13 @@ use crate::web::url::parse_query;
 use crate::erx;
 use axum::response::IntoResponse;
 use futures_util::future::BoxFuture;
-use redis::Commands;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use futures_util::TryFutureExt;
 use tower::{Layer, Service};
 use tracing::info;
 
@@ -141,21 +142,22 @@ impl Signator {
     }
 
     async fn rand_guard(&self, xu: String, xr: String) -> erx::ResultEX {
-        let mut conn = self.redis_client.get_connection().map_err(erx::smp)?;
+        let mut conn = self.redis_client.get_multiplexed_tokio_connection().await.map_err(erx::smp)?;
 
         let name = format!("XR:{}", xu);
-        let score: i64 = conn.zscore(name.as_str(), xr.as_str()).unwrap_or(0);
+        let score: i64 = conn.zscore(name.as_str(), xr.as_str()).await.map_err(erx::smp)?;
         let current: i64 = chrono::Local::now().timestamp();
 
         if (current - score).abs() < self.nonce_lifetime {
             return Err("duplicate rand value".into());
         }
 
+
         let mut pipe = redis::pipe();
         pipe.zadd(name.as_str(), xr.as_str(), current);
         pipe.zrembyscore(name.as_str(), "-inf", current - self.nonce_lifetime);
         pipe.expire(name.as_str(), self.nonce_lifetime);
-        let _ = pipe.query::<Vec<i64>>(&mut conn);
+        let _r = pipe.query_async::<Vec<i64>>(&mut conn).await.map_err(erx::smp)?;
 
         Ok(())
     }
@@ -333,7 +335,7 @@ impl Payload {
 
         let method = method.to_uppercase().to_string();
         let payload = Payload { method, path, xu, xt, xr, xs, ds, queries, body: bd };
-        
+
         Ok(payload)
     }
 

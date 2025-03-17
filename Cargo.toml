@@ -28,7 +28,7 @@ ofb = { version = "0.6" }
 pem = { version = "3.0.5" }
 percent-encoding = { version = "2.3" }
 rand = { version = "0.8.5" }
-redis = { version = "0.29" }
+redis = { version = "0.29", features = ["tokio-comp"] }
 regex = { version = "1" }
 reqwest = { version = "0.12", features = ["json"] }
 rkyv = { version = "" }
