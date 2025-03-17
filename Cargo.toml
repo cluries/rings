@@ -7,6 +7,7 @@ edition = "2021"
 members = ["ringb", "ringm"]
 
 [workspace.dependencies]
+deadpool-redis = { version = "0.20", features = ["tokio-comp", "serde"] }
 aes = { version = "0.8" }
 async-openai = { version = "0.28.0" }
 async-trait = { version = "0.1" }
@@ -89,3 +90,4 @@ tracing-appender = { workspace = true }
 tracing-serde = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
+deadpool-redis = { workspace = true }
