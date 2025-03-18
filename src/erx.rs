@@ -1,15 +1,15 @@
+/// Layouted: 预设好的一些Layout快速方法
+/// ResultE<T> = Result<T, Erx>;
+/// ResultEX = ResultE<()>;
+/// fn smp<T: ToString>(error: T) -> Erx
+/// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
+
+
 use crate::conf;
 use lazy_static::lazy_static;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-
-// Layouted: 预设好的一些Layout快速方法
-// ResultE<T> = Result<T, Erx>;
-// ResultEX = ResultE<()>;
-// fn smp<T: ToString>(error: T) -> Erx
-// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
-//
 
 lazy_static! {
     static ref APP_SHORT: String = {
@@ -17,7 +17,10 @@ lazy_static! {
     };
 }
 
+/// ResultE<T> = Result<T, Erx>;
 pub type ResultE<T> = Result<T, Erx>;
+
+/// ResultEX = ResultE<()>;
 pub type ResultEX = ResultE<()>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,54 +50,75 @@ pub fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
     }
 }
 
+/// Fuzz: 模糊错误 
 pub static FUZZ: &str = "FUZZ";
+
+/// Common: 通用错误
 pub static COMM: &str = "COMM";
+
+/// Middleware: 中间件错误
 pub static MIDL: &str = "MIDL";
+
+/// Service: 服务错误
 pub static SERV: &str = "SERV";
+
+/// Model: 模型错误
 pub static MODE: &str = "MODE";
+
+/// Action: Action错误
 pub static ACTN: &str = "ACTN";
+
+/// Undefined: 未定义错误
 pub static UNDF: &str = "UNDF";
 
 pub struct Layouted;
 
 impl Layouted {
+
+    /// fuzz_udf: 模糊未定义错误
     pub fn fuzz_udf(detail: &str) -> LayoutedC {
         LayoutedC::new(FUZZ, UNDF, detail)
     }
 
+    /// fuzz: 模糊错误
     pub fn fuzz(category: &str, detail: &str) -> LayoutedC {
         LayoutedC::new(FUZZ, category, detail)
     }
 
+    /// common: 通用错误
     pub fn common(category: &str, detail: &str) -> LayoutedC {
         LayoutedC::new(COMM, category, detail)
     }
 
+    /// middleware: 中间件错误
     pub fn middleware(category: &str, detail: &str) -> LayoutedC {
         LayoutedC::new(MIDL, category, detail)
     }
 
+    /// service: 服务错误
     pub fn service(category: &str, detail: &str) -> LayoutedC {
         LayoutedC::new(SERV, category, detail)
     }
 
+    /// model: 模型错误
     pub fn model(category: &str, detail: &str) -> LayoutedC {
         LayoutedC::new(MODE, category, detail)
     }
 
+    /// action: Action错误
     pub fn action(category: &str, detail: &str) -> LayoutedC {
         LayoutedC::new(ACTN, category, detail)
     }
 }
 
 
-// Code code format
-// aaaa-xxxx-yyyy-zzzz
-//
-//	aaaa : 应用标示，建议4位长度
-//	xxxx : 单词字母，建议4位长度，用于区分大类（功能域）
-//	yyyy : 字母或者数字，建议4位长度，用于区分子类
-//	zzzz : 字母或者数字，建议4位长度，具体错误
+/// Code code format
+/// aaaa-xxxx-yyyy-zzzz
+///
+///	aaaa : 应用标示，建议4位长度
+///	xxxx : 单词字母，建议4位长度，用于区分大类（功能域）
+///	yyyy : 字母或者数字，建议4位长度，用于区分子类
+///	zzzz : 字母或者数字，建议4位长度，具体错误
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LayoutedC {
     application: String,

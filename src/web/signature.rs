@@ -1,3 +1,6 @@
+/// signature.rs:
+/// an api middleware for signature
+
 use crate::erx::{Erx, Layouted, LayoutedC};
 use crate::tools::hash;
 use crate::web::api::Out;

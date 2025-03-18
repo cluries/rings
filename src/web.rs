@@ -24,6 +24,7 @@ use tower_http::validate_request::ValidateRequestHeaderLayer;
 use tracing::{error, info};
 use crate::web::luaction::{LuaAction};
 
+/// merge web routes
 #[macro_export]
 macro_rules! web_route_merge {
     ( $( $x:expr ),* ) => {

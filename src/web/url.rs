@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use tracing::error;
 
-pub fn join(base:&str, other:&str)->String{
 
+/// Join two url path
+pub fn join(base:&str, other:&str)->String{
     let be = base.ends_with("/");
     let os = other.starts_with("/");
     if be && os{
@@ -16,16 +17,21 @@ pub fn join(base:&str, other:&str)->String{
     format!("{}{}", base, other)
 }
 
+/// Url encode
 pub fn url_encode(val: &str) -> String {
     // percent_encoding::utf8_percent_encode(val, percent_encoding::NON_ALPHANUMERIC).collect()
     url::form_urlencoded::byte_serialize(val.as_bytes()).collect::<String>()
 }
 
-//
+/// Url decode
 pub fn url_decode(val: &str) -> String {
     percent_encoding::percent_decode(val.as_bytes()).decode_utf8().unwrap_or_default().into()
 }
 
+/// Parse url query string, return a hashmap
+/// all value will be decoded to string
+/// url must be a valid url
+/// then get the query string and parse it
 pub fn parse_url_query(url: &str) -> HashMap<String, String> {
     match url::Url::parse(url) {
         Ok(url) => {
@@ -39,7 +45,9 @@ pub fn parse_url_query(url: &str) -> HashMap<String, String> {
     }
 }
 
-// parse querystring
+/// Parse query string, return a hashmap
+/// it's different from parse_url_query, because it's not url
+/// 
 pub fn parse_query(query: &str) -> HashMap<String, String> {
     // let query = query.trim();
     // if query.is_empty() {

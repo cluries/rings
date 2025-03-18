@@ -5,6 +5,7 @@ use tokio_cron_scheduler::JobScheduler;
 use tracing::{error, info, warn};
 use crate::service::{ServiceTrait, ServiceManager};
 
+/// SchedulerManager
 pub struct SchedulerManager {
     stage: Arc<RwLock<RingState>>,
     count: u64,

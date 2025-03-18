@@ -1,3 +1,12 @@
+///  struct GetDefault;
+///  struct GetOption;
+///  struct Has;
+///  
+///  fn settings() -> &'static RwLock<Config> 
+///  fn rebit() -> &'static RwLock<Rebit>
+///  
+///  struct Rebit
+
 use std::cmp::PartialEq;
 use std::fmt;
 use std::str::FromStr;
@@ -6,12 +15,13 @@ use config::Config;
 use serde_derive::{Deserialize, Serialize};
 
 
+/// get settings
 pub fn settings() -> &'static RwLock<Config> {
     static CONFIG: OnceLock<RwLock<Config>> = OnceLock::new();
     CONFIG.get_or_init(|| RwLock::new(init_config()))
 }
 
-
+/// get rebit instance
 pub fn rebit() -> &'static RwLock<Rebit> {
     static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
     REBIT.get_or_init(||
@@ -67,7 +77,7 @@ fn init_config() -> Config {
 }
 
 
-
+/// make getter for settings, if not found, return default value    
 macro_rules! make_setting_getter_default {
     ($name:ident, $type:ty, $getter:ident) => {
         pub fn $name(k: &str, default: $type) -> $type {
@@ -80,6 +90,7 @@ macro_rules! make_setting_getter_default {
     };
 }
 
+/// make getter for settings, return Option value
 macro_rules! make_setting_getter_option {
     ($name:ident, $type:ty, $getter:ident) => {
         pub fn $name(k: &str) -> Option<$type> {
@@ -92,7 +103,7 @@ macro_rules! make_setting_getter_option {
     };
 }
 
-
+/// make getter for settings
 macro_rules! make_setting_getter {
     ($name:ident, $type:ty, $getter:ident) => {
         impl GetDefault {

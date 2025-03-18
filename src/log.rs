@@ -3,6 +3,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 
+/// Discard is a writer that discards all data written to it.
 struct Discard;
 
 impl std::io::Write for Discard {
@@ -28,7 +29,7 @@ pub async fn logging_initialize() { //-> Vec<WorkerGuard> {
     }
 
 
-    let rebit = crate::conf::rebit().read().unwrap();
+    let rebit = crate::conf::rebit().read().expect("conf::rebit is not initialized");
     let app_name = rebit.name.clone();
     let log_conf = match &rebit.log {
         None => Default::default(),
@@ -52,7 +53,7 @@ pub async fn logging_initialize() { //-> Vec<WorkerGuard> {
         guards.push(guard);
         console_reload.reload(
             tracing_subscriber::fmt::layer().with_writer(writer).with_ansi(true)
-        ).unwrap();
+        ).expect("console reload failed");
     }
 
     let logs_dir = log_conf.dirs.trim();
@@ -69,7 +70,7 @@ pub async fn logging_initialize() { //-> Vec<WorkerGuard> {
         guards.push(guard);
         persist_reload.reload(
             tracing_subscriber::fmt::layer().with_writer(writer).with_ansi(false)
-        ).unwrap();
+        ).expect("persist reload failed");
     }
 
     let directives: &str = &log_conf.level;

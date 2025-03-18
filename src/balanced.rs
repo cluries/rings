@@ -1,10 +1,9 @@
 use std::ops::IndexMut;
 use crate::erx;
 
-//
-// 一个不需要严谨的调度系统,不考虑线程安全等
-
-
+///
+/// 一个不需要严谨的调度系统,不考虑线程安全等
+/// 
 pub struct Balanced<T> {
     counter: u128,
     weights: Vec<Weighted<T>>,

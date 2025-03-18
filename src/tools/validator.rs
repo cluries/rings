@@ -4,6 +4,7 @@ pub struct Len;
 pub struct Num;
 pub struct Enc;
 
+
 impl Obj {
     pub fn defaults<T: Default + PartialEq>(val: &T) -> bool {
         *val == T::default()

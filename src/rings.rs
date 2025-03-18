@@ -5,20 +5,28 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tracing::{error, info, span};
 
+/// Rings Application
+/// RingsApplication = Arc<RwLock<Rings>>
 pub type RingsApplication = Arc<RwLock<Rings>>;
 
-
+/// Rings
 static RINGS: RwLock<Vec<RingsApplication>> = RwLock::new(Vec::new());
 
 
+/// Rings Application
 pub struct Rings {
+    /// Rings Name
     name: String,
+    /// Rings Mods
     mods: Vec<Box<dyn RingsMod>>,
+    /// Rings State
     state: Arc<RwLock<RingState>>,
+    /// Moments
     moments: Vec<Moment>,
 }
 
 
+/// Moment is a moment in time.
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Moment {
     name: String,
@@ -35,6 +43,14 @@ impl Moment {
 }
 
 
+/// Rings State
+/// RingState::Init => 1,
+/// RingState::Ready => 10,
+/// RingState::Working => 100,
+/// RingState::Paused => 9999,
+/// RingState::Terminating => -10,
+/// RingState::Terminated => -1,
+/// RingState::Unknown => 0,
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum RingState {
     Init,
@@ -46,7 +62,8 @@ pub enum RingState {
     Unknown,
 }
 
-//Ring Thread Safe State
+/// Ring Thread Safe State
+/// SafeRS = Arc<RwLock<RingState>>
 pub type SafeRS = Arc<RwLock<RingState>>;
 
 
@@ -134,6 +151,8 @@ pub trait RingsMod: crate::any::AnyTrait + Send + Sync {
 }
 
 
+/// R
+/// Just like namespace, call some rings methods
 pub struct R;
 impl R {
     pub fn instance(name: String) -> Result<RingsApplication, ()> {

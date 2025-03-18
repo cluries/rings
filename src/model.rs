@@ -4,11 +4,12 @@ pub mod status;
 pub mod kv;
 pub mod zero;
 pub mod preset;
-pub mod jq;
-
-use crate::erx;
+pub mod jsons;
+pub mod dbms;
+pub mod coffee;
 
 use redis;
+use crate::erx;
 
 
 // use deadpool_redis::{
@@ -19,39 +20,38 @@ use redis;
 //     Runtime as DeadPRuntime,
 // };
 
-// use futures_util::TryFutureExt;
-
 use std::sync::RwLock;
 use std::time::Duration;
 use tokio::sync::OnceCell;
 use tracing::{info, span, warn};
-
-
-use sea_orm::{
-    ConnectOptions,
-    Database,
-    DatabaseConnection,
-};
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
 use crate::conf::{Backend, BackendKind};
 use crate::web::url;
 
-static SHARED_DB_CONNECTION: OnceCell<DatabaseConnection> = OnceCell::const_new();
 
-static SHARED_REDIS_CONNECT_STRING: RwLock<String> = RwLock::new(String::new());
-
-// static SHARED_REDIS_POOL: OnceCell<deadpool_redis::Pool> = OnceCell::const_new();
-
-
+/// DBResult is a type alias for erx::ResultE<T> 
+/// actually it is Result<T, erx::Erx>
 pub type DBResult<T> = erx::ResultE<T>;
+
+/// DBResults is a type alias for erx::ResultE<Vec<T>>
+/// actually it is Result<Vec<T>, erx::Erx>
 pub type DBResults<T> = erx::ResultE<Vec<T>>;
 
+
+/// DBResultsRelated is a struct that contains results, total, offset
+/// designed for pagination results
+/// results: Vec<T> stored current page results
+/// total: usize stored total results matched query
+/// offset: usize stored offset
 pub struct DBResultsRelated<T> {
     results: Vec<T>,
     total: usize,
     offset: usize,
 }
 
+/// get shared DatabaseConnection
+/// panic if error
 pub fn shared_must() -> &'static DatabaseConnection {
     SHARED_DB_CONNECTION.get().expect("SHARED_DB_CONNECTION get failed")
 }
@@ -84,6 +84,8 @@ pub fn make_redis_client() -> erx::ResultE<redis::Client> {
 // }
 
 
+/// initialize model connection
+/// call once when application initialized
 pub async fn initialize_model_connection(backends: &Vec<Backend>) {
     let span = span!(tracing::Level::INFO, "INITIALIZE MODEL");
     let _guard = span.enter();
@@ -124,6 +126,7 @@ pub async fn initialize_model_connection(backends: &Vec<Backend>) {
     }
 }
 
+/// new database connection
 pub async fn new_database_connection(backend: &Backend) -> DatabaseConnection {
     match backend.kind {
         BackendKind::Redis => {
@@ -174,3 +177,13 @@ impl<T> DBResultsRelated<T> {
     }
 }
 
+
+/// shared database connection
+static SHARED_DB_CONNECTION: OnceCell<DatabaseConnection> = OnceCell::const_new();
+
+/// shared redis connection string
+/// can be changed by code, for example, when config changed
+/// if change, please call make_redis_client() to get new client
+static SHARED_REDIS_CONNECT_STRING: RwLock<String> = RwLock::new(String::new());
+
+// static SHARED_REDIS_POOL: OnceCell<deadpool_redis::Pool> = OnceCell::const_new();

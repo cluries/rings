@@ -1,6 +1,7 @@
-/// JSON Query
+use crate::model::dbms::DBMS;
 
-pub trait JsonQueryable {
+ 
+pub trait JsonInquirer {
     /// Extract a JSON field value
     fn extract(&self, field: &str) -> String;
 
@@ -33,7 +34,7 @@ pub trait JsonQueryable {
 }
 
 
-pub trait JsonOperationable {
+pub trait JsonOperator {
     /// Set a JSON field value
     fn set(&self, field: &str, value: &str) -> String;
 
@@ -60,16 +61,12 @@ pub trait JsonOperationable {
 }
 
 
-pub enum DBMS {
-    Postgres,
-    MySQL,
-}
-
-impl JsonQueryable for DBMS {
+impl JsonInquirer for DBMS {
     fn extract(&self, field: &str) -> String {
         match self {
             DBMS::Postgres => format!("->> '{}'", field),
             DBMS::MySQL => format!("->>'$.{}'", field),
+            DBMS::SQLite => format!("json_extract(data, '$.{}')", field),
         }
     }
 
@@ -77,6 +74,7 @@ impl JsonQueryable for DBMS {
         match self {
             DBMS::Postgres => format!("->>'{}' ", field),
             DBMS::MySQL => format!("->>'$.{}'", field),
+            DBMS::SQLite => format!("json_extract(data, '$.{}')", field),
         }
     }
 
@@ -84,6 +82,7 @@ impl JsonQueryable for DBMS {
         match self {
             DBMS::Postgres => format!("->>'{}' ", field),
             DBMS::MySQL => format!("->>'$.{}'", field),
+            DBMS::SQLite => format!("CAST(json_extract(data, '$.{}') AS INTEGER)", field),
         }
     }
 
@@ -91,6 +90,7 @@ impl JsonQueryable for DBMS {
         match self {
             DBMS::Postgres => format!("#>'{}'", path),
             DBMS::MySQL => format!("->>'$.{}'", path),
+            DBMS::SQLite => format!("json_extract(data, '$.{}')", path),
         }
     }
 
@@ -98,6 +98,7 @@ impl JsonQueryable for DBMS {
         match self {
             DBMS::Postgres => format!("? '{}'", field),
             DBMS::MySQL => format!("JSON_CONTAINS_PATH(data, 'one', '$.{}')", field),
+            DBMS::SQLite => format!("json_type(data, '$.{}') IS NOT NULL", field),
         }
     }
 
@@ -105,6 +106,7 @@ impl JsonQueryable for DBMS {
         match self {
             DBMS::Postgres => format!("?& array[{}]", path),
             DBMS::MySQL => format!("JSON_CONTAINS_PATH(data, 'one', '$.{}')", path),
+            DBMS::SQLite => format!("json_type(data, '$.{}') IS NOT NULL", path),
         }
     }
 
@@ -112,6 +114,7 @@ impl JsonQueryable for DBMS {
         match self {
             DBMS::Postgres => String::from("json_object_keys"),
             DBMS::MySQL => String::from("JSON_KEYS"),
+            DBMS::SQLite => String::from("json_group_array(json_each.key)"),
         }
     }
 
@@ -119,6 +122,7 @@ impl JsonQueryable for DBMS {
         match self {
             DBMS::Postgres => String::from("json_array_length"),
             DBMS::MySQL => String::from("JSON_LENGTH"),
+            DBMS::SQLite => String::from("json_array_length(data)"),
         }
     }
 
@@ -132,6 +136,10 @@ impl JsonQueryable for DBMS {
                 let pairs_str: Vec<String> = pairs.iter().map(|(k, v)| format!("'{}', {}", k, v)).collect();
                 format!("JSON_OBJECT({})", pairs_str.join(", "))
             }
+            DBMS::SQLite => {
+                let pairs_str: Vec<String> = pairs.iter().map(|(k, v)| format!("'{}', {}", k, v)).collect();
+                format!("json_object({})", pairs_str.join(", "))
+            }
         }
     }
 
@@ -139,15 +147,18 @@ impl JsonQueryable for DBMS {
         match self {
             DBMS::Postgres => format!("json_build_array({})", elements.join(", ")),
             DBMS::MySQL => format!("JSON_ARRAY({})", elements.join(", ")),
+            DBMS::SQLite => format!("json_array({})", elements.join(", ")),
         }
     }
 }
 
-impl JsonOperationable for DBMS {
+
+impl JsonOperator for DBMS {
     fn set(&self, field: &str, value: &str) -> String {
         match self {
             DBMS::Postgres => format!("jsonb_set(data, '{{{}}}', '{}')", field, value),
             DBMS::MySQL => format!("JSON_SET(data, '$.{}', '{}')", field, value),
+            DBMS::SQLite => format!("json_set(data, '$.{}', '{}')", field, value),
         }
     }
 
@@ -155,6 +166,7 @@ impl JsonOperationable for DBMS {
         match self {
             DBMS::Postgres => format!("jsonb_set(data, '{{{}}}', '{}')", path, value),
             DBMS::MySQL => format!("JSON_SET(data, '$.{}', '{}')", path, value),
+            DBMS::SQLite => format!("json_set(data, '$.{}', '{}')", path, value),
         }
     }
 
@@ -162,6 +174,7 @@ impl JsonOperationable for DBMS {
         match self {
             DBMS::Postgres => format!("data - '{}'", field),
             DBMS::MySQL => format!("JSON_REMOVE(data, '$.{}')", field),
+            DBMS::SQLite => format!("json_remove(data, '$.{}')", field),
         }
     }
 
@@ -169,6 +182,7 @@ impl JsonOperationable for DBMS {
         match self {
             DBMS::Postgres => format!("data #- '{{{}}}'", path),
             DBMS::MySQL => format!("JSON_REMOVE(data, '$.{}')", path),
+            DBMS::SQLite => format!("json_remove(data, '$.{}')", path),
         }
     }
 
@@ -176,6 +190,7 @@ impl JsonOperationable for DBMS {
         match self {
             DBMS::Postgres => format!("data || '{}'", other),
             DBMS::MySQL => format!("JSON_MERGE_PATCH(data, '{}')", other),
+            DBMS::SQLite => format!("json_patch(data, '{}')", other),
         }
     }
 
@@ -183,6 +198,7 @@ impl JsonOperationable for DBMS {
         match self {
             DBMS::Postgres => format!("jsonb_insert(data, '{{-1}}', '{}')", element),
             DBMS::MySQL => format!("JSON_ARRAY_APPEND(data, '$', '{}')", element),
+            DBMS::SQLite => format!("json_insert(data, '$[#]', '{}')", element),
         }
     }
 
@@ -190,6 +206,7 @@ impl JsonOperationable for DBMS {
         match self {
             DBMS::Postgres => format!("data - '{}'", index),
             DBMS::MySQL => format!("JSON_REMOVE(data, '$[{}]')", index),
+            DBMS::SQLite => format!("json_remove(data, '$[{}]')", index),
         }
     }
 
@@ -197,6 +214,7 @@ impl JsonOperationable for DBMS {
         match self {
             DBMS::Postgres => format!("jsonb_set(data, '{{{}}}'::text[], '{}')", index, value),
             DBMS::MySQL => format!("JSON_SET(data, '$[{}]', '{}')", index, value),
+            DBMS::SQLite => format!("json_set(data, '$[{}]', '{}')", index, value),
         }
     }
 }

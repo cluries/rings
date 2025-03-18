@@ -8,6 +8,7 @@ pub struct Id {
     val: i64,
 }
 
+/// id factory
 pub struct Factory {
     sharding: i64,
     sequence: RwLock<(i64, i64)>, // milli, sequence at milli
@@ -17,6 +18,8 @@ lazy_static! {
     static ref _shared_factory: Factory = Factory::new(0);
 }
 
+/// generate id
+/// actually, it is call shared().make()
 #[macro_export]
 macro_rules! id {
     () => {
@@ -39,13 +42,25 @@ macro_rules! id {
 //     };
 // }
 
+/// max sequence
 const MAX_SEQUENCE: i64 = 999;
-const MAX_SHARDING: i64 = 99;
+
+/// max sharding
+const MAX_SHARDING: i64 = 99; 
+
+/// millis base
 const MILLIS_BASE: i64 = 1000000;
+
+/// sequence base
 const SEQUENCE_BASE: i64 = 100;
+
+/// second div base
 const SECOND_DIV: i64 = SEQUENCE_BASE * 100;
+
+/// myabe min id value
 const MIN_VALUE: i64 = 1728747205481002100;
 
+/// get shared id factory
 pub fn shared() -> &'static Factory {
     &_shared_factory
 }
@@ -218,4 +233,16 @@ fn base62_to_decimal(base62: &str) -> u64 {
     }
 
     decimal
+}
+
+
+ 
+
+#[cfg(test)]
+#[allow(unused)]
+mod tests {
+
+    use super::*;
+     
+     
 }
