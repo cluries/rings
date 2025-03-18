@@ -40,8 +40,7 @@ pub type DBResults<T> = erx::ResultE<Vec<T>>;
 
 
 /// DBResultsRelated is a struct that contains results, total, offset
-/// designed for pagination results
-/// results: Vec<T> stored current page results
+/// designed for pagination results/// : Vec<T> stored current page results
 /// total: usize stored total results matched query
 /// offset: usize stored offset
 pub struct DBResultsRelated<T> {

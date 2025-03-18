@@ -16,3 +16,5 @@ pub mod audio;
 pub mod video;
 pub mod tests;
 pub mod lua;
+pub mod zip;
+pub mod rand;
