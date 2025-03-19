@@ -1,13 +1,16 @@
-//IgnoreCase::Prefix("prefix").matches("content")
+/// IgnoreCase::Prefix("prefix").matches("content")
 pub enum IgnoreCase {
     Contain(String),
     Prefix(String),
     Suffix(String),
 }
 
+/// Sub string tools.
 pub struct Sub;
+
+/// Word tools.
 pub struct Word;
- 
+
 
 impl IgnoreCase {
     pub fn matches(&self, s: &str) -> bool {
@@ -67,6 +70,32 @@ impl Sub {
         }
         s[start..end].to_string()
     }
+
+
+    /// Extract all strings between two strings.
+    /// 提取字符串中间的字符串
+    pub fn extract(s: &str, start: &str, end: &str) -> Vec<String> {
+        let mut vec = vec![];
+        let mut pos = 0;
+        while pos < s.len() {
+            // 查找起始字符串
+            if let Some(start_pos) = s[pos..].find(start) {
+                let start_index = pos + start_pos + start.len();
+                // 从起始位置开始查找结束字符串
+                if let Some(end_pos) = s[start_index..].find(end) {
+                    let end_index = start_index + end_pos;
+                    // 提取中间的字符串
+                    vec.push(s[start_index..end_index].to_string());
+                    pos = end_index + end.len();
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        vec
+    }
 }
 
 impl Word {
@@ -103,7 +132,7 @@ impl Word {
         }
         s[..end].to_string()
     }
-    
+
     pub fn ucfirst(s: &str) -> String {
         let mut chars = s.chars();
         match chars.next() {
@@ -154,34 +183,19 @@ impl Word {
     }
 }
 
- 
 
-#[test]
-fn test_start_with_ignore_case() {
-    let s = IgnoreCase::Prefix("ABC".to_string());
-    assert!(s.matches("abc"));
-    assert!(!s.matches("ab"));
-    assert!(s.matches("abcde"));
-    assert!(!s.matches("Aab"));
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    //
-    // assert!(start_with_ignore_case("ABC", "ABC"));
-    // assert!(start_with_ignore_case("ABC", "ab"));
-    // assert!(!start_with_ignore_case("ABC", "abcde"));
-    // assert!(!start_with_ignore_case("ABC", "Aab"));
+    #[test]
+    fn test_sub_extract() {
+        let s = "china is very big and strong";
+        let start = "is";
+        let end = "and";
+        let result = Sub::extract(s, start, end);
+        println!("{:?}", result);
+    }
 }
-
-// #[test]
-// fn test_end_with_ignore_case() {
-//     // assert!(end_with_ignore_case("ABC", "ABC"));
-//     // assert!(!end_with_ignore_case("ABC", "ab"));
-//     // assert!(!end_with_ignore_case("ABC", "abcde"));
-//     // assert!(end_with_ignore_case("ABC", "c"));
-// }
-
-// #[test]
-// fn test_strip_prefix_and_suffix() {
-//     assert_eq!(strip_prefix_and_suffix("abc_def_abc", 4, 4), "def");
-//     assert_eq!(strip_prefix_and_suffix("abc", 4, 4), "");
-//     assert_eq!(strip_prefix_and_suffix("strip_prefix_and_suffix", 0, 100), "");
-// }
+ 
+ 

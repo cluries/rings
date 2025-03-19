@@ -1,6 +1,6 @@
 use hmac::{Hmac, Mac};
 use sha1::{Sha1, Digest};
- 
+
 type HmacSha1 = Hmac<Sha1>;
 
 pub fn hmac_sha1(c: &str, key: &str) -> String {
@@ -16,16 +16,21 @@ pub fn sha1(c: &str) -> String {
 }
 
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_hmac_sha1() {
+        println!("{}", hmac_sha1("key", "value"));
+    }
 
-#[test]
-fn test_hmac_sha1() {
-    println!("{}", hmac_sha1("key", "value"));
+    #[test]
+    fn test_ha1() {
+        println!("{:?}", sha1("aaa"));
+    }
 }
 
-#[test]
-fn test_ha1() {
-    println!("{:?}", sha1("aaa"));
-}
 
 
 

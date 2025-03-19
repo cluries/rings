@@ -18,15 +18,17 @@ const MARK_DELETED: i32 = -1;
 const BOUNDARY_OK: i32 = 11;
 const BOUNDARY_ERROR: i32 = -11;
 
+const MARK_DELETED_STR: &'static str = "MarkDelete";
+const INITIALIZE_STR: &'static str = "Initialize";
+static OKP: &str = "OK(";
+static ERP: &str = "ERR(";
+
 impl Status {
     pub fn parse(formated: &str) -> crate::erx::ResultE<Self> {
         let formated = formated.trim();
         if formated.len() < 1 {
             return Err("Empty formated status".into());
         }
-
-        static OKP: &str = "OK(";
-        static ERP: &str = "ERR(";
 
         fn inner_parse(s: String) -> crate::erx::ResultE<(i32, String)> {
             let splits: Vec<&str> = s.splitn(2, " ").collect();
@@ -105,8 +107,6 @@ impl Status {
     }
 }
 
-const MARK_DELETED_STR: &'static str = "MarkDelete";
-const INITIALIZE_STR: &'static str = "Initialize";
 
 impl std::fmt::Display for Status {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

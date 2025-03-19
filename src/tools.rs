@@ -8,7 +8,6 @@ pub mod datetime;
 pub mod encrypt;
 pub mod httpclient;
 pub mod openai;
-pub mod aiprovider;
 pub mod image;
 pub mod captcha;
 pub mod mcp;

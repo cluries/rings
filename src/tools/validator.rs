@@ -15,6 +15,7 @@ impl Obj {
     }
 }
 
+/// Check if a string matches a regex.
 pub fn regex_match(regex: &str, string: &str) -> bool {
     match regex::Regex::new(regex) {
         Ok(re) => re.is_match(string),
@@ -22,6 +23,51 @@ pub fn regex_match(regex: &str, string: &str) -> bool {
     }
 }
 
+/// Extract all matches of a regex from a string.
+pub fn regex_extract(regex: &str, string: &str) -> Vec<String> {
+    let re = match regex::Regex::new(regex) {
+        Ok(re) => re,
+        Err(_) => return vec![],
+    };
+
+    let mut vec: Vec<String> = Vec::new();
+    for cap in re.captures_iter(string) {
+        if let Some(m) = cap.get(0) {
+            vec.push(m.as_str().to_string());
+        }
+    }
+    vec
+}
+
+/// Replace all matches of a regex in a string.
+pub fn regex_replace(regex: &str, string: &str, replace: &str) -> String {
+    let re = match regex::Regex::new(regex) {
+        Ok(re) => re,
+        Err(_) => return string.to_string(),
+    };
+    re.replace_all(string, replace).to_string()
+}
+
+/// Split a string by a regex.
+pub fn regex_split(regex: &str, string: &str) -> Vec<String> {
+    let re = match regex::Regex::new(regex) {
+        Ok(re) => re,
+        Err(_) => return vec![],
+    };
+    re.split(string).map(|s| s.to_string()).collect()
+}
+
+/// Find the first match of a regex in a string.
+pub fn regex_find(regex: &str, string: &str) -> Option<String> {
+    let re = match regex::Regex::new(regex) {
+        Ok(re) => re,
+        Err(_) => return None,
+    };
+    re.find(string).map(|m| m.as_str().to_string())
+}
+
+
+///
 impl Net {
     pub fn email(email: &str) -> bool {
         let r = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$";
@@ -60,15 +106,18 @@ impl Net {
 
 
 impl Len {
+    /// Check if a string is between min and max length.
     pub fn range(s: &str, min: usize, max: usize) -> bool {
         let l = s.len();
         l >= min && l <= max
     }
 
+    /// Check if a string is at least min length.
     pub fn min(s: &str, min: usize) -> bool {
         s.len() >= min
     }
 
+    /// Check if a string is at most max length.
     pub fn max(s: &str, max: usize) -> bool {
         s.len() <= max
     }
@@ -124,6 +173,19 @@ impl Enc {
     }
 }
 
- 
 
-
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_regex_extract() {
+        let s = "Hello, world! My name is John.";
+        let r = regex_extract(r"\w+", s);
+        println!("{:?}", r);
+        assert_eq!(r, vec!["Hello", "world", "My", "name", "is", "John"]);
+        
+        let s = "Hello, world! My name is John. i am 18 years old. i am a student. my math score is 90.";
+        let r = regex_extract(r"\d+", s);
+        println!("{:?}", r);
+    }
+}
