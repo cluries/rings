@@ -22,8 +22,16 @@ use tracing::info;
 
 static DEFAULT_RAND_LIFE: i64 = 300;
 
+
+static SIGN_STR: &str = "SIGN";
+static PAYL_STR: &str = "PAYL";
+static FRMT_STR: &str = "FRMT";
+static LOAD_STR: &str = "LOAD";
+static INVD_STR: &str = "INVD";
+
+
 fn make_code(detail: &str) -> LayoutedC {
-    Layouted::middleware("SIGN", detail)
+    Layouted::middleware(SIGN_STR, detail)
 }
 
 
@@ -107,37 +115,23 @@ impl Signator {
 
     pub async fn exec(&self, request: axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response> {
         let (payload_request, mut request) = clone_request(request).await;
-        let payload = Payload::from_request(payload_request).await;
-        if let Err(error) = payload {
-            return Err(rout!("PALD", error));
-        }
 
-        let payload = payload.unwrap();
-        if let Err(reason) = payload.guard() {
-            return Err(rout!("FMAT", reason.to_string()));
-        }
+        let payload = Payload::from_request(payload_request).await.map_err(|e| rout!(PAYL_STR, e))?;
+        payload.guard().map_err(|e| rout!(FRMT_STR, e.into()))?;
 
         let loader = Arc::clone(&self.key_loader);
-        let key = match loader(payload.val_xu()).await {
-            Ok(key) => key,
-            Err(erx) => {
-                return Err(rout!("LOAD", erx.message_string()));
-            }
-        };
+        let key = loader(payload.val_or_default_u()).await.map_err(|e| rout!(LOAD_STR, e.message_string()))?;
 
         if let Err((error, debug)) = payload.valid(key) {
-            let skip = !self.rear.is_empty() && self.rear.eq(&payload.val_ds());
-            if !skip {
-                return Err(rout!("INVD", error, debug));
+            if self.rear.is_empty() || !self.rear.eq(&payload.val_or_default_d()) {
+                return Err(rout!(INVD_STR, error, debug));
             }
         }
 
-        if let Err(reason) = self.rand_guard(payload.val_xu(), payload.val_xr()).await {
-            return Err(rout!("RAND", reason.message_string()));
-        }
+        self.rand_guard(payload.val_or_default_u(), payload.val_or_default_r()).await.map_err(|e| rout!(INVD_STR, e.message_string()))?;
 
         use crate::web::context::Context;
-        let context = Context::new(payload.val_xu());
+        let context = Context::new(payload.val_or_default_u());
         request.extensions_mut().insert(context);
 
         Ok(request)
@@ -331,15 +325,15 @@ impl Payload {
         Ok(payload)
     }
 
-    pub fn val_xu(&self) -> String {
+    pub fn val_or_default_u(&self) -> String {
         self.xu.clone().unwrap_or_default()
     }
 
-    pub fn val_xr(&self) -> String {
+    pub fn val_or_default_r(&self) -> String {
         self.xr.clone().unwrap_or_default()
     }
 
-    pub fn val_ds(&self) -> String {
+    pub fn val_or_default_d(&self) -> String {
         self.ds.clone().unwrap_or_default()
     }
 
@@ -351,7 +345,7 @@ impl Payload {
             let debug = Debug {
                 payload: load,
                 key: key.clone(),
-                client: self.val_xu(),
+                client: self.val_or_default_u(),
                 server: hash,
             };
             return Err((String::from("invalid signature"), debug));

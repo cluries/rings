@@ -70,6 +70,8 @@ pub static ACTN: &str = "ACTN";
 /// Undefined: 未定义错误
 pub static UNDF: &str = "UNDF";
 
+pub static TASK: &str = "TASK";
+
 pub struct Layouted;
 
 impl Layouted {
@@ -107,6 +109,9 @@ impl Layouted {
     pub fn action(category: &str, detail: &str) -> LayoutedC {
         LayoutedC::new(ACTN, category, detail)
     }
+
+    /// task: Task错误
+    pub fn task(category: &str, detail: &str) -> LayoutedC { LayoutedC::new(TASK, category, detail) }
 }
 
 
@@ -222,10 +227,12 @@ impl From<&str> for Erx {
 
 impl From<String> for Erx {
     fn from(str: String) -> Erx {
+        if str.is_empty() {
+            return Erx::default();
+        }
+
         serde_json::from_str(&str).unwrap_or_else(|_| {
-            let mut defaults = Erx::default();
-            defaults.message = str;
-            defaults
+            Erx::new(&str)
         })
     }
 }
