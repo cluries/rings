@@ -4,7 +4,6 @@
 /// fn smp<T: ToString>(error: T) -> Erx
 /// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
 
-
 use crate::conf;
 use lazy_static::lazy_static;
 use serde_derive::{Deserialize, Serialize};
@@ -74,7 +73,6 @@ pub static UNDF: &str = "UNDF";
 pub struct Layouted;
 
 impl Layouted {
-
     /// fuzz_udf: 模糊未定义错误
     pub fn fuzz_udf(detail: &str) -> LayoutedC {
         LayoutedC::new(FUZZ, UNDF, detail)
@@ -115,10 +113,10 @@ impl Layouted {
 /// Code code format
 /// aaaa-xxxx-yyyy-zzzz
 ///
-///	aaaa : 应用标示，建议4位长度
-///	xxxx : 单词字母，建议4位长度，用于区分大类（功能域）
-///	yyyy : 字母或者数字，建议4位长度，用于区分子类
-///	zzzz : 字母或者数字，建议4位长度，具体错误
+///    aaaa : 应用标示，建议4位长度
+///    xxxx : 单词字母，建议4位长度，用于区分大类（功能域）
+///    yyyy : 字母或者数字，建议4位长度，用于区分子类
+///    zzzz : 字母或者数字，建议4位长度，具体错误
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LayoutedC {
     application: String,
@@ -148,7 +146,7 @@ impl Erx {
     pub fn message(&self) -> &str {
         &self.message
     }
-    
+
     pub fn message_string(&self) -> String {
         self.message.clone()
     }
@@ -224,7 +222,11 @@ impl From<&str> for Erx {
 
 impl From<String> for Erx {
     fn from(str: String) -> Erx {
-        serde_json::from_str(&str).unwrap_or_default()
+        serde_json::from_str(&str).unwrap_or_else(|_| {
+            let mut defaults = Erx::default();
+            defaults.message = str;
+            defaults
+        })
     }
 }
 

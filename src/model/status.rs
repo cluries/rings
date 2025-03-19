@@ -25,8 +25,8 @@ impl Status {
             return Err("Empty formated status".into());
         }
 
-        static OKP: &str = "ok(";
-        static ERP: &str = "err(";
+        static OKP: &str = "OK(";
+        static ERP: &str = "ERR(";
 
         fn inner_parse(s: String) -> crate::erx::ResultE<(i32, String)> {
             let splits: Vec<&str> = s.splitn(2, " ").collect();
@@ -34,22 +34,26 @@ impl Status {
                 return Err("Empty formated status".into());
             }
 
+            if !splits[0].ends_with(")") {
+                return Err("Invalid formated status".into());
+            }
+
             let code = splits[0][..splits[0].len() - 1].parse::<i32>().map_err(crate::erx::smp)?;
             Ok((code, if splits.len() > 1 { splits[1] } else { "" }.to_string()))
         }
 
-        match formated.to_lowercase().as_str() {
-            "initialize" => Ok(Status::Initialize),
-            "markdeleted" => Ok(Status::MarkDeleted),
-            lower => {
-                if lower.starts_with(OKP) {
-                    let parsed = inner_parse(lower.to_string())?;
+        match formated {
+            INITIALIZE_STR => Ok(Status::Initialize),
+            MARK_DELETED_STR => Ok(Status::MarkDeleted),
+            formated => {
+                if formated.starts_with(OKP) {
+                    let parsed = inner_parse(formated[OKP.len()..].to_string())?;
                     Self::ok(parsed.0, &parsed.1)
-                } else if lower.starts_with(ERP) {
-                    let parsed = inner_parse(lower.to_string())?;
+                } else if formated.starts_with(ERP) {
+                    let parsed = inner_parse(formated[ERP.len()..].to_string())?;
                     Self::error(parsed.0, &parsed.1)
                 } else {
-                    Err(format!("Unknown status: {}", lower).into())
+                    Err(format!("Unknown status: {}", formated).into())
                 }
             }
         }
@@ -101,14 +105,16 @@ impl Status {
     }
 }
 
+const MARK_DELETED_STR: &'static str = "MarkDelete";
+const INITIALIZE_STR: &'static str = "Initialize";
 
 impl std::fmt::Display for Status {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Status::Initialize => write!(f, "Initialize"),
+            Status::Initialize => write!(f, "{}", INITIALIZE_STR),
             Status::OK(id, message) => write!(f, "OK({}) {}", id, message),
             Status::Error(id, message) => write!(f, "ERR({}) {}", id, message),
-            Status::MarkDeleted => write!(f, "MarkDelete"),
+            Status::MarkDeleted => write!(f, "{}", MARK_DELETED_STR),
         }
     }
 }
