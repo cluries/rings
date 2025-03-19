@@ -31,7 +31,7 @@ pub fn rand_str(len: usize) -> String {
 }
 
 
-fn rand_date_numbers(rng: &mut ThreadRng) -> (i32, i32, i32) {
+fn _rand_date_numbers(rng: &mut ThreadRng) -> (i32, i32, i32) {
     let year_end = chrono::Utc::now().year();
     let year = rng.gen_range(1970..year_end);
     let month = rng.gen_range(1..13);
@@ -46,15 +46,16 @@ fn rand_date_numbers(rng: &mut ThreadRng) -> (i32, i32, i32) {
     (year, month, day)
 }
 
+
 pub fn rand_date() -> String {
     let mut rng = rand::thread_rng();
-    let (year, month, day) = rand_date_numbers(&mut rng);
+    let (year, month, day) = _rand_date_numbers(&mut rng);
     format!("{}-{}-{}", year, month, day)
 }
 
 pub fn rand_datetime() -> String {
     let mut rng = rand::thread_rng();
-    let (year, month, day) = rand_date_numbers(&mut rng);
+    let (year, month, day) = _rand_date_numbers(&mut rng);
     let hour = rng.gen_range(0..24);
     let minute = rng.gen_range(0..60);
     let second = rng.gen_range(0..60);
