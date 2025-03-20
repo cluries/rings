@@ -6,6 +6,7 @@ pub mod preset;
 pub mod jsons;
 pub mod dbms;
 pub mod coffee;
+mod value;
 
 use redis;
 use crate::erx;

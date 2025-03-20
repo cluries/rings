@@ -95,6 +95,7 @@ impl Sub {
         }
         vec
     }
+
 }
 
 impl Word {
