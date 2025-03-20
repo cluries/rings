@@ -22,9 +22,11 @@ pub mod tools;
 pub mod types;
 pub mod web;
 
+pub mod axum{
+    pub use axum::*;
+}
 
 /// Re-export
-pub use axum;
 pub use serde;
 pub use serde_json;
 pub use serde_derive;
