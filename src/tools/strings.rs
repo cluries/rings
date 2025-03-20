@@ -71,7 +71,6 @@ impl Sub {
         s[start..end].to_string()
     }
 
-
     /// Extract all strings between two strings.
     /// 提取字符串中间的字符串
     pub fn extract(s: &str, start: &str, end: &str) -> Vec<String> {
