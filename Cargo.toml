@@ -34,7 +34,7 @@ reqwest = { version = "0.12", features = ["json"] }
 rsa = { version = "0.9" }
 sea-orm = { version = "1", features = ["sqlx-postgres", "postgres-array", "with-chrono", "with-json", "runtime-tokio", "macros", "with-bigdecimal"] }
 sea-orm-migration = { version = "1", features = ["sqlx-postgres"] }
-serde = { version = "1.0", features = ["derive", "serde_derive"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 sha1 = { version = "0.10" }
 tokio = { version = "1", features = ["full"] }
