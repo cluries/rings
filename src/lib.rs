@@ -28,7 +28,6 @@ pub mod reexports {
     pub use axum;
     pub use serde;
     pub use serde_json;
-    pub use serde_derive;
     pub use tracing;
     pub use tracing_subscriber;
     pub use tracing_appender;
