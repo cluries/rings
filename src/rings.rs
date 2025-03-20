@@ -1,6 +1,6 @@
 use crate::scheduler::SchedulerManager;
 use async_trait::async_trait;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tracing::{error, info, span};

@@ -12,7 +12,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::{OnceLock, RwLock};
 use config::Config;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 
 /// get settings
