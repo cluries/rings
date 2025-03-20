@@ -30,10 +30,7 @@ impl LuaBridge {
     where
         F: Fn(&LuaLua) -> mlua::Result<LuaFunction> + Send + Sync + 'static,
     {
-        self.rust_functions
-            .try_lock()
-            .map_err(re)?
-            .insert(name.into(), Box::new(func));
+        self.rust_functions.try_lock().map_err(re)?.insert(name.into(), Box::new(func));
         Ok(())
     }
 

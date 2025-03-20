@@ -1,9 +1,16 @@
+/// generate id
+/// format:
+
 use crate::erx;
+
+
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::sync::RwLock;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+/// id
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Id {
     val: i64,
 }
@@ -46,7 +53,7 @@ macro_rules! id {
 const MAX_SEQUENCE: i64 = 999;
 
 /// max sharding
-const MAX_SHARDING: i64 = 99; 
+const MAX_SHARDING: i64 = 99;
 
 /// millis base
 const MILLIS_BASE: i64 = 1000000;
@@ -57,7 +64,7 @@ const SEQUENCE_BASE: i64 = 100;
 /// second div base
 const SECOND_DIV: i64 = SEQUENCE_BASE * 100;
 
-/// myabe min id value
+/// maybe min id value
 const MIN_VALUE: i64 = 1728747205481002100;
 
 /// get shared id factory
@@ -88,7 +95,7 @@ impl Factory {
     pub fn make(&self) -> erx::ResultE<Id> {
         let millis = chrono::Local::now().timestamp_millis();
         let mut seq: i64 = 0;
-        let mut sequence = self.sequence.write().unwrap();
+        let mut sequence = self.sequence.try_write().map_err(erx::smp)?;
 
         if millis != sequence.0 {
             *sequence = (millis, seq);
@@ -103,6 +110,37 @@ impl Factory {
 
         let val = MILLIS_BASE * millis + seq * SEQUENCE_BASE + self.sharding;
         Ok(Id { val })
+    }
+
+    pub fn make_n(&self, n: u16) -> erx::ResultE<Vec<Id>> {
+        if n < 1 {
+            return Ok(vec![]);
+        }
+
+        let millis = chrono::Local::now().timestamp_millis();
+        let mut seq: i64 = 0;
+        let mut sequence = self.sequence.try_write().map_err(erx::smp)?;
+
+        if millis != sequence.0 {
+            *sequence = (millis, seq);
+        }
+
+        let n = i64::from(n);
+        if sequence.1 + n > MAX_SEQUENCE {
+            return Err("out of range range".into());
+        }
+
+        let start_seq = sequence.1;
+        seq = sequence.1 + n;
+        sequence.1 = seq;
+
+        let mut ids: Vec<Id> = Vec::new();
+        for i in start_seq..seq {
+            let val = MILLIS_BASE * millis + i * SEQUENCE_BASE + self.sharding;
+            ids.push(Id { val });
+        }
+
+        Ok(ids)
     }
 }
 
@@ -236,13 +274,40 @@ fn base62_to_decimal(base62: &str) -> u64 {
 }
 
 
- 
-
 #[cfg(test)]
 #[allow(unused)]
 mod tests {
-
     use super::*;
-     
-     
+
+    #[test]
+    fn test_id() {
+        let mut v = Vec::new();
+        for i in 1..999 {
+            v.push(id!().unwrap());
+        }
+        for id in v.iter() {
+            println!("{}", id);
+        }
+    }
+
+    #[test]
+    fn test_id_n() {
+        let mut v = Vec::new();
+        for i in 1..5 {
+            v.push(shared().make_n(3).unwrap())
+        }
+
+        for list in v.iter() {
+            for id in list {
+                println!("{}", id);
+            }
+        }
+    }
+
+    #[test]
+    fn test_try() {
+        for i in 4..9 {
+            println!("{}", i);
+        }
+    }
 }

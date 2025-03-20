@@ -16,13 +16,14 @@ pub mod javascript;
 pub mod define;
 pub mod luaction;
 
-use crate::rings::{RingState, SafeRS, RingsMod};
+use crate::rings::{RingState, RingsMod, SafeRS};
+use crate::web::luaction::LuaAction;
+
 use async_trait::async_trait;
 use axum::Router;
 use std::sync::{Arc, RwLock};
 use tower_http::validate_request::ValidateRequestHeaderLayer;
 use tracing::{error, info};
-use crate::web::luaction::{LuaAction};
 
 /// merge web routes
 #[macro_export]
@@ -187,10 +188,9 @@ impl RingsMod for Web {
                 }
             };
 
-            let serve = axum::serve(listen.unwrap(), router)
-                .with_graceful_shutdown(
-                    graceful(Arc::clone(&stage), name.clone())
-                );
+            let serve = axum::serve(listen.unwrap(), router).with_graceful_shutdown(
+                graceful(Arc::clone(&stage), name.clone())
+            );
 
             info!("WebMod[ {} ] try served : {}", &name,  bind);
             serve.await.expect(format!("WebMod[ {} ] failed to served : {}", &name, bind).as_str());

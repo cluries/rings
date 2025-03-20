@@ -18,3 +18,4 @@ pub mod lua;
 pub mod zip;
 pub mod rand;
 pub mod charset;
+pub mod id;

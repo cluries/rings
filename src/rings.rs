@@ -33,7 +33,9 @@ pub struct Moment {
     time: i64,
 }
 
+///
 impl Moment {
+    /// Moment with current time
     pub fn now(name: &str) -> Self {
         Self {
             name: name.to_string(),

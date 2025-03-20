@@ -20,8 +20,8 @@ static mut _LOG_WORKER_GUARD: Vec<WorkerGuard> = vec![];
 
 
 pub async fn logging_initialize() { //-> Vec<WorkerGuard> {
-    #![allow(static_mut_refs)]
 
+    #![allow(static_mut_refs)]
     unsafe {
         if _LOG_WORKER_GUARD.len() >= 2 {
             return;
@@ -84,6 +84,7 @@ pub async fn logging_initialize() { //-> Vec<WorkerGuard> {
 }
 
 
+#[allow(unused)]
 fn _sanitize_string(s: &str) -> String {
     s.chars().filter(|&c| !c.is_control() || c.is_whitespace()).collect()
 }

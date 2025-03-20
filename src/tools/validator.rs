@@ -1,19 +1,10 @@
-pub struct Obj;
 pub struct Net;
 pub struct Len;
 pub struct Num;
 pub struct Enc;
 
 
-impl Obj {
-    pub fn defaults<T: Default + PartialEq>(val: &T) -> bool {
-        *val == T::default()
-    }
 
-    pub fn empty(s: &str) -> bool {
-        s.trim().is_empty()
-    }
-}
 
 /// Check if a string matches a regex.
 pub fn regex_match(regex: &str, string: &str) -> bool {
@@ -183,7 +174,7 @@ mod tests {
         let r = regex_extract(r"\w+", s);
         println!("{:?}", r);
         assert_eq!(r, vec!["Hello", "world", "My", "name", "is", "John"]);
-        
+
         let s = "Hello, world! My name is John. i am 18 years old. i am a student. my math score is 90.";
         let r = regex_extract(r"\d+", s);
         println!("{:?}", r);
