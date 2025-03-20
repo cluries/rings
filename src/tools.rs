@@ -17,3 +17,4 @@ pub mod tests;
 pub mod lua;
 pub mod zip;
 pub mod rand;
+pub mod charset;

@@ -1,7 +1,6 @@
 pub mod conf;
 pub mod sql;
 pub mod status;
-pub mod kv;
 pub mod zero;
 pub mod preset;
 pub mod jsons;

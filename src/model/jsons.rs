@@ -1,5 +1,10 @@
-use crate::model::dbms::DBMS;
-
+#[allow(unused)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum RDBMS {
+    Postgres,
+    MySQL,
+    SQLite,
+}
  
 pub trait JsonInquirer {
     /// Extract a JSON field value
@@ -61,82 +66,82 @@ pub trait JsonOperator {
 }
 
 
-impl JsonInquirer for DBMS {
+impl JsonInquirer for RDBMS {
     fn extract(&self, field: &str) -> String {
         match self {
-            DBMS::Postgres => format!("->> '{}'", field),
-            DBMS::MySQL => format!("->>'$.{}'", field),
-            DBMS::SQLite => format!("json_extract(data, '$.{}')", field),
+            RDBMS::Postgres => format!("->> '{}'", field),
+            RDBMS::MySQL => format!("->>'$.{}'", field),
+            RDBMS::SQLite => format!("json_extract(data, '$.{}')", field),
         }
     }
 
     fn extract_text(&self, field: &str) -> String {
         match self {
-            DBMS::Postgres => format!("->>'{}' ", field),
-            DBMS::MySQL => format!("->>'$.{}'", field),
-            DBMS::SQLite => format!("json_extract(data, '$.{}')", field),
+            RDBMS::Postgres => format!("->>'{}' ", field),
+            RDBMS::MySQL => format!("->>'$.{}'", field),
+            RDBMS::SQLite => format!("json_extract(data, '$.{}')", field),
         }
     }
 
     fn extract_int(&self, field: &str) -> String {
         match self {
-            DBMS::Postgres => format!("->>'{}' ", field),
-            DBMS::MySQL => format!("->>'$.{}'", field),
-            DBMS::SQLite => format!("CAST(json_extract(data, '$.{}') AS INTEGER)", field),
+            RDBMS::Postgres => format!("->>'{}' ", field),
+            RDBMS::MySQL => format!("->>'$.{}'", field),
+            RDBMS::SQLite => format!("CAST(json_extract(data, '$.{}') AS INTEGER)", field),
         }
     }
 
     fn extract_path(&self, path: &str) -> String {
         match self {
-            DBMS::Postgres => format!("#>'{}'", path),
-            DBMS::MySQL => format!("->>'$.{}'", path),
-            DBMS::SQLite => format!("json_extract(data, '$.{}')", path),
+            RDBMS::Postgres => format!("#>'{}'", path),
+            RDBMS::MySQL => format!("->>'$.{}'", path),
+            RDBMS::SQLite => format!("json_extract(data, '$.{}')", path),
         }
     }
 
     fn exists(&self, field: &str) -> String {
         match self {
-            DBMS::Postgres => format!("? '{}'", field),
-            DBMS::MySQL => format!("JSON_CONTAINS_PATH(data, 'one', '$.{}')", field),
-            DBMS::SQLite => format!("json_type(data, '$.{}') IS NOT NULL", field),
+            RDBMS::Postgres => format!("? '{}'", field),
+            RDBMS::MySQL => format!("JSON_CONTAINS_PATH(data, 'one', '$.{}')", field),
+            RDBMS::SQLite => format!("json_type(data, '$.{}') IS NOT NULL", field),
         }
     }
 
     fn exists_path(&self, path: &str) -> String {
         match self {
-            DBMS::Postgres => format!("?& array[{}]", path),
-            DBMS::MySQL => format!("JSON_CONTAINS_PATH(data, 'one', '$.{}')", path),
-            DBMS::SQLite => format!("json_type(data, '$.{}') IS NOT NULL", path),
+            RDBMS::Postgres => format!("?& array[{}]", path),
+            RDBMS::MySQL => format!("JSON_CONTAINS_PATH(data, 'one', '$.{}')", path),
+            RDBMS::SQLite => format!("json_type(data, '$.{}') IS NOT NULL", path),
         }
     }
 
     fn keys(&self) -> String {
         match self {
-            DBMS::Postgres => String::from("json_object_keys"),
-            DBMS::MySQL => String::from("JSON_KEYS"),
-            DBMS::SQLite => String::from("json_group_array(json_each.key)"),
+            RDBMS::Postgres => String::from("json_object_keys"),
+            RDBMS::MySQL => String::from("JSON_KEYS"),
+            RDBMS::SQLite => String::from("json_group_array(json_each.key)"),
         }
     }
 
     fn array_length(&self) -> String {
         match self {
-            DBMS::Postgres => String::from("json_array_length"),
-            DBMS::MySQL => String::from("JSON_LENGTH"),
-            DBMS::SQLite => String::from("json_array_length(data)"),
+            RDBMS::Postgres => String::from("json_array_length"),
+            RDBMS::MySQL => String::from("JSON_LENGTH"),
+            RDBMS::SQLite => String::from("json_array_length(data)"),
         }
     }
 
     fn build_object(&self, pairs: Vec<(&str, &str)>) -> String {
         match self {
-            DBMS::Postgres => {
+            RDBMS::Postgres => {
                 let pairs_str: Vec<String> = pairs.iter().map(|(k, v)| format!("'{}', {}", k, v)).collect();
                 format!("json_build_object({})", pairs_str.join(", "))
             }
-            DBMS::MySQL => {
+            RDBMS::MySQL => {
                 let pairs_str: Vec<String> = pairs.iter().map(|(k, v)| format!("'{}', {}", k, v)).collect();
                 format!("JSON_OBJECT({})", pairs_str.join(", "))
             }
-            DBMS::SQLite => {
+            RDBMS::SQLite => {
                 let pairs_str: Vec<String> = pairs.iter().map(|(k, v)| format!("'{}', {}", k, v)).collect();
                 format!("json_object({})", pairs_str.join(", "))
             }
@@ -145,76 +150,76 @@ impl JsonInquirer for DBMS {
 
     fn build_array(&self, elements: Vec<&str>) -> String {
         match self {
-            DBMS::Postgres => format!("json_build_array({})", elements.join(", ")),
-            DBMS::MySQL => format!("JSON_ARRAY({})", elements.join(", ")),
-            DBMS::SQLite => format!("json_array({})", elements.join(", ")),
+            RDBMS::Postgres => format!("json_build_array({})", elements.join(", ")),
+            RDBMS::MySQL => format!("JSON_ARRAY({})", elements.join(", ")),
+            RDBMS::SQLite => format!("json_array({})", elements.join(", ")),
         }
     }
 }
 
 
-impl JsonOperator for DBMS {
+impl JsonOperator for RDBMS {
     fn set(&self, field: &str, value: &str) -> String {
         match self {
-            DBMS::Postgres => format!("jsonb_set(data, '{{{}}}', '{}')", field, value),
-            DBMS::MySQL => format!("JSON_SET(data, '$.{}', '{}')", field, value),
-            DBMS::SQLite => format!("json_set(data, '$.{}', '{}')", field, value),
+            RDBMS::Postgres => format!("jsonb_set(data, '{{{}}}', '{}')", field, value),
+            RDBMS::MySQL => format!("JSON_SET(data, '$.{}', '{}')", field, value),
+            RDBMS::SQLite => format!("json_set(data, '$.{}', '{}')", field, value),
         }
     }
 
     fn set_path(&self, path: &str, value: &str) -> String {
         match self {
-            DBMS::Postgres => format!("jsonb_set(data, '{{{}}}', '{}')", path, value),
-            DBMS::MySQL => format!("JSON_SET(data, '$.{}', '{}')", path, value),
-            DBMS::SQLite => format!("json_set(data, '$.{}', '{}')", path, value),
+            RDBMS::Postgres => format!("jsonb_set(data, '{{{}}}', '{}')", path, value),
+            RDBMS::MySQL => format!("JSON_SET(data, '$.{}', '{}')", path, value),
+            RDBMS::SQLite => format!("json_set(data, '$.{}', '{}')", path, value),
         }
     }
 
     fn delete(&self, field: &str) -> String {
         match self {
-            DBMS::Postgres => format!("data - '{}'", field),
-            DBMS::MySQL => format!("JSON_REMOVE(data, '$.{}')", field),
-            DBMS::SQLite => format!("json_remove(data, '$.{}')", field),
+            RDBMS::Postgres => format!("data - '{}'", field),
+            RDBMS::MySQL => format!("JSON_REMOVE(data, '$.{}')", field),
+            RDBMS::SQLite => format!("json_remove(data, '$.{}')", field),
         }
     }
 
     fn delete_path(&self, path: &str) -> String {
         match self {
-            DBMS::Postgres => format!("data #- '{{{}}}'", path),
-            DBMS::MySQL => format!("JSON_REMOVE(data, '$.{}')", path),
-            DBMS::SQLite => format!("json_remove(data, '$.{}')", path),
+            RDBMS::Postgres => format!("data #- '{{{}}}'", path),
+            RDBMS::MySQL => format!("JSON_REMOVE(data, '$.{}')", path),
+            RDBMS::SQLite => format!("json_remove(data, '$.{}')", path),
         }
     }
 
     fn merge(&self, other: &str) -> String {
         match self {
-            DBMS::Postgres => format!("data || '{}'", other),
-            DBMS::MySQL => format!("JSON_MERGE_PATCH(data, '{}')", other),
-            DBMS::SQLite => format!("json_patch(data, '{}')", other),
+            RDBMS::Postgres => format!("data || '{}'", other),
+            RDBMS::MySQL => format!("JSON_MERGE_PATCH(data, '{}')", other),
+            RDBMS::SQLite => format!("json_patch(data, '{}')", other),
         }
     }
 
     fn append(&self, element: &str) -> String {
         match self {
-            DBMS::Postgres => format!("jsonb_insert(data, '{{-1}}', '{}')", element),
-            DBMS::MySQL => format!("JSON_ARRAY_APPEND(data, '$', '{}')", element),
-            DBMS::SQLite => format!("json_insert(data, '$[#]', '{}')", element),
+            RDBMS::Postgres => format!("jsonb_insert(data, '{{-1}}', '{}')", element),
+            RDBMS::MySQL => format!("JSON_ARRAY_APPEND(data, '$', '{}')", element),
+            RDBMS::SQLite => format!("json_insert(data, '$[#]', '{}')", element),
         }
     }
 
     fn remove(&self, index: i32) -> String {
         match self {
-            DBMS::Postgres => format!("data - '{}'", index),
-            DBMS::MySQL => format!("JSON_REMOVE(data, '$[{}]')", index),
-            DBMS::SQLite => format!("json_remove(data, '$[{}]')", index),
+            RDBMS::Postgres => format!("data - '{}'", index),
+            RDBMS::MySQL => format!("JSON_REMOVE(data, '$[{}]')", index),
+            RDBMS::SQLite => format!("json_remove(data, '$[{}]')", index),
         }
     }
 
     fn update(&self, index: i32, value: &str) -> String {
         match self {
-            DBMS::Postgres => format!("jsonb_set(data, '{{{}}}'::text[], '{}')", index, value),
-            DBMS::MySQL => format!("JSON_SET(data, '$[{}]', '{}')", index, value),
-            DBMS::SQLite => format!("json_set(data, '$[{}]', '{}')", index, value),
+            RDBMS::Postgres => format!("jsonb_set(data, '{{{}}}'::text[], '{}')", index, value),
+            RDBMS::MySQL => format!("JSON_SET(data, '$[{}]', '{}')", index, value),
+            RDBMS::SQLite => format!("json_set(data, '$[{}]', '{}')", index, value),
         }
     }
 }
@@ -227,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_postgres_json_operations() {
-        let db = DBMS::Postgres;
+        let db = RDBMS::Postgres;
 
         // Test basic operations
         assert_eq!(db.extract("name"), "->> 'name'");
@@ -249,7 +254,7 @@ mod tests {
 
     #[test]
     fn test_mysql_json_operations() {
-        let db = DBMS::MySQL;
+        let db = RDBMS::MySQL;
 
         // Test basic operations
         assert_eq!(db.extract("name"), "->>'$.name'");
