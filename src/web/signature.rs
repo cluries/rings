@@ -264,10 +264,10 @@ struct Debug {
 }
 
 
-static XU: &str = "XU";
-static XT: &str = "XT";
-static XR: &str = "XR";
-static XS: &str = "XS";
+static XU: &str = "X-U";
+static XT: &str = "X-T";
+static XR: &str = "X-R";
+static XS: &str = "X-S";
 static DS: &str = "X-DEVELOPMENT-SKIP";
 
 
