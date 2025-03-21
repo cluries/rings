@@ -11,6 +11,7 @@ use redis::AsyncCommands;
 
 use crate::erx;
 use axum::response::IntoResponse;
+use axum::Router;
 use futures_util::future::BoxFuture;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -191,8 +192,10 @@ impl SigLayer {
         }
     }
 
-    pub fn to_service_builder(self) -> ServiceBuilder<Stack<SigLayer, Identity>> {
-        ServiceBuilder::new().layer(self)
+
+    /// 让SigLayer生效
+    pub fn integrated(self, router: Router) -> Router {
+        router.layer(ServiceBuilder::new().layer(self))
     }
 }
 
