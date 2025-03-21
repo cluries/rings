@@ -99,6 +99,7 @@ impl Signator {
             nonce_lifetime: DEFAULT_RAND_LIFE,
             key_loader,
             redis_client: redis::Client::open(redis_url).unwrap_or_else(|err| {
+                tracing::error!("{} {}", redis_url, err);
                 panic!("failed to connect to redis: {}", err);
             }),
         }
