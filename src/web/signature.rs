@@ -18,7 +18,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tower::{Layer, Service};
+use tower::layer::util::{Identity, Stack};
+use tower::{Layer, Service, ServiceBuilder};
 use tracing::info;
 
 static DEFAULT_RAND_LIFE: i64 = 300;
@@ -188,6 +189,16 @@ impl SigLayer {
         SigLayer {
             signator: Arc::new(s),
         }
+    }
+
+    pub fn to_service_builder(self) -> ServiceBuilder<Stack<SigLayer, Identity>> {
+        ServiceBuilder::new().layer(self)
+    }
+}
+
+impl Into<ServiceBuilder<Stack<SigLayer, Identity>>> for SigLayer {
+    fn into(self) -> ServiceBuilder<Stack<SigLayer, Identity>> {
+        ServiceBuilder::new().layer(self)
     }
 }
 
