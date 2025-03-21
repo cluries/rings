@@ -2,6 +2,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+use crate::tools::fs;
 
 /// Discard is a writer that discards all data written to it.
 struct Discard;
@@ -58,7 +59,8 @@ pub async fn logging_initialize() { //-> Vec<WorkerGuard> {
 
     let logs_dir = log_conf.dirs.trim();
     if logs_dir.len() > 0 {
-        if !crate::tools::fs::Is(logs_dir.to_string()).dir().await {
+        let is = fs::Is(logs_dir.to_string());
+        if !is.dir().await {
             panic!("log dir is not a directory: {}", logs_dir);
         }
         let prefix = format!("{}_rings.log", app_name);

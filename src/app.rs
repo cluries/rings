@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use crate::{
     rings::{RingsApplication, R},
     s,
@@ -7,6 +8,12 @@ use crate::{
 pub struct AppBuilder {
     rings_app: RingsApplication,
 }
+
+pub type AppBuilderWebReconfigor = (
+    String,
+    fn() -> Vec<axum::Router>,
+    fn(web: &mut crate::web::Web) -> &mut crate::web::Web,
+);
 
 impl AppBuilder {
     pub async fn new(defaults_name: &str) -> Self {
@@ -25,12 +32,23 @@ impl AppBuilder {
     }
 
     ///
-    pub async fn use_web(
-        &mut self,
-        reconfigor: Vec<(String, fn() -> Vec<axum::Router>, fn(web: &mut crate::web::Web) -> &mut crate::web::Web)>) -> &mut Self {
+    pub async fn use_web(&mut self, reconfigor: Vec<AppBuilderWebReconfigor>) -> &mut Self {
         let rebit = crate::conf::rebit()
             .read()
             .expect("Failed to read config rebit");
+
+        if rebit.webs.is_empty() {
+            return self;
+        }
+
+        let rings_app = Arc::clone(&self.rings_app);
+        let mut rings_app = match rings_app.try_write() {
+            Ok(w) => w,
+            Err(err) => {
+                tracing::error!("init_web rings write guard:{}", err);
+                panic!("{:?}", err);
+            }
+        };
 
         for wb in rebit.webs.iter() {
             let find = reconfigor.iter().find(|r| r.0.eq(&wb.name));
@@ -39,21 +57,13 @@ impl AppBuilder {
                     tracing::warn!("Reconfigor not found web iterm: {}", wb.name);
                     continue;
                 }
-                Some(v) => { v }
+                Some(v) => v,
             };
 
             let mut web = make_web(name, wb.bind_addr().as_str(), *router_maker);
             reconf(&mut web);
 
-            match self.rings_app.try_write() {
-                Ok(mut ring) => {
-                    ring.register_mod(web).await;
-                }
-                Err(err) => {
-                    tracing::error!("init_web rings write guard:{}", err);
-                    panic!("{:?}", err);
-                }
-            };
+            rings_app.register_mod(web).await;
         }
 
         self
