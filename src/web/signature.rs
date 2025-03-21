@@ -8,6 +8,7 @@ use crate::web::request::clone_request;
 use crate::web::url::parse_query;
 use redis::AsyncCommands;
 
+
 use crate::erx;
 use axum::response::IntoResponse;
 use futures_util::future::BoxFuture;
@@ -333,6 +334,15 @@ impl Payload {
         self.xr.clone().unwrap_or_default()
     }
 
+    pub fn val_or_default_s(&self) -> String {
+        self.xs.clone().unwrap_or_default()
+    }
+
+    #[allow(unused)]
+    pub fn val_or_default_t(&self) -> String {
+        self.xt.clone().unwrap_or_default()
+    }
+
     pub fn val_or_default_d(&self) -> String {
         self.ds.clone().unwrap_or_default()
     }
@@ -345,7 +355,7 @@ impl Payload {
             let debug = Debug {
                 payload: load,
                 key: key.clone(),
-                client: self.val_or_default_u(),
+                client: self.val_or_default_s(),
                 server: hash,
             };
             return Err((String::from("invalid signature"), debug));
