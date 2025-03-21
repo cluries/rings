@@ -1,10 +1,10 @@
 ///  struct GetDefault;
 ///  struct GetOption;
 ///  struct Has;
-///  
+///
 ///  fn settings() -> &'static RwLock<Config> 
 ///  fn rebit() -> &'static RwLock<Rebit>
-///  
+///
 ///  struct Rebit
 
 use std::cmp::PartialEq;
@@ -33,7 +33,7 @@ pub fn rebit() -> &'static RwLock<Rebit> {
                         name: "Rebit".to_string(),
                         short: "REBT".to_string(),
                         debug: true,
-                        web: Default::default(),
+                        webs: Default::default(),
                         model: Model { backends: vec![] },
                         log: None,
                     }
@@ -142,7 +142,7 @@ pub struct Rebit {
     pub name: String,
     pub short: String,
     pub debug: bool,
-    pub web: Web,
+    pub webs: Vec<Web>,
     pub model: Model,
     pub log: Option<Log>,
 }
@@ -156,6 +156,8 @@ pub struct Log {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Web {
+    pub name: String,
+    pub bind: Option<String>,
     pub port: u16,
 }
 
@@ -178,6 +180,8 @@ impl Default for Log {
 impl Default for Web {
     fn default() -> Self {
         Self {
+            name: format!("Web-{}", crate::tools::rand::rand_str(8)),
+            bind: None,
             port: 80,
         }
     }
@@ -189,7 +193,7 @@ impl Default for Rebit {
             name: "Rings".to_string(),
             short: "RING".to_string(),
             debug: true,
-            web: Default::default(),
+            webs: Default::default(),
             model: Model {
                 backends: vec![]
             },

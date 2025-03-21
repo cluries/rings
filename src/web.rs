@@ -67,8 +67,12 @@ pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>) -> We
     }
 }
 
-pub fn bind_port(port: u16) -> String {
-    format!("0.0.0.0:{}", port)
+
+impl crate::conf::Web {
+    pub fn bind_addr(&self) -> String {
+        let bind = self.bind.clone().unwrap_or("0.0.0.0".to_string());
+        format!("{}:{}", bind, self.port)
+    }
 }
 
 
