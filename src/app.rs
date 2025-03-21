@@ -4,7 +4,6 @@ use crate::{
     web::make_web,
 };
 
-
 pub struct AppBuilder {
     rings_app: RingsApplication,
 }
@@ -17,29 +16,33 @@ impl AppBuilder {
     }
 
     pub async fn use_model(&mut self) -> &mut Self {
-        let rebit = crate::conf::rebit().read().expect("Failed to read config rebit");
+        let rebit = crate::conf::rebit()
+            .read()
+            .expect("Failed to read config rebit");
         let backends = &rebit.model.backends;
         crate::model::initialize_model_connection(backends).await;
         self
     }
 
-
     ///
-    pub async fn use_web(&mut self, reconfigor: std::collections::HashMap<
-        String, (fn() -> Vec<axum::Router>, fn(web: &mut crate::web::Web) -> &mut crate::web::Web,)>) -> &mut Self {
+    pub async fn use_web(
+        &mut self,
+        reconfigor: Vec<(String, fn() -> Vec<axum::Router>, fn(web: &mut crate::web::Web) -> &mut crate::web::Web)>) -> &mut Self {
         let rebit = crate::conf::rebit()
             .read()
             .expect("Failed to read config rebit");
 
         for wb in rebit.webs.iter() {
-            if !reconfigor.contains_key(&wb.name) {
-                tracing::warn!("Reconfigor not found web iterm: {}", wb.name);
-                continue;
-            }
+            let find = reconfigor.iter().find(|r| r.0.eq(&wb.name));
+            let (name, router_maker, reconf) = match find {
+                None => {
+                    tracing::warn!("Reconfigor not found web iterm: {}", wb.name);
+                    continue;
+                }
+                Some(v) => { v }
+            };
 
-            let (router_maker, reconf) = reconfigor.get(&wb.name).unwrap();
-
-            let mut web = make_web(&wb.name, wb.bind_addr().as_str(), *router_maker);
+            let mut web = make_web(name, wb.bind_addr().as_str(), *router_maker);
             reconf(&mut web);
 
             match self.rings_app.try_write() {
@@ -62,7 +65,7 @@ impl AppBuilder {
         // self
     }
 
-    pub async fn build(self) -> RingsApplication {
+    pub fn build(self) -> RingsApplication {
         self.rings_app
     }
 }
