@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 ///  fn rebit() -> &'static RwLock<Rebit>
 ///
 ///  struct Rebit
-
 use std::cmp::PartialEq;
 use std::fmt;
 use std::str::FromStr;
@@ -23,27 +22,24 @@ pub fn settings() -> &'static RwLock<Config> {
 /// get rebit instance
 pub fn rebit() -> &'static RwLock<Rebit> {
     static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
-    REBIT.get_or_init(||
-        RwLock::new(
-            || -> Rebit {
-                let r = settings().read().unwrap().clone().try_deserialize::<Rebit>();
-                if cfg!(test) {
-                    Rebit {
-                        name: "Rebit".to_string(),
-                        short: "REBT".to_string(),
-                        debug: true,
-                        webs: Default::default(),
-                        model: Model { backends: vec![] },
-                        log: None,
-                    }
-                } else {
-                    r.unwrap_or_else(|e| panic!("rebit loading error: {}", e))
+    REBIT.get_or_init(|| {
+        RwLock::new(|| -> Rebit {
+            let r = settings().read().unwrap().clone().try_deserialize::<Rebit>();
+            if cfg!(test) {
+                Rebit {
+                    name: "Rebit".to_string(),
+                    short: "REBT".to_string(),
+                    debug: true,
+                    webs: Default::default(),
+                    model: Model { backends: vec![] },
+                    log: None,
                 }
-            }()
-        )
-    )
+            } else {
+                r.unwrap_or_else(|e| panic!("rebit loading error: {}", e))
+            }
+        }())
+    })
 }
-
 
 // #[cfg(not(test))]
 fn init_config() -> Config {
@@ -94,7 +90,7 @@ macro_rules! make_setting_getter_default {
             // let settings = settings().read();
             match settings().read() {
                 Ok(guard) => guard.$getter(k).unwrap_or(default),
-                Err(_) => default
+                Err(_) => default,
             }
         }
     };
@@ -107,7 +103,7 @@ macro_rules! make_setting_getter_option {
             // let settings = settings().read();
             match settings().read() {
                 Ok(guard) => guard.$getter(k).ok(),
-                Err(_) => None
+                Err(_) => None,
             }
         }
     };
@@ -131,7 +127,6 @@ pub struct GetDefault;
 pub struct GetOption;
 pub struct Has;
 
-
 make_setting_getter!(string, String, get_string);
 make_setting_getter!(boolean, bool, get_bool);
 make_setting_getter!(int, i64, get_int);
@@ -144,7 +139,7 @@ impl Has {
         let settings = settings().read();
         match settings {
             Ok(guard) => guard.get::<T>(k).is_ok(),
-            Err(_) => false
+            Err(_) => false,
         }
     }
 }
@@ -165,7 +160,6 @@ pub struct Log {
     pub console: bool,
     pub dirs: String,
 }
-
 
 pub type NestedMap = std::collections::HashMap<String, std::collections::HashMap<String, String>>;
 
@@ -195,12 +189,7 @@ impl Default for Log {
 
 impl Default for Web {
     fn default() -> Self {
-        Self {
-            name: format!("Web-{}", crate::tools::rand::rand_str(8)),
-            bind: None,
-            port: 80,
-            middleware: None,
-        }
+        Self { name: format!("Web-{}", crate::tools::rand::rand_str(8)), bind: None, port: 80, middleware: None }
     }
 }
 
@@ -211,9 +200,7 @@ impl Default for Rebit {
             short: "RING".to_string(),
             debug: true,
             webs: Default::default(),
-            model: Model {
-                backends: vec![]
-            },
+            model: Model { backends: vec![] },
             log: Default::default(),
         }
     }
@@ -252,7 +239,6 @@ pub struct Backend {
 pub struct Model {
     pub backends: Vec<Backend>,
 }
-
 
 #[allow(unused)]
 #[cfg(test)]

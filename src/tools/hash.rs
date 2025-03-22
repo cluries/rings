@@ -1,5 +1,5 @@
 use hmac::{Hmac, Mac};
-use sha1::{Sha1, Digest};
+use sha1::{Digest, Sha1};
 
 type HmacSha1 = Hmac<Sha1>;
 
@@ -15,11 +15,10 @@ pub fn sha1(c: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_hmac_sha1() {
         println!("{}", hmac_sha1("key", "value"));
@@ -30,7 +29,3 @@ mod tests {
         println!("{:?}", sha1("aaa"));
     }
 }
-
-
-
-

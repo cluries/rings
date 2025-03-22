@@ -5,7 +5,7 @@ pub enum RDBMS {
     MySQL,
     SQLite,
 }
- 
+
 pub trait JsonInquirer {
     /// Extract a JSON field value
     fn extract(&self, field: &str) -> String;
@@ -38,7 +38,6 @@ pub trait JsonInquirer {
     fn build_array(&self, elements: Vec<&str>) -> String;
 }
 
-
 pub trait JsonOperator {
     /// Set a JSON field value
     fn set(&self, field: &str, value: &str) -> String;
@@ -64,7 +63,6 @@ pub trait JsonOperator {
     /// Update element in JSON array
     fn update(&self, index: i32, value: &str) -> String;
 }
-
 
 impl JsonInquirer for RDBMS {
     fn extract(&self, field: &str) -> String {
@@ -136,15 +134,15 @@ impl JsonInquirer for RDBMS {
             RDBMS::Postgres => {
                 let pairs_str: Vec<String> = pairs.iter().map(|(k, v)| format!("'{}', {}", k, v)).collect();
                 format!("json_build_object({})", pairs_str.join(", "))
-            }
+            },
             RDBMS::MySQL => {
                 let pairs_str: Vec<String> = pairs.iter().map(|(k, v)| format!("'{}', {}", k, v)).collect();
                 format!("JSON_OBJECT({})", pairs_str.join(", "))
-            }
+            },
             RDBMS::SQLite => {
                 let pairs_str: Vec<String> = pairs.iter().map(|(k, v)| format!("'{}', {}", k, v)).collect();
                 format!("json_object({})", pairs_str.join(", "))
-            }
+            },
         }
     }
 
@@ -156,7 +154,6 @@ impl JsonInquirer for RDBMS {
         }
     }
 }
-
 
 impl JsonOperator for RDBMS {
     fn set(&self, field: &str, value: &str) -> String {
@@ -224,7 +221,6 @@ impl JsonOperator for RDBMS {
     }
 }
 
-
 /// Add tests for JSON operations
 #[cfg(test)]
 mod tests {
@@ -240,16 +236,10 @@ mod tests {
 
         // Test array/object building
         let pairs = vec![("name", "value"), ("age", "25")];
-        assert_eq!(
-            db.build_object(pairs),
-            "json_build_object('name', value, 'age', 25)"
-        );
+        assert_eq!(db.build_object(pairs), "json_build_object('name', value, 'age', 25)");
 
         let elements = vec!["1", "2", "3"];
-        assert_eq!(
-            db.build_array(elements),
-            "json_build_array(1, 2, 3)"
-        );
+        assert_eq!(db.build_array(elements), "json_build_array(1, 2, 3)");
     }
 
     #[test]
@@ -261,15 +251,7 @@ mod tests {
         assert_eq!(db.exists("age"), "JSON_CONTAINS_PATH(data, 'one', '$.age')");
 
         // Test modifications
-        assert_eq!(
-            db.set("name", "John"),
-            "JSON_SET(data, '$.name', 'John')"
-        );
-        assert_eq!(
-            db.append("value"),
-            "JSON_ARRAY_APPEND(data, '$', 'value')"
-        );
+        assert_eq!(db.set("name", "John"), "JSON_SET(data, '$.name', 'John')");
+        assert_eq!(db.append("value"), "JSON_ARRAY_APPEND(data, '$', 'value')");
     }
 }
-
-

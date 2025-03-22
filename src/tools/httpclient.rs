@@ -7,7 +7,6 @@ use crate::web::url::join as url_join;
 // 默认的User-Agent字符串
 static DEFAULT_USER_AGENT: &str = "Rings/1.0.0 (Linux; en-US; Iusworks.inc)";
 
-
 pub struct ClientBuilder {
     base: String,
     headers: reqwest::header::HeaderMap,
@@ -20,7 +19,7 @@ pub struct Client {
     base: String,
     cli: reqwest::Client,
 }
- 
+
 pub struct UserAgentBuilder {
     product: String,
     version: String,
@@ -75,38 +74,34 @@ impl UserAgentBuilder {
     // 构建标准格式的User-Agent字符串
     pub fn build(&self) -> String {
         let mut parts = vec![format!("{}/{}", self.product, self.version)];
-        
+
         let mut details = Vec::new();
-        
+
         if let Some(platform) = &self.platform {
             details.push(platform.clone());
         }
-        
+
         if let Some(os) = &self.os {
-            let os_str = if let Some(ver) = &self.os_version {
-                format!("{}; {}", os, ver)
-            } else {
-                os.clone()
-            };
+            let os_str = if let Some(ver) = &self.os_version { format!("{}; {}", os, ver) } else { os.clone() };
             details.push(os_str);
         }
-        
+
         if let Some(lang) = &self.language {
             details.push(lang.clone());
         }
-        
+
         if let Some(vendor) = &self.vendor {
             details.push(vendor.clone());
         }
-        
+
         if !details.is_empty() {
             parts.push(format!("({})", details.join("; ")));
         }
-        
+
         for comment in &self.comments {
             parts.push(format!("[{}]", comment));
         }
-        
+
         parts.join(" ")
     }
 }
@@ -163,7 +158,6 @@ impl ClientBuilder {
             builder = builder.proxy(proxy);
         }
 
-
         if let Some(user_agent) = &self.user_agent {
             builder = builder.user_agent(user_agent);
         } else {
@@ -185,7 +179,6 @@ impl ClientBuilder {
     }
 }
 
-
 impl Client {
     fn human_error<T: ToString>(error: T) -> String {
         error.to_string()
@@ -196,11 +189,7 @@ impl Client {
         // let url = url_join(&self.base, path);
         // let response = self.cli.get(url).send().await.map_err(|e| e.to_string())?;
 
-        Self::_response_untyped(
-            self.cli.get(
-                url_join(&self.base, path)
-            ).send().await.map_err(Self::human_error)?
-        ).await
+        Self::_response_untyped(self.cli.get(url_join(&self.base, path)).send().await.map_err(Self::human_error)?).await
     }
 
     pub async fn post(&self, path: &str, body: String) -> Result<String, String> {
@@ -246,7 +235,6 @@ impl Client {
         Self::_response_typed(response).await
     }
 
-
     pub async fn put_typed<ResponseT, RequestT>(&self, path: &str, params: &RequestT) -> Result<ResponseT, String>
     where
         ResponseT: serde::de::DeserializeOwned,
@@ -275,7 +263,6 @@ impl Client {
         Self::_response_typed(response).await
     }
 
-
     pub async fn get_valued(&self, path: &str) -> Result<serde_json::Value, String> {
         self.get_typed(path).await
     }
@@ -295,9 +282,7 @@ impl Client {
     }
 
     pub async fn delete_valued(&self, path: &str) -> Result<serde_json::Value, String> {
-        self.delete_typed(
-            path
-        ).await
+        self.delete_typed(path).await
     }
     pub async fn head_valued(&self, path: &str) -> Result<serde_json::Value, String> {
         self.head_typed(path).await
@@ -306,11 +291,7 @@ impl Client {
     async fn _response_untyped(response: Response) -> Result<String, String> {
         let status = response.status();
         let body = response.text().await.map_err(Self::human_error)?;
-        if status.is_success() {
-            Ok(body)
-        } else {
-            Err(body)
-        }
+        if status.is_success() { Ok(body) } else { Err(body) }
     }
 
     async fn _response_typed<T>(response: Response) -> Result<T, String>
@@ -318,14 +299,9 @@ impl Client {
         T: serde::de::DeserializeOwned,
     {
         if response.status().is_success() {
-            Ok(
-                response.json::<T>().await.map_err(Self::human_error)?
-            )
+            Ok(response.json::<T>().await.map_err(Self::human_error)?)
         } else {
-            Err(
-                response.text().await.map_err(Self::human_error)?
-            )
+            Err(response.text().await.map_err(Self::human_error)?)
         }
     }
 }
-

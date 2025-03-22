@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use crate::web::url::url_encode;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub trait Connectable {
     fn connection_string(&self, conf: ConnectBasic, options: Option<HashMap<String, String>>) -> String;
@@ -10,17 +10,16 @@ pub trait ConnectProtocol {
     fn protocol(&self) -> &'static str;
 }
 
-
 /// 数据库连接信息
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ConnectBasic {
-    alias: String, // 别名, 用于连接时的标识
-    host: String, // 主机地址
-    port: u16, // 端口
-    name: String, // 数据库名称
-    user: String, // 用户名
-    pass: String, // 密码
-    charset: Option<String>, // 字符集
+    alias: String,                    // 别名, 用于连接时的标识
+    host: String,                     // 主机地址
+    port: u16,                        // 端口
+    name: String,                     // 数据库名称
+    user: String,                     // 用户名
+    pass: String,                     // 密码
+    charset: Option<String>,          // 字符集
     options: HashMap<String, String>, // 其他选项
 }
 
@@ -48,7 +47,6 @@ pub enum DBMS {
     MultiModel(MultiModel),
 }
 
-
 /// 关系型数据库
 #[derive(Debug, Clone, PartialEq)]
 pub enum Relational {
@@ -58,7 +56,6 @@ pub enum Relational {
     SQLite,
     SQLServer,
 }
-
 
 /// 时序数据库
 #[derive(Debug, Clone, PartialEq)]
@@ -78,7 +75,6 @@ pub enum Document {
     RethinkDB,
 }
 
-
 /// 键值数据库
 #[derive(Debug, Clone, PartialEq)]
 pub enum KeyValue {
@@ -88,7 +84,6 @@ pub enum KeyValue {
     Cassandra,
 }
 
-
 /// 图数据库
 #[derive(Debug, Clone, PartialEq)]
 pub enum Graph {
@@ -97,7 +92,6 @@ pub enum Graph {
     Titan,
     ArangoDB,
 }
-
 
 /// 列式数据库
 #[derive(Debug, Clone, PartialEq)]
@@ -116,7 +110,6 @@ pub enum Search {
     Lucene,
     Xapian,
 }
-
 
 /// 多模型数据库
 #[derive(Debug, Clone, PartialEq)]
@@ -290,7 +283,7 @@ impl ConnectBasic {
     pub fn options(&self) -> &HashMap<String, String> {
         &self.options
     }
-    
+
     pub fn basic_connection_string(&self, protocol: &str, options: Option<HashMap<String, String>>) -> String {
         let mut c = format!("{}://{}:{}/{}?", protocol, self.host, self.port, self.name);
         // 添加用户名和密码
@@ -313,7 +306,6 @@ impl ConnectBasic {
         c
     }
 }
-
 
 #[cfg(test)]
 #[allow(unused)]

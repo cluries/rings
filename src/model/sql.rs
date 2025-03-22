@@ -2,7 +2,6 @@ pub struct Like {
     val: String,
 }
 
-
 impl Like {
     pub fn new(val: String) -> Self {
         Self { val }
@@ -32,5 +31,3 @@ impl From<String> for Like {
         Self { val }
     }
 }
-
-

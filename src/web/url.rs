@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 use tracing::error;
 
-
 /// Join two url path
-pub fn join(base:&str, other:&str)->String{
+pub fn join(base: &str, other: &str) -> String {
     let be = base.ends_with("/");
     let os = other.starts_with("/");
-    if be && os{
+    if be && os {
         return format!("{}{}", base, other[1..].to_string());
     }
 
-    if !be && !os{
+    if !be && !os {
         return format!("{}/{}", base, other);
     }
 
@@ -34,20 +33,18 @@ pub fn url_decode(val: &str) -> String {
 /// then get the query string and parse it
 pub fn parse_url_query(url: &str) -> HashMap<String, String> {
     match url::Url::parse(url) {
-        Ok(url) => {
-            url.query_pairs().into_owned().collect()
-        }
+        Ok(url) => url.query_pairs().into_owned().collect(),
 
         Err(err) => {
             error!("error {} parse:{}", err, url);
             HashMap::new()
-        }
+        },
     }
 }
 
 /// Parse query string, return a hashmap
 /// it's different from parse_url_query, because it's not url
-/// 
+///
 pub fn parse_query(query: &str) -> HashMap<String, String> {
     // let query = query.trim();
     // if query.is_empty() {
@@ -56,7 +53,3 @@ pub fn parse_query(query: &str) -> HashMap<String, String> {
 
     url::form_urlencoded::parse(query.as_bytes()).into_owned().collect()
 }
-
-
-
-

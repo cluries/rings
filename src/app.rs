@@ -9,18 +9,10 @@ pub struct AppBuilder {
     rings_app: RingsApplication,
 }
 
-pub type AppBuilderWebReconfigor = (
-    String,
-    fn() -> Vec<axum::Router>,
-    fn(web: &mut crate::web::Web) -> &mut crate::web::Web,
-);
+pub type AppBuilderWebReconfigor = (String, fn() -> Vec<axum::Router>, fn(web: &mut crate::web::Web) -> &mut crate::web::Web);
 
 pub fn web_reconfig_simple(name: &str, router_maker: fn() -> Vec<axum::Router>) -> AppBuilderWebReconfigor {
-    (
-        name.to_string(),
-        router_maker,
-        app_builder_web_reconfigor_extra_default,
-    )
+    (name.to_string(), router_maker, app_builder_web_reconfigor_extra_default)
 }
 
 fn app_builder_web_reconfigor_extra_default(web: &mut crate::web::Web) -> &mut crate::web::Web {
@@ -55,7 +47,7 @@ impl AppBuilder {
             Err(err) => {
                 tracing::error!("init_web rings write guard:{}", err);
                 panic!("{:?}", err);
-            }
+            },
         };
 
         for wb in rebit.webs.iter() {
@@ -64,7 +56,7 @@ impl AppBuilder {
                 None => {
                     tracing::warn!("Reconfigor not found web iterm: {}", wb.name);
                     continue;
-                }
+                },
                 Some(v) => v,
             };
 

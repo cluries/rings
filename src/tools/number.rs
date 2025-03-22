@@ -16,7 +16,6 @@ pub enum Number {
     F64(f64),
 }
 
-
 // String Convert
 pub struct StrC;
 
@@ -37,4 +36,3 @@ impl StrC {
         f64::from_str(value).unwrap_or(d)
     }
 }
-

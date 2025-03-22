@@ -1,0 +1,23 @@
+version = "Two"
+
+format_code = true
+
+use_small_heuristics = "Max"
+max_width = 140
+chain_width = 120
+single_line_if_else_max_width = 100
+
+
+reorder_imports = true
+group_imports = "StdExternalCrate"
+imports_indent = "Block"
+merge_imports = true
+reorder_imports_alphabetically = true
+
+
+merge_derives = false
+format_macro_matchers = true
+
+match_block_trailing_comma = true
+fn_args_layout = "Compressed"
+

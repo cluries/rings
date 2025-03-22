@@ -1,3 +1,1 @@
-pub struct Session {
-    
-}
+pub struct Session {}

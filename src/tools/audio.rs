@@ -1,22 +1,15 @@
-
-
 // Text-to-Speech
-pub struct TTS { 
+pub struct TTS {
     texts: Vec<String>,
 }
 
-
-// Speech-to-Text (STT) 
+// Speech-to-Text (STT)
 // ASR（Automatic Speech Recognition）
-pub struct STT {
-
-}
+pub struct STT {}
 
 impl TTS {
-    pub fn new(texts:Vec<String>) -> Self {
-        Self {
-            texts,
-        }
+    pub fn new(texts: Vec<String>) -> Self {
+        Self { texts }
     }
 
     pub fn texts(&self) -> &Vec<String> {
@@ -28,6 +21,6 @@ impl TTS {
     }
 
     // pub async speech(&self) -> Result<Vec<u8>, erx::Erx> {
-        
+
     // }
 }

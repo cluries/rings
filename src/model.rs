@@ -1,16 +1,15 @@
+pub mod coffee;
 pub mod conf;
+pub mod dbms;
+pub mod jsons;
+pub mod preset;
 pub mod sql;
 pub mod status;
-pub mod zero;
-pub mod preset;
-pub mod jsons;
-pub mod dbms;
-pub mod coffee;
 mod value;
+pub mod zero;
 
-use redis;
 use crate::erx;
-
+use redis;
 
 // use deadpool_redis::{
 //     redis::{
@@ -20,24 +19,22 @@ use crate::erx;
 //     Runtime as DeadPRuntime,
 // };
 
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::sync::RwLock;
 use std::time::Duration;
 use tokio::sync::OnceCell;
 use tracing::{info, span, warn};
-use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
 use crate::conf::{Backend, BackendKind};
 use crate::web::url;
 
-
-/// DBResult is a type alias for erx::ResultE<T> 
+/// DBResult is a type alias for erx::ResultE<T>
 /// actually it is Result<T, erx::Erx>
 pub type DBResult<T> = erx::ResultE<T>;
 
 /// DBResults is a type alias for erx::ResultE<Vec<T>>
 /// actually it is Result<Vec<T>, erx::Erx>
 pub type DBResults<T> = erx::ResultE<Vec<T>>;
-
 
 /// DBResultsRelated is a struct that contains results, total, offset
 /// designed for pagination results/// : Vec<T> stored current page results
@@ -60,7 +57,6 @@ pub fn shared() -> erx::ResultE<&'static DatabaseConnection> {
     SHARED_DB_CONNECTION.get().ok_or("SHARED_DB_CONNECTION get failed".into())
 }
 
-
 /// For async connections, connection pooling isn't necessary, unless blocking commands are used.
 /// The MultiplexedConnection is cloneable and can be used safely from multiple threads, so a single connection can be easily reused.
 /// For automatic reconnections consider using ConnectionManager with the connection-manager feature.
@@ -69,7 +65,6 @@ pub fn make_redis_client() -> erx::ResultE<redis::Client> {
     let s = SHARED_REDIS_CONNECT_STRING.read().map_err(erx::smp)?.clone();
     redis::Client::open(s).map_err(erx::smp)
 }
-
 
 // get redis connection from pool
 // pub async fn get_redis_client() -> erx::ResultE<deadpool_redis::Connection> {
@@ -81,7 +76,6 @@ pub fn make_redis_client() -> erx::ResultE<redis::Client> {
 //
 //     Ok(pool.get().await.map_err(erx::smp)?)
 // }
-
 
 /// initialize model connection
 /// call once when application initialized
@@ -96,9 +90,7 @@ pub async fn initialize_model_connection(backends: &Vec<Backend>) {
 
     async fn postgre(backend: &Backend) {
         info!("Connecting to postgres: {:?}", backend.connect);
-        SHARED_DB_CONNECTION.get_or_init(|| async {
-            new_database_connection(backend).await
-        }).await;
+        SHARED_DB_CONNECTION.get_or_init(|| async { new_database_connection(backend).await }).await;
     }
 
     async fn redis(backend: &Backend) {
@@ -129,11 +121,8 @@ pub async fn initialize_model_connection(backends: &Vec<Backend>) {
 pub async fn new_database_connection(backend: &Backend) -> DatabaseConnection {
     match backend.kind {
         BackendKind::Redis => {
-            panic!(
-                "Redis Backend '{}' connect is not supported yet",
-                backend.name
-            );
-        }
+            panic!("Redis Backend '{}' connect is not supported yet", backend.name);
+        },
         BackendKind::Postgres => (),
     };
 
@@ -149,7 +138,18 @@ pub async fn new_database_connection(backend: &Backend) -> DatabaseConnection {
 
     use log;
 
-    opt.max_connections(MAX_CONNECTIONS).min_connections(MIN_CONNECTIONS).connect_timeout(CONNECT_TIMEOUT).acquire_timeout(ACQUIRE_TIMEOUT).idle_timeout(IDLE_TIMEOUT).max_lifetime(MAX_LIFETIME).connect_lazy(false).sqlx_logging(true).sqlx_logging_level(log::LevelFilter::Info).sqlx_logging(true).sqlx_logging_level(log::LevelFilter::Info).sqlx_slow_statements_logging_settings(log::LevelFilter::Warn, Duration::from_secs(2));
+    opt.max_connections(MAX_CONNECTIONS)
+        .min_connections(MIN_CONNECTIONS)
+        .connect_timeout(CONNECT_TIMEOUT)
+        .acquire_timeout(ACQUIRE_TIMEOUT)
+        .idle_timeout(IDLE_TIMEOUT)
+        .max_lifetime(MAX_LIFETIME)
+        .connect_lazy(false)
+        .sqlx_logging(true)
+        .sqlx_logging_level(log::LevelFilter::Info)
+        .sqlx_logging(true)
+        .sqlx_logging_level(log::LevelFilter::Info)
+        .sqlx_slow_statements_logging_settings(log::LevelFilter::Warn, Duration::from_secs(2));
 
     if backend.kind == BackendKind::Postgres && connection_string.contains("currentSchema") {
         let params = url::parse_url_query(connection_string.as_str());
@@ -175,7 +175,6 @@ impl<T> DBResultsRelated<T> {
         self.offset
     }
 }
-
 
 /// shared database connection
 static SHARED_DB_CONNECTION: OnceCell<DatabaseConnection> = OnceCell::const_new();

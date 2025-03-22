@@ -5,7 +5,6 @@ use crate::erx;
 use std::env;
 use std::path::{Path, PathBuf};
 
-
 #[derive(Debug, Clone)]
 pub struct Directory(pub String);
 
@@ -14,7 +13,6 @@ pub struct Content(pub String);
 
 #[derive(Debug, Clone)]
 pub struct Is(pub String);
-
 
 pub fn normalize_path(path: &Path) -> PathBuf {
     let mut stack = Vec::new();
@@ -25,9 +23,9 @@ pub fn normalize_path(path: &Path) -> PathBuf {
             std::path::Component::RootDir => {
                 stack.clear();
                 stack.push(component);
-            }
+            },
             // 当前目录：忽略
-            std::path::Component::CurDir => {}
+            std::path::Component::CurDir => {},
             // 上级目录：弹出栈顶元素（如果可能）
             std::path::Component::ParentDir => {
                 if let Some(std::path::Component::RootDir) = stack.last() {
@@ -35,7 +33,7 @@ pub fn normalize_path(path: &Path) -> PathBuf {
                 } else if !stack.is_empty() {
                     stack.pop();
                 }
-            }
+            },
             // 普通路径组件：直接入栈
             _ => stack.push(component),
         }
@@ -78,7 +76,6 @@ impl Is {
     }
 }
 
-
 impl Directory {
     const BIT_FILE: i32 = 0;
     const BIT_DIR: i32 = 1;
@@ -102,7 +99,10 @@ impl Directory {
 
         while let Some(entry) = dir.next_entry().await.map_err(erx::smp)? {
             let ft = entry.file_type().await.map_err(erx::smp)?;
-            if (((1 << Self::BIT_FILE) & focus) != 0 && ft.is_file()) || (((1 << Self::BIT_DIR) & focus) != 0 && ft.is_dir()) || (((1 << Self::BIT_SYMLINK) & focus) != 0 && ft.is_symlink()) {
+            if (((1 << Self::BIT_FILE) & focus) != 0 && ft.is_file())
+                || (((1 << Self::BIT_DIR) & focus) != 0 && ft.is_dir())
+                || (((1 << Self::BIT_SYMLINK) & focus) != 0 && ft.is_symlink())
+            {
                 results.push(entry.file_name().to_string_lossy().into_owned());
             }
         }
@@ -110,7 +110,6 @@ impl Directory {
         Ok(results)
     }
 }
-
 
 impl Content {
     pub async fn len(&self) -> Result<u64, erx::Erx> {
@@ -123,7 +122,6 @@ impl Content {
         fd.read_exact(&mut buffer).await.map_err(erx::smp)?;
         Ok(buffer)
     }
-
 
     pub async fn head_lines(&self, lines: usize) -> Result<Vec<String>, erx::Erx> {
         let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
@@ -139,7 +137,7 @@ impl Content {
                     result.push(line.trim_end().to_string());
                     count += 1;
                     line.clear();
-                }
+                },
                 Err(e) => return Err(erx::smp(e)),
             }
         }
@@ -147,12 +145,10 @@ impl Content {
         Ok(result)
     }
 
-
     pub async fn head_string(&self, size: usize) -> Result<String, erx::Erx> {
         let v8 = self.head(size).await?;
         Ok(String::from_utf8_lossy(&v8).into_owned())
     }
-
 
     pub async fn tail(&self, size: usize) -> Result<Vec<u8>, erx::Erx> {
         let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
@@ -181,7 +177,6 @@ impl Content {
 
         // Use a circular buffer to store the last N lines
         let mut line_buffer = Vec::with_capacity(lines);
-
 
         // For very large files, read in chunks from the end
         let chunk_size: usize = (lines / 32).clamp(2, 16) * 1024;
@@ -217,7 +212,6 @@ impl Content {
         Ok(line_buffer)
     }
 
-
     pub async fn tail_string(&self, size: usize) -> Result<String, erx::Erx> {
         let v8 = self.tail(size).await?;
         Ok(String::from_utf8_lossy(&v8).into_owned())
@@ -242,7 +236,6 @@ impl Content {
         Ok(String::from_utf8_lossy(&v8).into_owned())
     }
 
-
     pub async fn truncate(&self, size: u64) -> Result<(), erx::Erx> {
         let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
         fd.set_len(size).await.map_err(erx::smp)
@@ -254,7 +247,6 @@ impl Content {
         fd.flush().await.map_err(erx::smp)
     }
 
-
     pub async fn append(&self, contents: &str) -> Result<(), erx::Erx> {
         let mut fd = tokio::fs::OpenOptions::new().append(true).open(&self.0).await.map_err(erx::smp)?;
         fd.write_all(contents.as_bytes()).await.map_err(erx::smp)?;
@@ -264,7 +256,6 @@ impl Content {
     pub async fn clear(&self) -> Result<(), erx::Erx> {
         self.truncate(0).await
     }
-
 
     pub async fn json<T: DeserializeOwned>(&self) -> Result<T, erx::Erx> {
         let json = self.utf8_string().await?;
@@ -282,7 +273,6 @@ impl Into<Directory> for Is {
         Directory(self.0)
     }
 }
-
 
 impl From<Directory> for Is {
     fn from(dir: Directory) -> Self {
@@ -302,7 +292,6 @@ impl From<Content> for Is {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -310,9 +299,7 @@ mod tests {
 
     #[test]
     fn test_join_path() {
-        let c = join_path(vec![
-            "/root/user/work", "../notin", "name/d"
-        ]);
+        let c = join_path(vec!["/root/user/work", "../notin", "name/d"]);
 
         println!("{:?}", c);
     }

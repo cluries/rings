@@ -4,14 +4,11 @@ pub mod tools {
     pub fn project_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
     }
-    
+
     pub fn src_dir() -> PathBuf {
         project_dir().join("src")
     }
-    
-   
 }
-
 
 #[cfg(test)]
 mod tests {

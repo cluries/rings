@@ -1,10 +1,7 @@
-use mlua::{
-    Error as LuaError, Function as LuaFunction, Lua as LuaLua,
-};
+use mlua::{Error as LuaError, Function as LuaFunction, Lua as LuaLua};
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-
 
 pub struct LuaBridge {
     code: String,
@@ -12,18 +9,13 @@ pub struct LuaBridge {
     rust_functions: Arc<Mutex<HashMap<String, Box<dyn Fn(&LuaLua) -> mlua::Result<LuaFunction> + Send + Sync>>>>,
 }
 
-
 fn re<T: ToString>(e: T) -> LuaError {
     mlua::Error::RuntimeError(e.to_string())
 }
 
 impl LuaBridge {
     pub fn new(code: String) -> Self {
-        LuaBridge {
-            code,
-            lua: Arc::new(Mutex::new(LuaLua::new())),
-            rust_functions: Arc::new(Mutex::new(HashMap::new())),
-        }
+        LuaBridge { code, lua: Arc::new(Mutex::new(LuaLua::new())), rust_functions: Arc::new(Mutex::new(HashMap::new())) }
     }
 
     pub fn register_function<F>(&mut self, name: &str, func: F) -> mlua::Result<()>
@@ -43,7 +35,6 @@ impl LuaBridge {
 
         lua.load(&self.code).exec().map(|_| Ok(()))?
     }
-
 
     pub fn get_global<T: mlua::FromLua>(&self, name: &str) -> mlua::Result<T> {
         let lua = self.lua.try_lock().map_err(re)?;
@@ -72,7 +63,6 @@ impl LuaBridge {
 unsafe impl Send for LuaBridge {}
 unsafe impl Sync for LuaBridge {}
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,11 +82,9 @@ mod tests {
                 let a = a + 200;
                 let r = a * 2 + b;
 
-
                 Ok(format!("{} + {} + 2", get_name(), r))
             })
         });
-
 
         c.unwrap();
 
@@ -104,7 +92,6 @@ mod tests {
 
         // 执行Lua代码
         bridge.execute().unwrap();
-
 
         // 测试调用函数
         for _ in 0..10 {

@@ -1,6 +1,5 @@
 /// signature.rs:
 /// an api middleware for signature
-
 use crate::erx::{Erx, Layouted, LayoutedC};
 use crate::tools::hash;
 use crate::web::api::Out;
@@ -25,18 +24,15 @@ use tracing::info;
 
 static DEFAULT_RAND_LIFE: i64 = 300;
 
-
 static SIGN_STR: &str = "SIGN";
 static PAYL_STR: &str = "PAYL";
 static FRMT_STR: &str = "FRMT";
 static LOAD_STR: &str = "LOAD";
 static INVD_STR: &str = "INVD";
 
-
 fn make_code(detail: &str) -> LayoutedC {
     Layouted::middleware(SIGN_STR, detail)
 }
-
 
 macro_rules! rout {
     ($x:expr) => {
@@ -68,7 +64,7 @@ macro_rules! rout {
     };
 }
 
-pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output=Result<String, Erx>> + Send>> + Send + Sync>;
+pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
 
 pub struct Signator {
     rear: String, // 后门，开发时候方便用
@@ -131,7 +127,9 @@ impl Signator {
             }
         }
 
-        self.rand_guard(payload.val_or_default_u(), payload.val_or_default_r()).await.map_err(|e| rout!(INVD_STR, e.message_string()))?;
+        self.rand_guard(payload.val_or_default_u(), payload.val_or_default_r())
+            .await
+            .map_err(|e| rout!(INVD_STR, e.message_string()))?;
 
         use crate::web::context::Context;
         let context = Context::new(payload.val_or_default_u());
@@ -180,18 +178,17 @@ impl SigLayer {
         Self::with_rear(redis_url, key_loader, excludes, "".to_string())
     }
 
-    pub fn with_rear(redis_url: &str, key_loader: KeyLoader, excludes: Vec<fn(parts: &axum::http::request::Parts) -> bool>, rear: String) -> Self {
+    pub fn with_rear(
+        redis_url: &str, key_loader: KeyLoader, excludes: Vec<fn(parts: &axum::http::request::Parts) -> bool>, rear: String,
+    ) -> Self {
         info!("new signator: {}", redis_url);
         let mut s = Signator::with_rear(redis_url, key_loader, rear);
         for exclude in excludes {
             s.add_exclude(exclude);
         }
 
-        SigLayer {
-            signator: Arc::new(s),
-        }
+        SigLayer { signator: Arc::new(s) }
     }
-
 
     /// 让SigLayer生效
     pub fn integrated(self, router: Router) -> Router {
@@ -212,16 +209,13 @@ where
     type Service = SigMiddle<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        SigMiddle {
-            inner,
-            signator: Arc::clone(&self.signator),
-        }
+        SigMiddle { inner, signator: Arc::clone(&self.signator) }
     }
 }
 
 impl<S> Service<axum::extract::Request> for SigMiddle<S>
 where
-    S: Service<axum::extract::Request, Response=axum::response::Response> + Send + Clone + 'static,
+    S: Service<axum::extract::Request, Response = axum::response::Response> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
     type Response = S::Response;
@@ -249,7 +243,7 @@ where
                 Ok(request) => {
                     let response: axum::response::Response = inner.call(request).await?;
                     Ok(response)
-                }
+                },
                 Err(response) => Ok(response),
             }
         })
@@ -278,22 +272,18 @@ struct Debug {
     client: String,
 }
 
-
 static XU: &str = "X-U";
 static XT: &str = "X-T";
 static XR: &str = "X-R";
 static XS: &str = "X-S";
 static DS: &str = "X-DEVELOPMENT-SKIP";
 
-
 impl Payload {
     async fn from_request(req: axum::extract::Request) -> Result<Self, String> {
         let (parts, body) = req.into_parts();
 
         let headers = parts.headers;
-        let header = |n| -> Option<String> {
-            headers.get(n).and_then(|value| value.to_str().ok()).map(String::from)
-        };
+        let header = |n| -> Option<String> { headers.get(n).and_then(|value| value.to_str().ok()).map(String::from) };
 
         let xu = header(XU);
         let xt = header(XT);
@@ -310,7 +300,12 @@ impl Payload {
 
         use crate::web::define::HttpMethod;
 
-        let body_guard = HttpMethod::POST.is(method) || HttpMethod::PUT.is(method) || HttpMethod::DELETE.is(method) || HttpMethod::OPTIONS.is(method) || HttpMethod::PATCH.is(method) || HttpMethod::PATCH.is(method);
+        let body_guard = HttpMethod::POST.is(method)
+            || HttpMethod::PUT.is(method)
+            || HttpMethod::DELETE.is(method)
+            || HttpMethod::OPTIONS.is(method)
+            || HttpMethod::PATCH.is(method)
+            || HttpMethod::PATCH.is(method);
 
         if body_guard {
             const LIMIT: usize = 1024 * 1024 * 32;
@@ -324,7 +319,7 @@ impl Payload {
                             Err(err) => Err(err.to_string()),
                         }
                     }
-                }
+                },
                 Err(err) => Err(err.to_string()),
             };
 
@@ -366,12 +361,7 @@ impl Payload {
         let hash = hash::hmac_sha1(&load, &key);
 
         if !hash.eq(self.xs.as_ref().unwrap_or(&String::default())) {
-            let debug = Debug {
-                payload: load,
-                key: key.clone(),
-                client: self.val_or_default_s(),
-                server: hash,
-            };
+            let debug = Debug { payload: load, key: key.clone(), client: self.val_or_default_s(), server: hash };
             return Err((String::from("invalid signature"), debug));
         }
 

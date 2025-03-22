@@ -43,4 +43,3 @@ macro_rules! migrate_drop_tables {
         }
     };
 }
-

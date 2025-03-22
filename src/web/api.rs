@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 pub type OutAny = Out<serde_json::Value>;
 
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Out<T: Serialize> {
     pub code: String,
@@ -18,41 +17,23 @@ pub struct Out<T: Serialize> {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,
-
 }
-
 
 impl<T: Serialize> Out<T> {
     pub fn new(code: LayoutedC, message: Option<String>, data: Option<T>) -> Self {
-        Out {
-            code: code.into(),
-            message,
-            data,
-        }
+        Out { code: code.into(), message, data }
     }
 
     pub fn only_code(code: LayoutedC) -> Self {
-        Out {
-            code: code.into(),
-            message: None,
-            data: None,
-        }
+        Out { code: code.into(), message: None, data: None }
     }
 
     pub fn code_message(code: LayoutedC, message: &str) -> Self {
-        Out {
-            code: code.into(),
-            message: if message.is_empty() { None } else { Some(message.to_string()) },
-            data: None,
-        }
+        Out { code: code.into(), message: if message.is_empty() { None } else { Some(message.to_string()) }, data: None }
     }
 
     pub fn ok(data: T) -> Self {
-        Out {
-            code: LayoutedC::okay().into(),
-            message: None,
-            data: Some(data),
-        }
+        Out { code: LayoutedC::okay().into(), message: None, data: Some(data) }
     }
 }
 
@@ -62,13 +43,9 @@ impl<T: Serialize> From<Except> for Out<T> {
     }
 }
 
-
 impl<T: Serialize> From<Erx> for Out<T> {
     fn from(value: Erx) -> Self {
-        Except::Fuzzy(
-            value.code().layout_string(),
-            value.message().to_string(),
-        ).into()
+        Except::Fuzzy(value.code().layout_string(), value.message().to_string()).into()
     }
 }
 
@@ -77,7 +54,7 @@ impl<T: Serialize> From<Option<T>> for Out<T> {
         static OPTION_NONE_MESSAGE: &'static str = "sorry, some error occurred, but no message was provided";
         match value {
             Some(data) => Out::ok(data),
-            None => Except::Unknown(OPTION_NONE_MESSAGE.to_string()).into()
+            None => Except::Unknown(OPTION_NONE_MESSAGE.to_string()).into(),
         }
     }
 }
@@ -85,13 +62,11 @@ impl<T: Serialize> From<Option<T>> for Out<T> {
 impl<T: Serialize, E: ToString> From<Result<T, E>> for Out<T> {
     fn from(value: Result<T, E>) -> Self {
         match value {
-            Ok(v) => {
-                Out::ok(v)
-            }
+            Ok(v) => Out::ok(v),
             Err(e) => {
                 let message = e.to_string();
                 Except::Unknown(message).into()
-            }
+            },
         }
     }
 }
@@ -101,18 +76,12 @@ impl<T: Serialize> axum::response::IntoResponse for Out<T> {
         let body = serde_json::to_string(&self);
 
         let (status, body) = match body {
-            Ok(body) => {
-                (StatusCode::OK, body)
-            }
+            Ok(body) => (StatusCode::OK, body),
             Err(err) => {
                 static JSE: &'static str = "JSON Serialization Error";
-                let body = serde_json::to_string(
-                    &Except::Unknown(
-                        err.to_string()
-                    ).out::<()>()
-                ).unwrap_or(JSE.to_string());
+                let body = serde_json::to_string(&Except::Unknown(err.to_string()).out::<()>()).unwrap_or(JSE.to_string());
                 (StatusCode::INTERNAL_SERVER_ERROR, body)
-            }
+            },
         };
 
         let mut response = Response::new(body);
@@ -125,5 +94,3 @@ impl<T: Serialize> axum::response::IntoResponse for Out<T> {
         response.into_response()
     }
 }
-
-
