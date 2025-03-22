@@ -1,8 +1,7 @@
+use crate::tools::fs;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-
-use crate::tools::fs;
 
 /// Discard is a writer that discards all data written to it.
 struct Discard;
@@ -78,6 +77,15 @@ pub async fn logging_initialize() {
 }
 
 #[allow(unused)]
-fn _sanitize_string(s: &str) -> String {
-    s.chars().filter(|&c| !c.is_control() || c.is_whitespace()).collect()
+mod tools {
+    use regex::Regex;
+
+    fn _sanitize_string(s: &str) -> String {
+        s.chars().filter(|&c| !c.is_control() || c.is_whitespace()).collect()
+    }
+
+    fn _remove_ansi_codes(text: &str) -> String {
+        let re = Regex::new(r"\x1B\[[0-9;]*[mGKH]").unwrap();
+        re.replace_all(text, "").to_string()
+    }
 }
