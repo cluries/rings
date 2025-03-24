@@ -1,19 +1,17 @@
+use config::{Config, Value};
+use serde::{Deserialize, Serialize};
 ///  struct GetDefault;
 ///  struct GetOption;
 ///  struct Has;
 ///
-///  fn settings() -> &'static RwLock<Config> 
+///  fn settings() -> &'static RwLock<Config>
 ///  fn rebit() -> &'static RwLock<Rebit>
 ///
 ///  struct Rebit
-
 use std::cmp::PartialEq;
 use std::fmt;
 use std::str::FromStr;
 use std::sync::{OnceLock, RwLock};
-use config::Config;
-use serde::{Deserialize, Serialize};
-
 
 /// get settings
 pub fn settings() -> &'static RwLock<Config> {
@@ -24,31 +22,27 @@ pub fn settings() -> &'static RwLock<Config> {
 /// get rebit instance
 pub fn rebit() -> &'static RwLock<Rebit> {
     static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
-    REBIT.get_or_init(||
-        RwLock::new(
-            || -> Rebit {
-                let r = settings().read().unwrap().clone().try_deserialize::<Rebit>();
-                if cfg!(test) {
-                    Rebit {
-                        name: "Rebit".to_string(),
-                        short: "REBT".to_string(),
-                        debug: true,
-                        webs: Default::default(),
-                        model: Model { backends: vec![] },
-                        log: None,
-                    }
-                } else {
-                    r.unwrap_or_else(|e| panic!("rebit loading error: {}", e))
+    REBIT.get_or_init(|| {
+        RwLock::new(|| -> Rebit {
+            let r = settings().read().unwrap().clone().try_deserialize::<Rebit>();
+            if cfg!(test) {
+                Rebit {
+                    name: "Rebit".to_string(),
+                    short: "REBT".to_string(),
+                    debug: true,
+                    webs: Default::default(),
+                    model: Model { backends: vec![] },
+                    log: None,
                 }
-            }()
-        )
-    )
+            } else {
+                r.unwrap_or_else(|e| panic!("rebit loading error: {}", e))
+            }
+        }())
+    })
 }
 
-
-#[cfg(not(test))]
+// #[cfg(not(test))]
 fn init_config() -> Config {
-
     //development production testing
     let run_mode = std::env::var("REBT_RUN_MODE").unwrap_or("development".to_string());
 
@@ -63,28 +57,40 @@ fn init_config() -> Config {
 
     tracing::info!("Config file path: {}", config_path);
 
-    let conf = config::File::with_name(&format!("{config_path}/config.yml"));
+    let conf = config::File::with_name(&format!("{config_path}/config.yml")).required(false);
     let mode = config::File::with_name(&format!("{config_path}/{run_mode}.yml")).required(false);
     let local = config::File::with_name(&format!("{config_path}/local.yml")).required(false);
 
-    let settings = Config::builder().add_source(conf).add_source(mode).add_source(local).add_source(config::Environment::with_prefix("REBT")).build().unwrap();
-    settings
+    let mut builder = Config::builder().add_source(conf).add_source(mode).add_source(local);
+    #[cfg(test)]
+    {
+        use crate::tools::tests::tools::project_dir;
+
+        let tests_load = format!("{}/tests_load.yml", project_dir().to_string_lossy());
+        tracing::info!("test mode, loading: {}", tests_load);
+        println!("test mode, loading: {}", tests_load);
+
+        builder = builder.add_source(config::File::with_name(tests_load.as_str()).required(false));
+    }
+
+    builder = builder.add_source(config::Environment::with_prefix("REBT"));
+
+    builder.build().unwrap()
 }
 
-#[cfg(test)]
-fn init_config() -> Config {
-    Config::builder().build().unwrap()
-}
+// #[cfg(test)]
+// fn init_config() -> Config {
+//     Config::builder().build().unwrap()
+// }
 
-
-/// make getter for settings, if not found, return default value    
+/// make getter for settings, if not found, return default value
 macro_rules! make_setting_getter_default {
     ($name:ident, $type:ty, $getter:ident) => {
         pub fn $name(k: &str, default: $type) -> $type {
             // let settings = settings().read();
             match settings().read() {
                 Ok(guard) => guard.$getter(k).unwrap_or(default),
-                Err(_) => default
+                Err(_) => default,
             }
         }
     };
@@ -97,7 +103,7 @@ macro_rules! make_setting_getter_option {
             // let settings = settings().read();
             match settings().read() {
                 Ok(guard) => guard.$getter(k).ok(),
-                Err(_) => None
+                Err(_) => None,
             }
         }
     };
@@ -121,18 +127,19 @@ pub struct GetDefault;
 pub struct GetOption;
 pub struct Has;
 
-
 make_setting_getter!(string, String, get_string);
 make_setting_getter!(boolean, bool, get_bool);
 make_setting_getter!(int, i64, get_int);
 make_setting_getter!(float, f64, get_float);
+make_setting_getter!(table, std::collections::HashMap<String, Value>, get_table);
+make_setting_getter!(array, Vec<Value>, get_array);
 
 impl Has {
     pub fn has<T: for<'a> serde::Deserialize<'a>>(k: &str) -> bool {
         let settings = settings().read();
         match settings {
             Ok(guard) => guard.get::<T>(k).is_ok(),
-            Err(_) => false
+            Err(_) => false,
         }
     }
 }
@@ -154,11 +161,14 @@ pub struct Log {
     pub dirs: String,
 }
 
+pub type NestedMap = std::collections::HashMap<String, std::collections::HashMap<String, String>>;
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Web {
     pub name: String,
     pub bind: Option<String>,
     pub port: u16,
+    pub middleware: Option<NestedMap>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Eq)]
@@ -179,11 +189,7 @@ impl Default for Log {
 
 impl Default for Web {
     fn default() -> Self {
-        Self {
-            name: format!("Web-{}", crate::tools::rand::rand_str(8)),
-            bind: None,
-            port: 80,
-        }
+        Self { name: format!("Web-{}", crate::tools::rand::rand_str(8)), bind: None, port: 80, middleware: None }
     }
 }
 
@@ -194,9 +200,7 @@ impl Default for Rebit {
             short: "RING".to_string(),
             debug: true,
             webs: Default::default(),
-            model: Model {
-                backends: vec![]
-            },
+            model: Model { backends: vec![] },
             log: Default::default(),
         }
     }
@@ -236,3 +240,13 @@ pub struct Model {
     pub backends: Vec<Backend>,
 }
 
+#[allow(unused)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn tests() {
+        print!("{:?}", settings().read().unwrap().clone().try_deserialize::<std::collections::HashMap<String, Value>>().unwrap());
+        print!("{:?}", GetOption::array("webs"));
+    }
+}

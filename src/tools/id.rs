@@ -1,6 +1,5 @@
 /// generate id
 /// format:
-
 use crate::erx;
 
 
@@ -74,10 +73,7 @@ pub fn shared() -> &'static Factory {
 
 impl Factory {
     pub fn new(sharding: i64) -> Factory {
-        Factory {
-            sharding: sharding % MAX_SHARDING,
-            sequence: RwLock::new((0, 0)),
-        }
+        Factory { sharding: sharding % MAX_SHARDING, sequence: RwLock::new((0, 0)) }
     }
 
     pub fn sharding(&self) -> i64 {
@@ -159,14 +155,9 @@ impl From<String> for Id {
 
 impl From<i64> for Id {
     fn from(value: i64) -> Self {
-        if value >= MIN_VALUE {
-            Id { val: value }
-        } else {
-            panic!("less than min value")
-        }
+        if value >= MIN_VALUE { Id { val: value } } else { panic!("less than min value") }
     }
 }
-
 
 impl Into<i64> for Id {
     fn into(self) -> i64 {
@@ -198,13 +189,7 @@ impl Id {
     }
 
     pub fn description(self) -> String {
-        format!(
-            "{} shard:{:02} seq:{:03} millis:{}",
-            self.val.to_string(),
-            self.sharding(),
-            self.sequence(),
-            self.millis()
-        )
+        format!("{} shard:{:02} seq:{:03} millis:{}", self.val.to_string(), self.sharding(), self.sequence(), self.millis())
     }
 
     pub fn valid(&self) -> bool {
@@ -231,10 +216,9 @@ impl Id {
 const BASE62: u64 = 62;
 
 const BASE62_CHARS: [u8; 62] = [
-    b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e', b'f',
-    b'g', b'h', b'i', b'j', b'k', b'l', b'm', b'n', b'o', b'p', b'q', b'r', b's', b't', b'u', b'v',
-    b'w', b'x', b'y', b'z', b'A', b'B', b'C', b'D', b'E', b'F', b'G', b'H', b'I', b'J', b'K', b'L',
-    b'M', b'N', b'O', b'P', b'Q', b'R', b'S', b'T', b'U', b'V', b'W', b'X', b'Y', b'Z',
+    b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e', b'f', b'g', b'h', b'i', b'j', b'k', b'l',
+    b'm', b'n', b'o', b'p', b'q', b'r', b's', b't', b'u', b'v', b'w', b'x', b'y', b'z', b'A', b'B', b'C', b'D', b'E', b'F', b'G', b'H',
+    b'I', b'J', b'K', b'L', b'M', b'N', b'O', b'P', b'Q', b'R', b'S', b'T', b'U', b'V', b'W', b'X', b'Y', b'Z',
 ];
 
 const BASE62_MAP: [u8; 128] = {
@@ -272,7 +256,6 @@ fn base62_to_decimal(base62: &str) -> u64 {
 
     decimal
 }
-
 
 #[cfg(test)]
 #[allow(unused)]

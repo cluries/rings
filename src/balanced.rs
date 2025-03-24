@@ -1,9 +1,9 @@
-use std::ops::IndexMut;
 use crate::erx;
+use std::ops::IndexMut;
 
 ///
 /// 一个不需要严谨的调度系统,不考虑线程安全等
-/// 
+///
 pub struct Balanced<T> {
     counter: u128,
     weights: Vec<Weighted<T>>,
@@ -11,14 +11,12 @@ pub struct Balanced<T> {
     circle: usize, // Current position in the round-robin cycle
 }
 
-
 #[derive(Debug)]
 pub struct InvokedLink {
     pub weight_id: u32,
     pub concurrent_id: u32,
     pub version: u128,
 }
-
 
 pub struct Weighted<T> {
     id: u32,
@@ -28,14 +26,12 @@ pub struct Weighted<T> {
     invoker: Box<dyn Fn() -> T>,
 }
 
-
 #[derive(Clone, Debug)]
 pub struct Job {
     id: i32,
     name: String,
     normal_timeout: u128,
 }
-
 
 #[derive(Clone, Debug)]
 pub struct Concurrent {
@@ -45,11 +41,9 @@ pub struct Concurrent {
     end: u128,
 }
 
-
 fn millis() -> u128 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()
 }
-
 
 // 求最大公约数
 pub fn vector_gcd(numbers: &[u8]) -> Option<u8> {
@@ -73,15 +67,9 @@ pub fn vector_gcd(numbers: &[u8]) -> Option<u8> {
     numbers.iter().fold(numbers[0], |a, &b| gcd(a, b)).into()
 }
 
-
 impl<T> Balanced<T> {
     pub fn new() -> Self {
-        Balanced {
-            counter: 0,
-            weights: Vec::new(),
-            weights_pool: Vec::new(),
-            circle: 0,
-        }
+        Balanced { counter: 0, weights: Vec::new(), weights_pool: Vec::new(), circle: 0 }
     }
 
     pub fn count(&self) -> u128 {
@@ -118,18 +106,11 @@ impl<T> Balanced<T> {
     }
 
     fn rebuild_weight_pool(&mut self) -> &mut Self {
-        let mut weights: Vec<u8> = self.weights.iter().filter(
-            |w| w.weight > 0
-        ).map(
-            |w| w.weight
-        ).collect();
+        let mut weights: Vec<u8> = self.weights.iter().filter(|w| w.weight > 0).map(|w| w.weight).collect();
 
         if let Some(gcd @ 2..) = vector_gcd(&weights) {
-            weights.iter_mut().for_each(
-                |x| *x /= gcd
-            );
+            weights.iter_mut().for_each(|x| *x /= gcd);
         }
-
 
         let cap = weights.iter().fold(0, |a, b| a + *b as usize);
         self.weights_pool.resize(cap, 0);
@@ -152,7 +133,6 @@ impl<T> Balanced<T> {
         self
     }
 
-
     pub fn balance(&mut self, job: &Job) -> Result<(T, InvokedLink), erx::Erx> {
         fn try_acquire_resource<T>(weight: &mut Weighted<T>, job: &Job, used_millis: u128) -> Option<(T, InvokedLink)> {
             if !(weight.condition)(job) {
@@ -164,11 +144,11 @@ impl<T> Balanced<T> {
                     let result = (weight.invoker)();
                     let weight_id = weight.id;
                     Some((result, InvokedLink { weight_id, concurrent_id, version }))
-                }
+                },
                 Err(ex) => {
-                    tracing::error!("{}",ex.message());
+                    tracing::error!("{}", ex.message());
                     None
-                }
+                },
             }
         }
 
@@ -196,7 +176,6 @@ impl<T> Balanced<T> {
             attempts -= 1;
         }
 
-
         Err(erx::Erx::new("no available resources"))
     }
 
@@ -210,18 +189,14 @@ impl<T> Balanced<T> {
     }
 }
 
-
 const DEFAULT_CONCURRENT_TIMEOUT: u128 = 1000_000_000;
 
 impl<T> Weighted<T> {
-    pub fn new(id: u32,
-               weight: u8,
-               concurrents: Vec<Concurrent>,
-               condition: Box<dyn Fn(&Job) -> bool>,
-               invoker: Box<dyn Fn() -> T>) -> Self {
+    pub fn new(
+        id: u32, weight: u8, concurrents: Vec<Concurrent>, condition: Box<dyn Fn(&Job) -> bool>, invoker: Box<dyn Fn() -> T>,
+    ) -> Self {
         Self { id, weight, concurrents, condition, invoker }
     }
-
 
     pub fn id(&self) -> u32 {
         self.id
@@ -299,18 +274,12 @@ impl<T> Weighted<T> {
     }
 }
 
-
 impl Concurrent {
     pub fn new(id: u32) -> Concurrent {
         let start = 0;
         let version = 0;
         let end = 0;
-        Concurrent {
-            id,
-            version,
-            start,
-            end,
-        }
+        Concurrent { id, version, start, end }
     }
 
     pub fn make_concurrents(size: usize, id_start: u32) -> Vec<Concurrent> {
@@ -391,14 +360,12 @@ impl Job {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[derive(Debug)]
     struct AI {}
-
 
     impl AI {
         fn new() -> AI {
@@ -417,11 +384,7 @@ mod tests {
         //     weights_factory(2, 2)
         // );
 
-        let weights = vec![
-            weights_factory(0, 40),
-            weights_factory(1, 60),
-            weights_factory(2, 20),
-        ];
+        let weights = vec![weights_factory(0, 40), weights_factory(1, 60), weights_factory(2, 20)];
 
         bd.add_weights(weights);
 
@@ -434,24 +397,9 @@ mod tests {
         }
     }
 
-
     fn weights_factory(factory: u32, weight: u8) -> Weighted<AI> {
         let concurrents = Concurrent::make_concurrents(8, 0);
 
-        Weighted::new(
-            factory,
-            weight,
-            concurrents,
-            Box::new(|job| -> bool{
-                job.id() >= 0
-            }),
-            Box::new(|| -> AI{
-                AI::new()
-            }),
-        )
+        Weighted::new(factory, weight, concurrents, Box::new(|job| -> bool { job.id() >= 0 }), Box::new(|| -> AI { AI::new() }))
     }
 }
-
-
-
-

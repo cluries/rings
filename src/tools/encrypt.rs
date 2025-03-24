@@ -1,31 +1,23 @@
 use crate::erx;
 
-use rand::Rng;
 use base64::Engine;
+use rand::Rng;
 
 use block_padding::{Padding, Pkcs7};
 use ofb::cipher::StreamCipher;
 
 use aes::{
     cipher::{
-        KeyInit, KeyIvInit,
-        BlockDecrypt, BlockDecryptMut,
-        BlockEncrypt, BlockEncryptMut,
-        generic_array::{
-            typenum, GenericArray,
-        },
+        generic_array::{typenum, GenericArray}, BlockDecrypt, BlockDecryptMut, BlockEncrypt, BlockEncryptMut, KeyInit,
+        KeyIvInit,
     },
     Aes128,
 };
 
 use rsa::{
-    Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
-    pkcs1::{
-        DecodeRsaPrivateKey, DecodeRsaPublicKey,
-        EncodeRsaPrivateKey, EncodeRsaPublicKey,
-    },
+    pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey}, Pkcs1v15Encrypt, RsaPrivateKey,
+    RsaPublicKey,
 };
-
 
 /// 表示AES加密算法的不同模式
 #[derive(Debug)]
@@ -66,12 +58,10 @@ pub enum AESMode {
     CCM { iv: Vec<u8> },
 }
 
-
 type GAB128 = GenericArray<u8, typenum::U16>;
 
 impl AESMode {
     const BIT128_BLOCK_SIZE: usize = 16;
-
 
     /// 获取模式的名称
     pub fn name(&self) -> &'static str {
@@ -86,7 +76,6 @@ impl AESMode {
         }
     }
 
-
     pub fn encrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
         match self {
             AESMode::ECB => self.ecb_encrypt(key, payload),
@@ -95,7 +84,7 @@ impl AESMode {
             AESMode::OFB { .. } => self.ofb_encrypt(key, payload),
             AESMode::CTR { .. } => self.ctr_encrypt(key, payload),
             AESMode::GCM { .. } => Err(erx::Erx::new("!unimplemented!")),
-            AESMode::CCM { .. } => Err(erx::Erx::new("!unimplemented!"))
+            AESMode::CCM { .. } => Err(erx::Erx::new("!unimplemented!")),
         }
     }
 
@@ -114,7 +103,7 @@ impl AESMode {
             AESMode::OFB { .. } => self.ofb_decrypt(key, payload),
             AESMode::CTR { .. } => self.ctr_decrypt(key, payload),
             AESMode::GCM { .. } => Err(erx::Erx::new("!unimplemented!")),
-            AESMode::CCM { .. } => Err(erx::Erx::new("!unimplemented!"))
+            AESMode::CCM { .. } => Err(erx::Erx::new("!unimplemented!")),
         }
     }
 
@@ -124,7 +113,6 @@ impl AESMode {
         payload_vec.extend(std::iter::repeat(0).take(padding_count));
         payload_vec
     }
-
 
     fn ecb_encrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
         let key = GAB128::from_slice(key);
@@ -150,7 +138,6 @@ impl AESMode {
             result.extend_from_slice(&block);
         }
 
-
         Ok(result)
     }
 
@@ -164,7 +151,8 @@ impl AESMode {
         let block_count = payload.len() / AESMode::BIT128_BLOCK_SIZE;
         let mut result = vec![];
         for i in 0..block_count {
-            let mut block: GAB128 = GAB128::clone_from_slice(&payload[i * AESMode::BIT128_BLOCK_SIZE..(i + 1) * AESMode::BIT128_BLOCK_SIZE]);
+            let mut block: GAB128 =
+                GAB128::clone_from_slice(&payload[i * AESMode::BIT128_BLOCK_SIZE..(i + 1) * AESMode::BIT128_BLOCK_SIZE]);
             cipher.decrypt_block(&mut block);
             if i + 1 == block_count {
                 result.extend_from_slice(Pkcs7::unpad(&mut block).map_err(erx::smp)?);
@@ -184,7 +172,7 @@ impl AESMode {
             AESMode::CBC { iv } => iv.clone(),
             _ => {
                 return Err(erx::Erx::new("error call CBC method"));
-            }
+            },
         };
 
         let mut buffer = Self::padding_buffer(payload);
@@ -200,7 +188,7 @@ impl AESMode {
             AESMode::CBC { iv } => iv.clone(),
             _ => {
                 return Err(erx::Erx::new("error call CBC method"));
-            }
+            },
         };
 
         let decoder: cbc::Decryptor<Aes128> = cbc::Decryptor::new(key, iv.as_slice().into());
@@ -210,14 +198,13 @@ impl AESMode {
         Ok(result)
     }
 
-
     fn cfb_encrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
         let key = GAB128::from_slice(key);
         let iv = match self {
             AESMode::CFB { iv } => iv.clone(),
             _ => {
                 return Err(erx::Erx::new("error call CFB method"));
-            }
+            },
         };
 
         let mut buffer = Self::padding_buffer(payload);
@@ -232,7 +219,7 @@ impl AESMode {
             AESMode::CFB { iv } => iv.clone(),
             _ => {
                 return Err(erx::Erx::new("error call CFB method"));
-            }
+            },
         };
 
         let mut buf = payload.to_vec();
@@ -247,7 +234,7 @@ impl AESMode {
             AESMode::OFB { iv } => iv.clone(),
             _ => {
                 return Err(erx::Erx::new("error call OFB method"));
-            }
+            },
         };
 
         type Aes128Ofb = ofb::Ofb<Aes128>;
@@ -268,7 +255,7 @@ impl AESMode {
             AESMode::CTR { iv } => iv.clone(),
             _ => {
                 return Err(erx::Erx::new("error call CTR method"));
-            }
+            },
         };
         let mut buffer = payload.to_vec();
         let mut cipher = Aes128Ctr64LE::new(key.into(), iv.as_slice().into());
@@ -286,7 +273,6 @@ pub enum RSAPadding {
     // OAEP,
 }
 
-
 impl RSAPadding {
     fn encrypt(&self, public_key: &str, payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
         match self {
@@ -295,7 +281,7 @@ impl RSAPadding {
                 let mut rng = rand::thread_rng();
                 let result = key.encrypt(&mut rng, Pkcs1v15Encrypt, payload).map_err(erx::smp)?;
                 Ok(result)
-            }
+            },
         }
     }
 
@@ -305,7 +291,7 @@ impl RSAPadding {
                 let key: RsaPrivateKey = DecodeRsaPrivateKey::from_pkcs1_pem(private_key).map_err(erx::smp)?;
                 let result = key.decrypt(Pkcs1v15Encrypt, payload).map_err(erx::smp)?;
                 Ok(result)
-            }
+            },
         }
     }
 }
@@ -339,7 +325,6 @@ impl RSAUtils {
         let private_key = private_key.to_pkcs1_pem(Default::default()).map_err(erx::smp)?.to_string();
         let public_key = public_key.to_pkcs1_pem(Default::default()).map_err(erx::smp)?.to_string();
 
-
         Ok((private_key, public_key))
     }
 }
@@ -349,12 +334,11 @@ pub enum Encrypt {
     RSA { private_key: String, public_key: String, padding: RSAPadding },
 }
 
-
 impl Encrypt {
     pub fn encrypt(&self, input: &[u8]) -> Result<Vec<u8>, erx::Erx> {
         let result = match self {
             Encrypt::AES { key, mode } => mode.encrypt(key.as_bytes(), input)?,
-            Encrypt::RSA { private_key: _, public_key, padding } => padding.encrypt(&public_key, input)?
+            Encrypt::RSA { private_key: _, public_key, padding } => padding.encrypt(&public_key, input)?,
         };
 
         Ok(result)
@@ -381,52 +365,37 @@ impl Encrypt {
     }
 }
 
-
 #[test]
 fn test_ecb_encrypt() {
     let key = "1234567890123456";
     let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES {
-        key: key.to_string(),
-        mode: AESMode::ECB,
-    };
+    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::ECB };
     let end = c.encrypt(input).unwrap();
     let ded = c.decrypt(&end).unwrap();
-
 
     println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
     println!("{:?}", String::from_utf8(ded).unwrap());
 }
-
 
 #[test]
 fn test_cbc_encrypt() {
     let key = "1234567890123456";
     let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES {
-        key: key.to_string(),
-        mode: AESMode::CBC { iv: key.as_bytes().to_vec() },
-    };
+    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::CBC { iv: key.as_bytes().to_vec() } };
     let end = c.encrypt(input).unwrap();
     let ded = c.decrypt(&end).unwrap();
-
 
     println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
     println!("{:?}", String::from_utf8(ded).unwrap());
 }
 
-
 #[test]
 fn test_cfb_encrypt() {
     let key = "1234567890123456";
     let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES {
-        key: key.to_string(),
-        mode: AESMode::CFB { iv: key.as_bytes().to_vec() },
-    };
+    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::CFB { iv: key.as_bytes().to_vec() } };
     let end = c.encrypt(input).unwrap();
     let ded = c.decrypt(&end).unwrap();
-
 
     println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
     println!("{:?}", String::from_utf8(ded).unwrap());
@@ -436,13 +405,9 @@ fn test_cfb_encrypt() {
 fn test_ofb_encrypt() {
     let key = "1234567890123456";
     let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES {
-        key: key.to_string(),
-        mode: AESMode::OFB { iv: key.as_bytes().to_vec() },
-    };
+    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::OFB { iv: key.as_bytes().to_vec() } };
     let end = c.encrypt(input).unwrap();
     let ded = c.decrypt(&end).unwrap();
-
 
     println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
     println!("{:?}", String::from_utf8(ded).unwrap());
@@ -452,13 +417,9 @@ fn test_ofb_encrypt() {
 fn test_ctr_encrypt() {
     let key = "1234567890123456";
     let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES {
-        key: key.to_string(),
-        mode: AESMode::CTR { iv: key.as_bytes().to_vec() },
-    };
+    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::CTR { iv: key.as_bytes().to_vec() } };
     let end = c.encrypt(input).unwrap();
     let ded = c.decrypt(&end).unwrap();
-
 
     println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
     println!("{:?}", String::from_utf8(ded).unwrap());
@@ -477,12 +438,7 @@ fn test_rsa() {
 
     let (pri, pbb) = RSAUtils::gen_key_pair(RSABits::K2).unwrap();
 
-    let c = Encrypt::RSA {
-        private_key: pri,
-        public_key: pbb,
-        padding: RSAPadding::PKCS1v15,
-    };
-
+    let c = Encrypt::RSA { private_key: pri, public_key: pbb, padding: RSAPadding::PKCS1v15 };
 
     let end = c.encrypt(input).unwrap();
     let ded = c.decrypt(&end).unwrap();

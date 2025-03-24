@@ -38,7 +38,6 @@ impl Zero for bool {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

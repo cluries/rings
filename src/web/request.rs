@@ -1,7 +1,6 @@
 use axum::body::Bytes;
 use tracing::error;
 
-
 // TODO 2019.10.24
 //
 // i think this is a stupid method to clone a request
@@ -16,12 +15,9 @@ pub async fn clone_request(req: axum::extract::Request) -> (axum::extract::Reque
         error!("axum::body::to_bytes error: {}", e);
         Bytes::new()
     });
-    
+
     (
         axum::extract::Request::from_parts(parts.clone(), axum::body::Body::from(bytes.clone())),
-        axum::extract::Request::from_parts(parts.clone(), axum::body::Body::from(bytes.clone()))
+        axum::extract::Request::from_parts(parts.clone(), axum::body::Body::from(bytes.clone())),
     )
 }
-
-
- 

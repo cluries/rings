@@ -57,19 +57,15 @@ impl Status {
                 } else {
                     Err(format!("Unknown status: {}", formated).into())
                 }
-            }
+            },
         }
     }
 
     pub fn valid(&self) -> bool {
         match self {
             Status::Initialize => true,
-            Status::OK(c, _) => {
-                *c >= BOUNDARY_OK
-            }
-            Status::Error(c, _) => {
-                *c <= BOUNDARY_ERROR
-            }
+            Status::OK(c, _) => *c >= BOUNDARY_OK,
+            Status::Error(c, _) => *c <= BOUNDARY_ERROR,
             Status::MarkDeleted => true,
         }
     }
@@ -106,7 +102,6 @@ impl Status {
         code <= BOUNDARY_ERROR
     }
 }
-
 
 impl std::fmt::Display for Status {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -166,16 +161,14 @@ impl From<(i32, &str)> for Status {
                 } else {
                     panic!("invalid status val: {} ", v);
                 }
-            }
+            },
         }
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     #[test]
     fn test_status() {
@@ -185,12 +178,8 @@ mod tests {
 
         let s = crate::tools::json::Enc::en(&Status::ok(1000, "waiting")).unwrap();
         println!("{}", s);
-        println!(
-            "{:?}",
-            crate::tools::json::Dec::de::<Status>(s.as_str()).unwrap()
-        );
+        println!("{:?}", crate::tools::json::Dec::de::<Status>(s.as_str()).unwrap());
     }
-
 
     #[test]
     fn test_parse() {
@@ -204,4 +193,3 @@ mod tests {
         println!("{:?}", Status::parse(&*err.to_string()));
     }
 }
-

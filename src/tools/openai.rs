@@ -4,15 +4,9 @@ use crate::erx;
 use crate::tools::strings::IgnoreCase;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::{
-    ChatCompletionRequestMessage,
-    ChatCompletionRequestMessageContentPartImage,
-    ChatCompletionRequestMessageContentPartText,
-    ChatCompletionRequestUserMessageContent,
-    ChatCompletionRequestUserMessageContentPart,
-    CreateChatCompletionRequestArgs,
-    CreateChatCompletionResponse,
-    ImageDetail,
-    ImageUrl,
+    ChatCompletionRequestMessage, ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
+    ChatCompletionRequestUserMessageContent, ChatCompletionRequestUserMessageContentPart, CreateChatCompletionRequestArgs,
+    CreateChatCompletionResponse, ImageDetail, ImageUrl,
 };
 use async_openai::Client;
 
@@ -37,17 +31,14 @@ pub struct ChatResponse {
     response: CreateChatCompletionResponse,
 }
 
-
 pub struct PromptsBuilder {
     messages: Vec<ChatCompletionRequestMessage>,
 }
-
 
 impl ChatResponse {
     pub fn new(duration: Duration, response: CreateChatCompletionResponse) -> Self {
         Self { duration, response }
     }
-
 
     pub fn duration(&self) -> Duration {
         self.duration
@@ -62,14 +53,11 @@ impl ChatResponse {
             return Vec::new();
         }
 
-        self.response.choices.iter().fold(
-            Vec::new(),
-            |mut acc, choice| {
-                if let Some(_reason) = choice.finish_reason {}
-                acc.push(choice.message.content.clone().unwrap_or_default());
-                acc
-            },
-        )
+        self.response.choices.iter().fold(Vec::new(), |mut acc, choice| {
+            if let Some(_reason) = choice.finish_reason {}
+            acc.push(choice.message.content.clone().unwrap_or_default());
+            acc
+        })
     }
 
     pub fn response_string(&self) -> String {
@@ -103,9 +91,7 @@ impl ChatResponse {
 
 impl PromptsBuilder {
     pub fn default() -> Self {
-        Self {
-            messages: Vec::new(),
-        }
+        Self { messages: Vec::new() }
     }
 
     pub fn add(&mut self, message: ChatCompletionRequestMessage) -> &mut Self {
@@ -120,76 +106,51 @@ impl PromptsBuilder {
     pub fn user(&mut self, message: &str) -> &mut Self {
         use async_openai::types::ChatCompletionRequestUserMessageArgs;
 
-        self.messages.push(
-            ChatCompletionRequestUserMessageArgs::default().content(message).build().unwrap().into()
-        );
+        self.messages.push(ChatCompletionRequestUserMessageArgs::default().content(message).build().unwrap().into());
         self
     }
 
     pub fn system(&mut self, message: &str) -> &mut Self {
         use async_openai::types::ChatCompletionRequestSystemMessageArgs;
-        self.messages.push(
-            ChatCompletionRequestSystemMessageArgs::default().content(message).build().unwrap().into()
-        );
+        self.messages.push(ChatCompletionRequestSystemMessageArgs::default().content(message).build().unwrap().into());
         self
     }
 
     pub fn assistant(&mut self, message: &str) -> &mut Self {
         use async_openai::types::ChatCompletionRequestAssistantMessageArgs;
-        self.messages.push(
-            ChatCompletionRequestAssistantMessageArgs::default().content(message).build().unwrap().into()
-        );
+        self.messages.push(ChatCompletionRequestAssistantMessageArgs::default().content(message).build().unwrap().into());
         self
     }
 
     pub fn developer(&mut self, message: &str) -> &mut Self {
         use async_openai::types::ChatCompletionRequestDeveloperMessageArgs;
-        self.messages.push(
-            ChatCompletionRequestDeveloperMessageArgs::default().content(message).build().unwrap().into()
-        );
+        self.messages.push(ChatCompletionRequestDeveloperMessageArgs::default().content(message).build().unwrap().into());
         self
     }
 
     pub fn function(&mut self, message: &str) -> &mut Self {
         use async_openai::types::ChatCompletionRequestFunctionMessageArgs;
-        self.messages.push(
-            ChatCompletionRequestFunctionMessageArgs::default().content(message).build().unwrap().into()
-        );
+        self.messages.push(ChatCompletionRequestFunctionMessageArgs::default().content(message).build().unwrap().into());
         self
     }
 
     pub fn tool(&mut self, message: &str) -> &mut Self {
         use async_openai::types::ChatCompletionRequestToolMessageArgs;
-        self.messages.push(
-            ChatCompletionRequestToolMessageArgs::default().content(message).build().unwrap().into()
-        );
+        self.messages.push(ChatCompletionRequestToolMessageArgs::default().content(message).build().unwrap().into());
         self
     }
 
     pub fn image(&mut self, message: &str, url: &str) -> &mut Self {
         // use async_openai::types::ChatCompletionRequestMessageContentPartImageArgs;
 
-        let m = ChatCompletionRequestUserMessageContent::Array(
-            vec![
-                ChatCompletionRequestUserMessageContentPart::Text(
-                    ChatCompletionRequestMessageContentPartText {
-                        text: message.to_string(),
-                    }
-                ),
-                ChatCompletionRequestUserMessageContentPart::ImageUrl(
-                    ChatCompletionRequestMessageContentPartImage {
-                        image_url: ImageUrl {
-                            url: url.to_string(),
-                            detail: Some(ImageDetail::Auto),
-                        }
-                    }
-                ),
-            ]
-        );
+        let m = ChatCompletionRequestUserMessageContent::Array(vec![
+            ChatCompletionRequestUserMessageContentPart::Text(ChatCompletionRequestMessageContentPartText { text: message.to_string() }),
+            ChatCompletionRequestUserMessageContentPart::ImageUrl(ChatCompletionRequestMessageContentPartImage {
+                image_url: ImageUrl { url: url.to_string(), detail: Some(ImageDetail::Auto) },
+            }),
+        ]);
 
-        self.messages.push(
-            async_openai::types::ChatCompletionRequestUserMessage::from(m).into(),
-        );
+        self.messages.push(async_openai::types::ChatCompletionRequestUserMessage::from(m).into());
 
         self
     }
@@ -200,7 +161,6 @@ impl Into<Vec<ChatCompletionRequestMessage>> for PromptsBuilder {
         self.messages()
     }
 }
-
 
 impl LLM {
     pub fn with_provider(provider: Provider) -> LLM {
@@ -215,23 +175,19 @@ impl LLM {
     }
 
     pub async fn chat_single(&self, prompt: Vec<ChatCompletionRequestMessage>) -> Result<ChatResponse, erx::Erx> {
-        let request = CreateChatCompletionRequestArgs::default().stream(
-            false
-        ).model(
-            self.provider.model.clone()
-        ).response_format(
-            async_openai::types::ResponseFormat::Text
-        ).messages(
-            prompt
-        ).build().map_err(erx::smp)?;
-
+        let request = CreateChatCompletionRequestArgs::default()
+            .stream(false)
+            .model(self.provider.model.clone())
+            .response_format(async_openai::types::ResponseFormat::Text)
+            .messages(prompt)
+            .build()
+            .map_err(erx::smp)?;
 
         let start = SystemTime::now();
         let response = self.cli().chat().create(request).await.map_err(erx::smp)?;
         let duration = SystemTime::now().duration_since(start).unwrap_or_default();
         Ok(ChatResponse::new(duration, response))
     }
-
 
     // pub async fn chat_own_type<T: Serialize>(&self, own: T) -> Result<ChatResponse, erx::Erx> {
     //     Err("OpenAI does not support this chat".into())

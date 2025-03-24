@@ -3,15 +3,13 @@ use crate::tools::fs;
 // TODO not finished
 #[allow(unused)]
 pub struct LuaAction {
-    prefix: String,  // URL Prefix
+    prefix: String,           // URL Prefix
     scripts_location: String, // Lua scripts location
 }
-
 
 async fn a() {}
 
 pub struct LuaActionContext {}
-
 
 impl LuaAction {
     pub async fn new(prefix: String, scripts_location: String) -> LuaAction {
@@ -19,12 +17,10 @@ impl LuaAction {
             panic!("prefix must not end with '*'");
         }
 
-
         let path = fs::join_path(vec![fs::working_dir().unwrap().to_str().unwrap(), scripts_location.as_str()]);
         if !fs::Is(path.clone()).dir().await {
             panic!("cannot read scripts dir: {}", path);
         }
-
 
         Self { prefix, scripts_location }
     }
@@ -45,4 +41,3 @@ impl LuaActionContext {
 
 unsafe impl Sync for LuaAction {}
 unsafe impl Send for LuaAction {}
-

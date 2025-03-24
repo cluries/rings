@@ -3,9 +3,6 @@ pub struct Len;
 pub struct Num;
 pub struct Enc;
 
-
-
-
 /// Check if a string matches a regex.
 pub fn regex_match(regex: &str, string: &str) -> bool {
     match regex::Regex::new(regex) {
@@ -57,7 +54,6 @@ pub fn regex_find(regex: &str, string: &str) -> Option<String> {
     re.find(string).map(|m| m.as_str().to_string())
 }
 
-
 ///
 impl Net {
     pub fn email(email: &str) -> bool {
@@ -95,7 +91,6 @@ impl Net {
     }
 }
 
-
 impl Len {
     /// Check if a string is between min and max length.
     pub fn range(s: &str, min: usize, max: usize) -> bool {
@@ -117,7 +112,6 @@ impl Len {
         s.len() == len
     }
 }
-
 
 impl Num {
     pub fn number(s: &str) -> bool {
@@ -163,7 +157,6 @@ impl Enc {
         regex_match(r"^[A-Za-z0-9+/=]+$", s)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

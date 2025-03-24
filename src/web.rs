@@ -1,20 +1,20 @@
 //https://kaisery.github.io/trpl-zh-cn/ch19-06-macros.html
 
-pub mod middleware;
 pub mod api;
+pub mod context;
+pub mod cookie;
+pub mod define;
+pub mod except;
+pub mod javascript;
+pub mod luaction;
+pub mod middleware;
+pub mod request;
+pub mod session;
 pub mod signature;
 pub mod tools;
-pub mod context;
-pub mod request;
-pub mod validator;
-pub mod url;
 pub mod types;
-pub mod except;
-pub mod session;
-pub mod cookie;
-pub mod javascript;
-pub mod define;
-pub mod luaction;
+pub mod url;
+pub mod validator;
 
 use crate::rings::{RingState, RingsMod, SafeRS};
 use crate::web::luaction::LuaAction;
@@ -31,7 +31,7 @@ macro_rules! web_route_merge {
     ( $( $x:expr ),* ) => {
         {
             let mut routes:Vec<Router> = vec![];
-            
+
             $(
                 routes.extend($x);
             )*
@@ -40,7 +40,6 @@ macro_rules! web_route_merge {
         }
     };
 }
-
 
 #[derive(Clone)]
 pub struct WebState {}
@@ -67,14 +66,12 @@ pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>) -> We
     }
 }
 
-
 impl crate::conf::Web {
     pub fn bind_addr(&self) -> String {
         let bind = self.bind.clone().unwrap_or("0.0.0.0".to_string());
         format!("{}:{}", bind, self.port)
     }
 }
-
 
 impl Web {
     fn web_spec(&mut self) {
@@ -107,7 +104,6 @@ impl Web {
     // }
 }
 
-
 #[async_trait]
 impl RingsMod for Web {
     fn name(&self) -> String {
@@ -117,7 +113,6 @@ impl RingsMod for Web {
     fn duplicate_able(&self) -> bool {
         false
     }
-
 
     async fn initialize(&mut self) -> Result<(), crate::erx::Erx> {
         self.web_spec();
@@ -136,7 +131,7 @@ impl RingsMod for Web {
 
         if !current.is_ready_to_terminating() {
             return Err(crate::erx::Erx::new(
-                format!("Ring:{} current state:{} can not terminate", self.name, <RingState as Into<&str>>::into(current)).as_str()
+                format!("Ring:{} current state:{} can not terminate", self.name, <RingState as Into<&str>>::into(current)).as_str(),
             ));
         }
 
@@ -172,7 +167,6 @@ impl RingsMod for Web {
     //     Ok(())
     // }
 
-
     async fn fire(&mut self) -> Result<(), crate::erx::Erx> {
         let web_listen = |name: String, bind: String, router: Router, stage: Arc<RwLock<RingState>>| async move {
             let listen = tokio::net::TcpListener::bind(bind.as_str()).await;
@@ -192,11 +186,9 @@ impl RingsMod for Web {
                 }
             };
 
-            let serve = axum::serve(listen.unwrap(), router).with_graceful_shutdown(
-                graceful(Arc::clone(&stage), name.clone())
-            );
+            let serve = axum::serve(listen.unwrap(), router).with_graceful_shutdown(graceful(Arc::clone(&stage), name.clone()));
 
-            info!("WebMod[ {} ] try served : {}", &name,  bind);
+            info!("WebMod[ {} ] try served : {}", &name, bind);
             serve.await.expect(format!("WebMod[ {} ] failed to served : {}", &name, bind).as_str());
 
             // *stage.write().unwrap() = RingState::Terminated;
@@ -207,7 +199,6 @@ impl RingsMod for Web {
 
         Ok(())
     }
-
 
     fn stage(&self) -> RingState {
         RingState::srs_get_must(&self.stage).unwrap()
@@ -227,7 +218,3 @@ impl crate::any::AnyTrait for Web {
         self
     }
 }
-
-
-
-

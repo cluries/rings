@@ -11,10 +11,11 @@ impl MigrationName for Migration {
 }
 
 fn define_user_table() -> TableCreateStatement {
-    Table::create().table(User::Table).col(
-        ColumnDef::new(User::Id).integer().not_null().auto_increment().primary_key()
-    )
-        .col(ColumnDef::new(User::Name).string().not_null()).to_owned()
+    Table::create()
+        .table(User::Table)
+        .col(ColumnDef::new(User::Id).integer().not_null().auto_increment().primary_key())
+        .col(ColumnDef::new(User::Name).string().not_null())
+        .to_owned()
 }
 
 #[async_trait::async_trait]

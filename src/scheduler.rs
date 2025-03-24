@@ -1,9 +1,9 @@
-use crate::rings::{RingState};
-use std::sync::{Arc, RwLock};
+use crate::rings::RingState;
+use crate::service::{ServiceManager, ServiceTrait};
 use async_trait::async_trait;
+use std::sync::{Arc, RwLock};
 use tokio_cron_scheduler::JobScheduler;
 use tracing::{error, info, warn};
-use crate::service::{ServiceTrait, ServiceManager};
 
 /// SchedulerManager
 pub struct SchedulerManager {
@@ -12,19 +12,13 @@ pub struct SchedulerManager {
     scheduler: Option<JobScheduler>,
 }
 
-
 impl SchedulerManager {
     pub(crate) fn new() -> Self {
-        Self {
-            stage: Arc::new(RwLock::new(RingState::Init)),
-            count: 0,
-            scheduler: None,
-        }
+        Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: None }
     }
 }
 
 pub const SCHEDULER_MANAGER_NAME: &str = "SchedulerManager";
-
 
 impl SchedulerManager {
     pub fn debug(&self) {
@@ -36,7 +30,6 @@ impl SchedulerManager {
         info!("scheduler manager {} mut counter:{}", SCHEDULER_MANAGER_NAME, self.count);
     }
 }
-
 
 impl SchedulerManager {
     async fn load_service_scheduled(&self) {
@@ -52,10 +45,10 @@ impl SchedulerManager {
                         for job in service.schedules() {
                             futures.push(scheduler.add(job));
                         }
-                    }
+                    },
                     Err(ex) => {
                         error!("scheduler service lock poisoned: {}", ex);
-                    }
+                    },
                 }
             }
 
@@ -85,7 +78,6 @@ impl crate::rings::RingsMod for SchedulerManager {
             })
         }));
 
-
         self.scheduler = Some(scheduler);
 
         self.load_service_scheduled().await;
@@ -100,7 +92,6 @@ impl crate::rings::RingsMod for SchedulerManager {
         Ok(())
     }
 
-
     async fn unregister(&mut self) -> Result<(), crate::erx::Erx> {
         self.shutdown().await
     }
@@ -110,7 +101,7 @@ impl crate::rings::RingsMod for SchedulerManager {
         let current = self.stage.try_read().map_err(crate::erx::smp)?.clone();
         if !current.is_ready_to_terminating() {
             return Err(crate::erx::Erx::new(
-                format!("Ring:{} current state:{} can not terminate", self.name(), <RingState as Into<&str>>::into(current)).as_str()
+                format!("Ring:{} current state:{} can not terminate", self.name(), <RingState as Into<&str>>::into(current)).as_str(),
             ));
         }
 
@@ -124,7 +115,6 @@ impl crate::rings::RingsMod for SchedulerManager {
 
         Ok(())
     }
-
 
     async fn fire(&mut self) -> Result<(), crate::erx::Erx> {
         *self.stage.write().unwrap() = RingState::Working;
@@ -140,11 +130,11 @@ impl crate::rings::RingsMod for SchedulerManager {
                         if stage == RingState::Terminating || stage == RingState::Terminated {
                             break;
                         }
-                    }
+                    },
                     Err(ex) => {
                         warn!("scheduler stage lock poisoned: {}", ex);
                         stage_read_lock_failures += 1;
-                    }
+                    },
                 }
                 tokio::time::sleep(duration).await;
             }
@@ -153,7 +143,6 @@ impl crate::rings::RingsMod for SchedulerManager {
 
             stage_read_lock_failures
         };
-
 
         let run = async {};
 
@@ -173,7 +162,6 @@ impl crate::rings::RingsMod for SchedulerManager {
         i64::MAX
     }
 }
-
 
 /*
 
@@ -217,6 +205,3 @@ impl crate::any::AnyTrait for SchedulerManager {
         self
     }
 }
-
-
-

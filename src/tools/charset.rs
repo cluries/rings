@@ -1,7 +1,7 @@
 /// 字符集枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Charset {
-    /// UTF-8 字符集 
+    /// UTF-8 字符集
     UTF8,
     /// GB2312 中文字符集
     GB2312,
@@ -30,8 +30,6 @@ impl Charset {
             Charset::ISO8859_1 => "ISO-8859-1",
         }
     }
-
-
 }
 
 impl std::fmt::Display for Charset {
@@ -39,5 +37,3 @@ impl std::fmt::Display for Charset {
         write!(f, "{}", self.name())
     }
 }
-
-

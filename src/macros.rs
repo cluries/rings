@@ -19,7 +19,6 @@ macro_rules! mst {
     };
 }
 
-
 // to optional string
 #[macro_export]
 macro_rules! tos {
@@ -30,7 +29,6 @@ macro_rules! tos {
         Some(tos_helper!($($e),+))
     };
 }
-
 
 // to string
 #[macro_export]
@@ -66,27 +64,21 @@ macro_rules! all_none {
     };
 }
 
-
-
 // convert Result<T,_> to Result<T,String>
 #[macro_export]
 macro_rules! result_message {
-   ($s:expr) => {
+    ($s:expr) => {
         match $s {
             Ok(r) => Ok(r),
             Err(err) => Err(err.to_string()),
         }
-   };
+    };
 }
 
 #[macro_export]
 macro_rules! ternary {
     ($condition:expr, $true_value:expr, $false_value:expr) => {
-        if $condition {
-            $true_value
-        } else {
-            $false_value
-        }
+        if $condition { $true_value } else { $false_value }
     };
 }
 
@@ -98,7 +90,7 @@ macro_rules! try_or_return {
             Err(e) => {
                 error!("{}", e);
                 return;
-            }
+            },
         }
     };
 }

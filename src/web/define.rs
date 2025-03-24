@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 
 pub enum HttpMethod {
     GET,
@@ -100,18 +100,17 @@ impl Into<String> for HttpMethod {
     }
 }
 
-
 impl HttpMethod {
     pub fn as_str(&self) -> &'static str {
         match self {
-            HttpMethod::GET => { "GET" }
-            HttpMethod::POST => { "POST" }
-            HttpMethod::DELETE => { "DELETE" }
-            HttpMethod::PUT => { "PUT" }
-            HttpMethod::HEAD => { "HEAD" }
-            HttpMethod::OPTIONS => { "OPTIONS" }
-            HttpMethod::TRACE => { "TRACE" }
-            HttpMethod::PATCH => { "PATCH" }
+            HttpMethod::GET => "GET",
+            HttpMethod::POST => "POST",
+            HttpMethod::DELETE => "DELETE",
+            HttpMethod::PUT => "PUT",
+            HttpMethod::HEAD => "HEAD",
+            HttpMethod::OPTIONS => "OPTIONS",
+            HttpMethod::TRACE => "TRACE",
+            HttpMethod::PATCH => "PATCH",
         }
     }
 
@@ -121,21 +120,20 @@ impl HttpMethod {
 
     pub fn from_str(method: &str) -> Option<HttpMethod> {
         match method.to_uppercase().as_str() {
-            "GET" => { Some(HttpMethod::GET) }
-            "POST" => { Some(HttpMethod::POST) }
-            "DELETE" => { Some(HttpMethod::DELETE) }
-            "PUT" => { Some(HttpMethod::PUT) }
-            "HEAD" => { Some(HttpMethod::HEAD) }
-            "OPTIONS" => { Some(HttpMethod::OPTIONS) }
-            "TRACE" => { Some(HttpMethod::TRACE) }
-            "PATCH" => { Some(HttpMethod::PATCH) }
-            _ => { None }
+            "GET" => Some(HttpMethod::GET),
+            "POST" => Some(HttpMethod::POST),
+            "DELETE" => Some(HttpMethod::DELETE),
+            "PUT" => Some(HttpMethod::PUT),
+            "HEAD" => Some(HttpMethod::HEAD),
+            "OPTIONS" => Some(HttpMethod::OPTIONS),
+            "TRACE" => Some(HttpMethod::TRACE),
+            "PATCH" => Some(HttpMethod::PATCH),
+            _ => None,
         }
     }
 }
 
-
-lazy_static!(
+lazy_static! {
     static ref HTTP_CODES: HashMap<i32, String> = {
         let mut map = HashMap::new();
         map.insert(HttpCode::UnDefined.code(), HttpCode::UnDefined.message().into());
@@ -203,7 +201,7 @@ lazy_static!(
         map.insert(HttpCode::NetworkAuthenticationRequired.code(), HttpCode::NetworkAuthenticationRequired.message().into());
         map
     };
-);
+}
 
 impl HttpCode {
     pub fn from_code(code: i32) -> Self {
@@ -352,7 +350,7 @@ impl HttpCode {
             HttpCode::NotExtended => 510,
             HttpCode::NetworkAuthenticationRequired => 511,
 
-            HttpCode::UnDefined => 0
+            HttpCode::UnDefined => 0,
         }
     }
 
@@ -430,7 +428,7 @@ impl HttpCode {
             HttpCode::NotExtended => "Not Extended",
             HttpCode::NetworkAuthenticationRequired => "Network Authentication Required",
 
-            HttpCode::UnDefined => "Undefined HttpCode"
+            HttpCode::UnDefined => "Undefined HttpCode",
         }
     }
 }

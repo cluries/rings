@@ -11,22 +11,15 @@ pub struct Sub;
 /// Word tools.
 pub struct Word;
 
-
 impl IgnoreCase {
     pub fn matches(&self, s: &str) -> bool {
         match self {
-            IgnoreCase::Contain(val) => {
-                s.to_lowercase().contains(&val.to_lowercase())
-            }
+            IgnoreCase::Contain(val) => s.to_lowercase().contains(&val.to_lowercase()),
             IgnoreCase::Prefix(prefix) => {
                 let src_len = s.len();
                 let prx_len = prefix.len();
-                if src_len < prx_len {
-                    false
-                } else {
-                    s[..prx_len].eq_ignore_ascii_case(prefix)
-                }
-            }
+                if src_len < prx_len { false } else { s[..prx_len].eq_ignore_ascii_case(prefix) }
+            },
             IgnoreCase::Suffix(suffix) => {
                 let src_len = s.len();
                 let sfx_len = suffix.len();
@@ -36,7 +29,7 @@ impl IgnoreCase {
                     let index = src_len - sfx_len;
                     s[index..].eq_ignore_ascii_case(suffix)
                 }
-            }
+            },
         }
     }
 
@@ -52,7 +45,6 @@ impl IgnoreCase {
         IgnoreCase::Suffix(s.to_string()).matches(suffix)
     }
 }
-
 
 impl Sub {
     pub fn head(s: &str, size: usize) -> String {
@@ -95,7 +87,6 @@ impl Sub {
         }
         vec
     }
-
 }
 
 impl Word {
@@ -183,7 +174,6 @@ impl Word {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -197,5 +187,3 @@ mod tests {
         println!("{:?}", result);
     }
 }
- 
- 

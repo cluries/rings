@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 
-mod migrate;
 mod db;
+mod migrate;
 
 #[proc_macro]
 pub fn migrate_using_macros(input: TokenStream) -> TokenStream {

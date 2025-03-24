@@ -1,5 +1,3 @@
-pub mod user;
 mod config;
 mod log;
-
-
+pub mod user;

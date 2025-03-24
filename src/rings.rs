@@ -12,7 +12,6 @@ pub type RingsApplication = Arc<RwLock<Rings>>;
 /// Rings
 static RINGS: RwLock<Vec<RingsApplication>> = RwLock::new(Vec::new());
 
-
 /// Rings Application
 pub struct Rings {
     /// Rings Name
@@ -25,7 +24,6 @@ pub struct Rings {
     moments: Vec<Moment>,
 }
 
-
 /// Moment is a moment in time.
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Moment {
@@ -37,13 +35,9 @@ pub struct Moment {
 impl Moment {
     /// Moment with current time
     pub fn now(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            time: chrono::Utc::now().timestamp_micros(),
-        }
+        Self { name: name.to_string(), time: chrono::Utc::now().timestamp_micros() }
     }
 }
-
 
 /// Rings State
 /// RingState::Init => 1,
@@ -67,7 +61,6 @@ pub enum RingState {
 /// Ring Thread Safe State
 /// SafeRS = Arc<RwLock<RingState>>
 pub type SafeRS = Arc<RwLock<RingState>>;
-
 
 impl Into<i32> for RingState {
     fn into(self) -> i32 {
@@ -113,7 +106,7 @@ impl Into<&str> for RingState {
 
 impl RingState {
     pub fn is_ready_to_terminating(&self) -> bool {
-        matches!(self, RingState::Init| RingState::Ready | RingState::Working | RingState::Paused)
+        matches!(self, RingState::Init | RingState::Ready | RingState::Working | RingState::Paused)
     }
 
     pub fn srs_set(rs: &SafeRS, s: RingState) -> Result<(), crate::erx::Erx> {
@@ -139,7 +132,6 @@ impl RingState {
     }
 }
 
-
 #[async_trait]
 pub trait RingsMod: crate::any::AnyTrait + Send + Sync {
     fn name(&self) -> String;
@@ -151,7 +143,6 @@ pub trait RingsMod: crate::any::AnyTrait + Send + Sync {
     fn stage(&self) -> RingState;
     fn level(&self) -> i64;
 }
-
 
 /// R
 /// Just like namespace, call some rings methods
@@ -168,7 +159,6 @@ impl R {
         Err(())
     }
 
-
     // make rings
     pub async fn make(name: &str) -> RingsApplication {
         crate::log::logging_initialize().await;
@@ -177,9 +167,7 @@ impl R {
             name: name.to_string(),
             mods: vec![],
             state: Arc::new(RwLock::new(RingState::Init)),
-            moments: vec![
-                Moment::now("make"),
-            ],
+            moments: vec![Moment::now("make")],
         };
 
         app.register_mod(SchedulerManager::new()).await;
@@ -189,10 +177,10 @@ impl R {
         match RINGS.try_write() {
             Ok(mut rings) => {
                 rings.push(Arc::clone(&arc));
-            }
+            },
             Err(ex) => {
                 error!("make rings push RINGS: {}", ex);
-            }
+            },
         }
 
         info!("rings application:{} made", name);
@@ -204,17 +192,15 @@ impl R {
         match rings_app.try_write() {
             Ok(mut guard) => {
                 guard.fire().await;
-            }
+            },
             Err(ex) => {
                 error!("{}", ex);
-            }
+            },
         };
-
 
         Rings::serve(&rings_app).await;
     }
 }
-
 
 impl Rings {
     pub fn make_moment(&mut self, name: &str) {
@@ -244,9 +230,7 @@ impl Rings {
         self.mods.push(Box::new(md));
         self.moments.push(Moment::now(&format!("mod [{}] registered", &self.name)));
 
-        self.mods.sort_by(|a, b| {
-            a.level().cmp(&b.level())
-        });
+        self.mods.sort_by(|a, b| a.level().cmp(&b.level()));
 
         self
     }
@@ -265,14 +249,13 @@ impl Rings {
             match md.shutdown().await {
                 Ok(_) => {
                     info!("rings mod:[ {} ] shutdown accepted", md.name());
-                }
+                },
                 Err(ex) => {
-                    error!("failed to signal shutdown: {} error: {}",md.name(), ex.message());
-                }
+                    error!("failed to signal shutdown: {} error: {}", md.name(), ex.message());
+                },
             }
         }
     }
-
 
     pub fn get_mod<T: RingsMod>(&self, name: &str) -> Option<&T> {
         for m in &self.mods {
@@ -287,15 +270,12 @@ impl Rings {
     pub fn get_mod_mut<T: RingsMod>(&mut self, name: &str) -> Option<&mut T> {
         for m in &mut self.mods {
             if m.name().eq(name) {
-                return Some(
-                    m.as_any_mut().downcast_mut::<T>().unwrap()
-                );
+                return Some(m.as_any_mut().downcast_mut::<T>().unwrap());
             }
         }
 
         None
     }
-
 
     pub async fn remove_mod(&mut self, name: &str) -> &mut Self {
         let drain = |m: &Box<dyn RingsMod>| m.name().eq(name);
@@ -322,7 +302,6 @@ impl Rings {
         }
     }
 
-
     pub async fn fire(&mut self) {
         let span = span!(tracing::Level::INFO, "FireMod");
         let _guard = span.enter();
@@ -338,7 +317,6 @@ impl Rings {
         }
 
         *self.state.write().unwrap() = RingState::Working;
-
 
         // let mut groups: HashMap<i64, Vec<_>> = HashMap::new();
         // for m in self.mods.iter_mut() {
@@ -374,7 +352,6 @@ impl Rings {
 
         // let groups: Vec<(i64, _)> = self.mods.iter_mut().map(|m| (m.level(), m.fire())).collect();
 
-
         // let ctrl_c = |name: String, stage: Arc<RwLock<RingState>>| async move {
         //     tokio::signal::ctrl_c().await.expect("RINGS attempt to terminate immediately");
         //     *stage.write().unwrap() = RingState::Terminating;
@@ -402,9 +379,8 @@ impl Rings {
         *self.state.write().unwrap() = state;
     }
 
-
     async fn serve(app: &RingsApplication) {
-        let _ = tokio::join!( Self::catch_signal(app), Self::holding(app));
+        let _ = tokio::join!(Self::catch_signal(app), Self::holding(app));
     }
 
     async fn catch_signal(app: &RingsApplication) {
@@ -416,10 +392,10 @@ impl Rings {
         match app.write() {
             Ok(mut write_app) => {
                 write_app.shutdown().await;
-            }
+            },
             Err(er) => {
                 error!("failed to listen_signal_kill: {}", er);
-            }
+            },
         };
     }
 
@@ -452,16 +428,15 @@ impl Rings {
 
                     let mod_stages = ring.mods_stages();
                     info!("mod stages: {:?}", mod_stages);
-                }
+                },
                 Err(_) => {
                     consecutive_failures += 1;
-                }
+                },
             }
         }
 
         app.write().unwrap().set_state(RingState::Terminated);
     }
-
 
     pub fn description(&self) -> String {
         let mut md = "".to_string();
@@ -474,4 +449,3 @@ impl Rings {
         md
     }
 }
-

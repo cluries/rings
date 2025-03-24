@@ -3,7 +3,6 @@
 /// ResultEX = ResultE<()>;
 /// fn smp<T: ToString>(error: T) -> Erx
 /// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
-
 use crate::conf;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -11,9 +10,7 @@ use std::collections::HashMap;
 
 
 lazy_static! {
-    static ref APP_SHORT: String = {
-        conf::rebit().read().unwrap().short.clone()
-    };
+    static ref APP_SHORT: String = conf::rebit().read().expect("failed read rebit object").short.clone();
 }
 
 /// ResultE<T> = Result<T, Erx>;
@@ -31,25 +28,16 @@ pub struct Erx {
 
 pub static LAYOUTED_C_ZERO: &'static str = "0000";
 
-
 pub fn smp<T: ToString>(error: T) -> Erx {
-    Erx {
-        code: Default::default(),
-        message: error.to_string(),
-        extra: Vec::new(),
-    }
+    Erx { code: Default::default(), message: error.to_string(), extra: Vec::new() }
 }
 
 pub fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
     let additional = additional.to_string();
-    move |err: T| Erx {
-        code: Default::default(),
-        message: format!("{} : {}", additional, err.to_string()),
-        extra: Vec::new(),
-    }
+    move |err: T| Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() }
 }
 
-/// Fuzz: 模糊错误 
+/// Fuzz: 模糊错误
 pub static FUZZ: &str = "FUZZ";
 
 /// Common: 通用错误
@@ -111,9 +99,10 @@ impl Layouted {
     }
 
     /// task: Task错误
-    pub fn task(category: &str, detail: &str) -> LayoutedC { LayoutedC::new(TASK, category, detail) }
+    pub fn task(category: &str, detail: &str) -> LayoutedC {
+        LayoutedC::new(TASK, category, detail)
+    }
 }
-
 
 /// Code code format
 /// aaaa-xxxx-yyyy-zzzz
@@ -130,14 +119,9 @@ pub struct LayoutedC {
     detail: String,
 }
 
-
 impl Erx {
     pub fn new(message: &str) -> Erx {
-        Erx {
-            code: Default::default(),
-            message: message.to_string(),
-            extra: Vec::new(),
-        }
+        Erx { code: Default::default(), message: message.to_string(), extra: Vec::new() }
     }
 
     pub fn code(&self) -> LayoutedC {
@@ -186,11 +170,7 @@ impl Erx {
 
 impl Default for Erx {
     fn default() -> Self {
-        Erx {
-            code: Default::default(),
-            message: Default::default(),
-            extra: Default::default(),
-        }
+        Erx { code: Default::default(), message: Default::default(), extra: Default::default() }
     }
 }
 
@@ -200,23 +180,17 @@ impl<T> Into<Result<T, Erx>> for Erx {
     }
 }
 
-
 impl Into<String> for Erx {
     fn into(self) -> String {
         serde_json::to_string(&self).unwrap_or_default()
     }
 }
 
-
 impl Into<(String, String)> for Erx {
     fn into(self) -> (String, String) {
-        (
-            self.code.into(),
-            self.message
-        )
+        (self.code.into(), self.message)
     }
 }
-
 
 impl From<&str> for Erx {
     fn from(s: &str) -> Self {
@@ -224,24 +198,19 @@ impl From<&str> for Erx {
     }
 }
 
-
 impl From<String> for Erx {
     fn from(str: String) -> Erx {
         if str.is_empty() {
             return Erx::default();
         }
 
-        serde_json::from_str(&str).unwrap_or_else(|_| {
-            Erx::new(&str)
-        })
+        serde_json::from_str(&str).unwrap_or_else(|_| Erx::new(&str))
     }
 }
 
 impl From<Box<dyn std::error::Error>> for Erx {
     fn from(value: Box<dyn std::error::Error>) -> Self {
-        Erx::new(
-            &value.to_string(),
-        )
+        Erx::new(&value.to_string())
     }
 }
 
@@ -254,11 +223,7 @@ impl From<(&str, &str)> for Erx {
 impl From<(String, String)> for Erx {
     fn from((code, message): (String, String)) -> Erx {
         let code: LayoutedC = code.into();
-        Erx {
-            code,
-            message,
-            extra: Default::default(),
-        }
+        Erx { code, message, extra: Default::default() }
     }
 }
 
@@ -282,15 +247,10 @@ impl<T: ToString + Default> From<Vec<T>> for Erx {
                 extra.push((first.to_string(), second.to_string()));
             }
 
-            Erx {
-                code: code.into(),
-                message,
-                extra,
-            }
+            Erx { code: code.into(), message, extra }
         }
     }
 }
-
 
 impl LayoutedC {
     pub fn okay() -> LayoutedC {
@@ -303,25 +263,17 @@ impl LayoutedC {
     }
 
     pub fn new(domain: &str, category: &str, detail: &str) -> LayoutedC {
-        LayoutedC {
-            application: APP_SHORT.clone(),
-            domain: domain.into(),
-            category: category.into(),
-            detail: detail.into(),
-        }
+        LayoutedC { application: APP_SHORT.clone(), domain: domain.into(), category: category.into(), detail: detail.into() }
     }
 
     pub fn is_okc(&self) -> bool {
-        self.domain.replace("0", "").len() == 0
-            && self.category.replace("0", "").len() == 0
-            && self.detail.replace("0", "").len() == 0
+        self.domain.replace("0", "").len() == 0 && self.category.replace("0", "").len() == 0 && self.detail.replace("0", "").len() == 0
     }
 
     pub fn layout_string(&self) -> String {
         format!("{}-{}-{}-{}", self.application, self.domain, self.category, self.detail)
     }
 }
-
 
 impl Into<String> for LayoutedC {
     fn into(self) -> String {
@@ -337,23 +289,13 @@ impl Into<bool> for LayoutedC {
 
 impl Into<(String, String, String, String)> for LayoutedC {
     fn into(self) -> (String, String, String, String) {
-        (
-            self.application,
-            self.domain,
-            self.category,
-            self.detail,
-        )
+        (self.application, self.domain, self.category, self.detail)
     }
 }
 
 impl Default for LayoutedC {
     fn default() -> Self {
-        LayoutedC {
-            application: APP_SHORT.clone(),
-            domain: UNDF.into(),
-            category: UNDF.into(),
-            detail: UNDF.into(),
-        }
+        LayoutedC { application: APP_SHORT.clone(), domain: UNDF.into(), category: UNDF.into(), detail: UNDF.into() }
     }
 }
 
@@ -396,11 +338,6 @@ impl From<String> for LayoutedC {
 
 impl From<(String, String, String, String)> for LayoutedC {
     fn from(value: (String, String, String, String)) -> Self {
-        LayoutedC {
-            application: value.0,
-            domain: value.1,
-            category: value.2,
-            detail: value.3,
-        }
+        LayoutedC { application: value.0, domain: value.1, category: value.2, detail: value.3 }
     }
 }

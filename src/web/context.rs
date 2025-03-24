@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Context {
     ident: String,
@@ -10,11 +9,7 @@ pub struct Context {
 
 impl Context {
     pub fn new(ident: String) -> Context {
-        Context {
-            ident,
-            born: chrono::Utc::now().timestamp_micros(),
-            vals: HashMap::new(),
-        }
+        Context { ident, born: chrono::Utc::now().timestamp_micros(), vals: HashMap::new() }
     }
 
     pub fn get_born(&self) -> i64 {

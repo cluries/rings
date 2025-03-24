@@ -16,28 +16,19 @@ pub enum Format {
     DatetimeWithTimeZone,
 }
 
-pub static MONTHS: [&'static str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+pub static MONTHS: [&'static str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-pub static MONTHS_LONG: [&'static str; 12] = [
-    "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
-];
+pub static MONTHS_LONG: [&'static str; 12] =
+    ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-pub static WEEKDAYS: [&'static str; 7] = [
-    "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun",
-];
+pub static WEEKDAYS: [&'static str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-pub static WEEKDAYS_LONG: [&'static str; 7] = [
-    "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
-];
-
+pub static WEEKDAYS_LONG: [&'static str; 7] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 pub static FORMAT_DATE: &'static str = "%Y-%m-%d";
 pub static FORMAT_TIME: &'static str = "%H:%M:%S";
 pub static FORMAT_DATETIME: &'static str = "%Y-%m-%d %H:%M:%S";
 pub static FORMAT_DATETIME_WITH_TIMEZONE: &'static str = "%Y-%m-%d %H:%M:%S %Z";
-
 
 impl Format {
     pub fn layout(&self) -> &'static str {
@@ -119,7 +110,6 @@ impl Now {
     }
 }
 
-
 impl Timestamp {
     pub fn with(timestamp: i64) -> Self {
         // 根据timestamp的大小推断时间单位并转换为纳秒
@@ -137,15 +127,11 @@ impl Timestamp {
             timestamp
         };
 
-        Self {
-            nanos,
-        }
+        Self { nanos }
     }
 
     pub fn with_now() -> Self {
-        Self {
-            nanos: chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
-        }
+        Self { nanos: chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default() }
     }
 
     // pub fn with_nanos(nanos: i64) -> Self {
@@ -192,7 +178,6 @@ impl Timestamp {
     }
 }
 
-
 impl Is {
     pub fn leap(year: i32) -> bool {
         // 判断是否为闰年:
@@ -207,5 +192,3 @@ impl Is {
 fn test_local_datetime() {
     // println!("{}", Now::local_datetime_with_zone_string());
 }
-
-

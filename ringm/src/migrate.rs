@@ -1,9 +1,8 @@
-
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Ident, LitStr, Token};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
+use syn::{parse_macro_input, Ident, LitStr, Token};
 
 struct MakeMigratorArgs {
     name: LitStr,
@@ -19,7 +18,6 @@ impl Parse for MakeMigratorArgs {
     }
 }
 
-
 pub fn using_macros(_input: TokenStream) -> TokenStream {
     let expanded = quote! {
 
@@ -31,7 +29,7 @@ pub fn using_macros(_input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
- pub fn make_migrator(input: TokenStream) -> TokenStream {
+pub fn make_migrator(input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(input as MakeMigratorArgs);
 
     let names = args.name.value();

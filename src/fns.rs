@@ -1,6 +1,5 @@
 use std::ops::Fn;
 
-
 /// 对函数进行组合，返回一个新的函数 f(g(x))
 pub fn compose<F, G, A, B, C>(f: F, g: G) -> impl Fn(A) -> C
 where
@@ -31,7 +30,6 @@ where
     }
 }
 
-
 /// 将函数转换为可重试的函数
 pub fn with_retry<F, A, B, E>(f: F, max_retries: u32) -> impl Fn(A) -> Result<B, E>
 where
@@ -48,7 +46,7 @@ where
                         return Err(e);
                     }
                     retries += 1;
-                }
+                },
             }
         }
     }
@@ -72,5 +70,3 @@ where
         result.lock().unwrap().as_ref().unwrap().clone()
     }
 }
-
-
