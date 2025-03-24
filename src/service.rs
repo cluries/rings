@@ -5,17 +5,17 @@ use tokio_cron_scheduler::Job;
 
 static SHARED_MANAGER: OnceCell<ServiceManager> = OnceCell::const_new();
 
-
 static SHARED_SERVICE_NAME: &str = "SharedServiceManager";
 
 /// shared service manager init
 pub(crate) async fn shared_service_manager() -> &'static ServiceManager {
-    SHARED_MANAGER.get_or_init(|| async {
-        tracing::info!("Initializing shared service manager");
-        ServiceManager::new(SHARED_SERVICE_NAME)
-    }).await
+    SHARED_MANAGER
+        .get_or_init(|| async {
+            tracing::info!("Initializing shared service manager");
+            ServiceManager::new(SHARED_SERVICE_NAME)
+        })
+        .await
 }
-
 
 pub trait ServiceTrait: crate::any::AnyTrait + Send + Sync {
     fn name(&self) -> &str;
@@ -93,7 +93,7 @@ impl ServiceManager {
                 let warp = Arc::new(RwLock::new(Box::new(ctx) as Box<dyn ServiceTrait>));
                 write_guard.push(Arc::clone(&warp));
                 Ok(warp)
-            }
+            },
             Err(er) => Err(Erx::new(er.to_string().as_str())),
         }
     }
@@ -111,7 +111,7 @@ impl ServiceManager {
             Err(ex) => {
                 tracing::error!("{}", ex);
                 true
-            }
+            },
             Ok(srv) => !srv.name().eq(name.as_str()),
         });
 
@@ -127,7 +127,6 @@ impl ServiceManager {
     }
 }
 
-
 #[cfg(test)]
 #[allow(unused)]
 mod tests {
@@ -139,7 +138,6 @@ mod tests {
         let m = shared_service_manager().await;
         m.register::<TestService>();
     }
-
 
     struct TestService {}
 
