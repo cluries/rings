@@ -181,7 +181,7 @@ static SHARED_DB_CONNECTION: OnceCell<DatabaseConnection> = OnceCell::const_new(
 
 /// shared redis connection string
 /// can be changed by code, for example, when config changed
-/// if change, please call make_redis_client() to get new client
+/// if changed, please call make_redis_client() to get new client
 static SHARED_REDIS_CONNECT_STRING: RwLock<String> = RwLock::new(String::new());
 
 // static SHARED_REDIS_POOL: OnceCell<deadpool_redis::Pool> = OnceCell::const_new();

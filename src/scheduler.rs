@@ -45,10 +45,10 @@ impl SchedulerManager {
                         for job in service.schedules() {
                             futures.push(scheduler.add(job));
                         }
-                    },
+                    }
                     Err(ex) => {
                         error!("scheduler service lock poisoned: {}", ex);
-                    },
+                    }
                 }
             }
 
@@ -77,6 +77,8 @@ impl crate::rings::RingsMod for SchedulerManager {
                 info!("scheduler shutdown");
             })
         }));
+
+        crate::service::shared_service_manager().await;
 
         self.scheduler = Some(scheduler);
 
@@ -130,11 +132,11 @@ impl crate::rings::RingsMod for SchedulerManager {
                         if stage == RingState::Terminating || stage == RingState::Terminated {
                             break;
                         }
-                    },
+                    }
                     Err(ex) => {
                         warn!("scheduler stage lock poisoned: {}", ex);
                         stage_read_lock_failures += 1;
-                    },
+                    }
                 }
                 tokio::time::sleep(duration).await;
             }

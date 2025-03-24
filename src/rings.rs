@@ -1,3 +1,4 @@
+use crate::any::AnyTrait;
 use crate::scheduler::SchedulerManager;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,15 @@ pub type RingsApplication = Arc<RwLock<Rings>>;
 
 /// Rings
 static RINGS: RwLock<Vec<RingsApplication>> = RwLock::new(Vec::new());
+
+static RINGS_INVOKE_MACRO: RwLock<Vec<(String, fn())>> = RwLock::new(Vec::new());
+
+
+/// name: ringsapp name
+pub fn add_rings_invoke_macro(name: &str, func: fn()) {
+    RINGS_INVOKE_MACRO.write().unwrap().push((name.to_string(), func));
+}
+
 
 /// Rings Application
 pub struct Rings {
@@ -133,7 +143,7 @@ impl RingState {
 }
 
 #[async_trait]
-pub trait RingsMod: crate::any::AnyTrait + Send + Sync {
+pub trait RingsMod: AnyTrait + Send + Sync {
     fn name(&self) -> String;
     fn duplicate_able(&self) -> bool;
     async fn initialize(&mut self) -> Result<(), crate::erx::Erx>;
@@ -176,14 +186,32 @@ impl R {
 
         match RINGS.try_write() {
             Ok(mut rings) => {
+                // # TODO
+                // Currently, only one app registration is supported.
+                // When we change this later, we need to synchronously modify
+                // the support for multiple RingApps in other components
+                // like ServiceManager, SchedulerManager, and Model.
+                if rings.len() > 1 {
+                    panic!("Sorry, you've already registered an app. \
+                    The current version only supports registering one app. \
+                    We'll support multiple apps as soon as possible.");
+                }
+
                 rings.push(Arc::clone(&arc));
-            },
+            }
             Err(ex) => {
                 error!("make rings push RINGS: {}", ex);
-            },
+            }
         }
 
         info!("rings application:{} made", name);
+
+        let invoke_macros = RINGS_INVOKE_MACRO.read().expect("unable to read RINGS_INVOKE_MACRO");
+        for (ring_app_name, func) in invoke_macros.iter() {
+            if name.eq(ring_app_name) {
+                func();
+            }
+        }
 
         Arc::clone(&arc)
     }
@@ -192,10 +220,10 @@ impl R {
         match rings_app.try_write() {
             Ok(mut guard) => {
                 guard.fire().await;
-            },
+            }
             Err(ex) => {
                 error!("{}", ex);
-            },
+            }
         };
 
         Rings::serve(&rings_app).await;
@@ -249,10 +277,10 @@ impl Rings {
             match md.shutdown().await {
                 Ok(_) => {
                     info!("rings mod:[ {} ] shutdown accepted", md.name());
-                },
+                }
                 Err(ex) => {
                     error!("failed to signal shutdown: {} error: {}", md.name(), ex.message());
-                },
+                }
             }
         }
     }
@@ -392,10 +420,10 @@ impl Rings {
         match app.write() {
             Ok(mut write_app) => {
                 write_app.shutdown().await;
-            },
+            }
             Err(er) => {
                 error!("failed to listen_signal_kill: {}", er);
-            },
+            }
         };
     }
 
@@ -428,10 +456,10 @@ impl Rings {
 
                     let mod_stages = ring.mods_stages();
                     info!("mod stages: {:?}", mod_stages);
-                },
+                }
                 Err(_) => {
                     consecutive_failures += 1;
-                },
+                }
             }
         }
 
@@ -447,5 +475,16 @@ impl Rings {
             md.push_str(&m.name());
         }
         md
+    }
+}
+
+
+#[cfg(test)]
+mod tests{
+
+    #[tokio::test]
+    async fn test_rings() {
+
+        // crate::rings::add_rings_invoke_macro("test_mod")
     }
 }

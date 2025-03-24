@@ -5,6 +5,18 @@ use tokio_cron_scheduler::Job;
 
 static SHARED_MANAGER: OnceCell<ServiceManager> = OnceCell::const_new();
 
+
+static SHARED_SERVICE_NAME: &str = "SharedServiceManager";
+
+/// shared service manager init
+pub(crate) async fn shared_service_manager() -> &'static ServiceManager {
+    SHARED_MANAGER.get_or_init(|| async {
+        tracing::info!("Initializing shared service manager");
+        ServiceManager::new(SHARED_SERVICE_NAME)
+    }).await
+}
+
+
 pub trait ServiceTrait: crate::any::AnyTrait + Send + Sync {
     fn name(&self) -> &str;
     fn initialize(&mut self);
@@ -35,12 +47,17 @@ pub trait ServiceTrait: crate::any::AnyTrait + Send + Sync {
 // ) -> Arc<Vec<T>>;
 
 pub struct ServiceManager {
+    name: String,
     managed: RwLock<Vec<Arc<RwLock<Box<dyn ServiceTrait>>>>>,
 }
 
 impl ServiceManager {
-    pub fn new() -> Self {
-        ServiceManager { managed: Default::default() }
+    pub fn new(name: &str) -> Self {
+        ServiceManager { name: name.to_string(), managed: RwLock::new(Vec::new()) }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     fn managed_by_name(&self, name: &str) -> Option<Arc<RwLock<Box<dyn ServiceTrait>>>> {
@@ -76,7 +93,7 @@ impl ServiceManager {
                 let warp = Arc::new(RwLock::new(Box::new(ctx) as Box<dyn ServiceTrait>));
                 write_guard.push(Arc::clone(&warp));
                 Ok(warp)
-            },
+            }
             Err(er) => Err(Erx::new(er.to_string().as_str())),
         }
     }
@@ -94,7 +111,7 @@ impl ServiceManager {
             Err(ex) => {
                 tracing::error!("{}", ex);
                 true
-            },
+            }
             Ok(srv) => !srv.name().eq(name.as_str()),
         });
 
@@ -106,6 +123,59 @@ impl ServiceManager {
     }
 
     pub async fn shared() -> &'static ServiceManager {
-        SHARED_MANAGER.get_or_init(|| async { ServiceManager::new() }).await
+        shared_service_manager().await
+    }
+}
+
+
+#[cfg(test)]
+#[allow(unused)]
+mod tests {
+    use super::*;
+    use crate::any::AnyTrait;
+    use std::any::Any;
+    #[tokio::test]
+    async fn test_service_manager() {
+        let m = shared_service_manager().await;
+        m.register::<TestService>();
+    }
+
+
+    struct TestService {}
+
+    impl Default for TestService {
+        fn default() -> Self {
+            TestService {}
+        }
+    }
+
+    impl AnyTrait for TestService {
+        fn as_any(&self) -> &dyn Any {
+            self
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
+    }
+
+    impl ServiceTrait for TestService {
+        fn name(&self) -> &str {
+            "testservice"
+        }
+
+        fn initialize(&mut self) {
+            println!("Service '{}' initialized!", self.name());
+        }
+
+        fn release(&mut self) {}
+
+        fn ready(&self) -> bool {
+            true
+        }
+
+        fn schedules(&self) -> Vec<Job> {
+            Vec::new()
+        }
     }
 }
