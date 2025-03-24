@@ -1,6 +1,7 @@
 version = "Two"
 
-format_code = true
+format_strings = true
+hex_literal_case = "Upper"
 
 use_small_heuristics = "Max"
 max_width = 140
@@ -11,13 +12,27 @@ single_line_if_else_max_width = 100
 reorder_imports = true
 group_imports = "StdExternalCrate"
 imports_indent = "Block"
+imports_layout = "Mixed"
+imports_granularity = "Crate"
 merge_imports = true
-reorder_imports_alphabetically = true
 
 
 merge_derives = false
 format_macro_matchers = true
 
 match_block_trailing_comma = true
-fn_args_layout = "Compressed"
+fn_params_layout = "Compressed"
+
+
+# Reorder impl items. type and const are put first, then macros and methods.
+reorder_impl_items = true
+
+# Reorder mod declarations alphabetically in group.
+reorder_modules = true
+
+
+# Force multiline closure and match arm bodies to be wrapped in a block
+# https://rust-lang.github.io/rustfmt/?version=v1.8.0&search=#force_multiline_blocks
+# force_multiline_blocks = true
+
 
