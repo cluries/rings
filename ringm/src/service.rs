@@ -15,8 +15,9 @@ pub fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
     let function_name_string = format!("ringm_generated_rings_service_register_{}", struct_obj.ident.to_string());
     let function_name = Ident::new(&function_name_string, proc_macro2::Span::call_site());
 
-    let call_site = proc_macro2::Span::();
-    let s = call_site.unwrap().source_text().unwrap();
+    // let call_site = proc_macro2::Span::();
+    // let s = call_site.unwrap().source_text().unwrap();
+    let s = "".to_string();
 
     marks.push((function_name_string.clone(),s));
 
