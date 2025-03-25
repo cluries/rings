@@ -4,6 +4,8 @@ use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
 static SERVICE_MACRO_MARKS: std::sync::Mutex<Vec<(String, String)>> = std::sync::Mutex::new(Vec::new());
+static SREVICE_RESOLVES: std::sync::Mutex<Vec<(String, String)>> = std::sync::Mutex::new(Vec::new());
+
 
 pub fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = crate::tools::parse_input_string(attr);
@@ -28,6 +30,8 @@ pub fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
         //
         pub fn #function_name() {
             let mod_path = module_path!();
+            ringm::service_resolve!(#function_name_string, mod_path);
+
             println!("This is function: {}, args: {} mod:{}", #function_name_string , #attrs, mod_path );
         }
     };
@@ -56,6 +60,19 @@ pub fn expand(input: TokenStream) -> TokenStream {
         {
             #(#generated_functions)*
         }
+    };
+
+    expanded.into()
+}
+
+
+pub fn resolve(attr: TokenStream) -> TokenStream {
+    let attrs = crate::tools::parse_input_string(attr);
+    let mut resolves = SREVICE_RESOLVES.lock().unwrap();
+    resolves.push((attrs[0], attrs[1]));
+
+    let expanded = quote! {
+
     };
 
     expanded.into()

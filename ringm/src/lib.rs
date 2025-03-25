@@ -24,3 +24,8 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn serviced(input: TokenStream) -> TokenStream {
     service::expand(input)
 }
+
+#[proc_macro]
+pub fn service_resolve(input: TokenStream) -> TokenStream {
+    service::resolve(input)
+}
