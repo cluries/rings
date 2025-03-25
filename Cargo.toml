@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["ringb", "ringm"]
+members = [ "rexamples","ringb", "ringm"]
 
 [workspace.dependencies]
 aes = { version = "0.8" }

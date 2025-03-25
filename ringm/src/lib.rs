@@ -1,10 +1,9 @@
 use proc_macro::TokenStream;
-use quote::ToTokens;
-use syn::parse::Parse;
 
 mod db;
 mod migrate;
 mod service;
+mod tools;
 
 #[proc_macro]
 pub fn migrate_using_macros(input: TokenStream) -> TokenStream {
@@ -22,6 +21,6 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn service_load(input: TokenStream) -> TokenStream {
+pub fn serviced(input: TokenStream) -> TokenStream {
     service::expand(input)
 }

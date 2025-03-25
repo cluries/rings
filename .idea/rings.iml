@@ -5,6 +5,8 @@
       <sourceFolder url="file://$MODULE_DIR$/ringb/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/ringm/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/rexamples/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ringm/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

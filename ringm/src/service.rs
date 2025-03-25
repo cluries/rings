@@ -1,52 +1,61 @@
-use proc_macro::{TokenStream, TokenTree};
-use quote::{quote, ToTokens};
-use syn::parse::Parse;
-use syn::{parse_macro_input, ItemStruct};
+use proc_macro::TokenStream;
+use proc_macro2::Ident;
+use quote::quote;
+use syn::{parse_macro_input, DeriveInput};
 
 static SERVICE_MACRO_MARKS: std::sync::Mutex<Vec<(String, String)>> = std::sync::Mutex::new(Vec::new());
 
 pub fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr_str = parse_attr_string(attr);
-
-    let input = parse_macro_input!(item as ItemStruct);
-    // let struct_name = input.ident.to_string();
+    let attrs = crate::tools::parse_input_string(attr);
+    let itemc = item.clone();
+    let struct_obj = parse_macro_input!(itemc as DeriveInput);
 
     let mut marks = SERVICE_MACRO_MARKS.lock().unwrap();
-    marks.push((attr_str, input.ident.to_string().clone()));
 
-    input.into_token_stream().into()
+    let function_name_string = format!("ringm_generated_rings_service_register_{}", struct_obj.ident.to_string());
+    let function_name = Ident::new(&function_name_string, proc_macro2::Span::call_site());
+
+    let call_site = proc_macro2::Span::();
+    let s = call_site.unwrap().source_text().unwrap();
+
+    marks.push((function_name_string.clone(),s));
+
+    // let info = proc_macro2::Span::call_site();
+
+    let function = quote! {
+
+        //
+        pub fn #function_name() {
+            let mod_path = module_path!();
+            println!("This is function: {}, args: {} mod:{}", #function_name_string , #attrs, mod_path );
+        }
+    };
+
+    let mut merged = TokenStream::from(item);
+    merged.extend(TokenStream::from(function));
+    merged
 }
 
 pub fn expand(input: TokenStream) -> TokenStream {
-    // Parse the input string
-    let input_str = parse_attr_string(input);
-
-    // Look up the struct name associated with this string
+    let attrs = crate::tools::parse_input_string(input);
     let marks = SERVICE_MACRO_MARKS.lock().unwrap();
 
-    let mut ident = String::new();
-    for (attr_str, ist) in marks.iter() {
-        ident.push_str(&format!("{} = {} ", attr_str, ist));
-    }
+    let generated_functions = marks.iter().map(|(function_name, mod_path)| {
+        // let function_ident = Ident::new(&function_name, proc_macro2::Span::call_site());
+        // quote! {
+        //     let _ = #function_ident();
+        // };
+        quote! {
+            let _ = #mod_path;
+        }
+    });
 
     let expanded = quote! {
-        use rings;
-        let c = rings::service::ServiceManager::shared().await;
-        // c.register::<>();
-
-        println!("===={}", c.name());
+        println!("This is service expand: {}", #attrs);
+        {
+            #(#generated_functions)*
+        }
     };
 
     expanded.into()
-}
-
-fn parse_attr_string(attr: TokenStream) -> String {
-    let mut iter = attr.into_iter();
-    if let Some(TokenTree::Literal(lit)) = iter.next() {
-        let lit_str = lit.to_string();
-        // Remove the quotes from the string literal
-        lit_str.trim_matches('"').to_string()
-    } else {
-        panic!("Expected a string literal")
-    }
 }
