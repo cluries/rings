@@ -17,6 +17,11 @@ pub(crate) async fn shared_service_manager() -> &'static ServiceManager {
         .await
 }
 
+pub async fn registe_to_shared<T: ServiceTrait + Default>() {
+    let shared_service_manager = shared_service_manager().await;
+    shared_service_manager.register::<T>().expect("registration failed");
+}
+
 pub trait ServiceTrait: crate::any::AnyTrait + Send + Sync {
     fn name(&self) -> &str;
     fn initialize(&mut self);

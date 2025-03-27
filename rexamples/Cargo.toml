@@ -1,0 +1,9 @@
+[package]
+name = "rexamples"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rings = { path = "../." }
+ringm = { path = "../ringm" }
+ringb = { path = "../ringb" }

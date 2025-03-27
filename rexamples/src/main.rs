@@ -2,12 +2,14 @@
 mod rm;
 
 
-#[ringm::service("service some one")]
+#[ringm::service]
 struct SomeOne {}
 
-#[ringm::service("service some two")]
+#[ringm::service]
 struct SomeTwo {}
 
 fn main() {
-    ringm::serviced!("service developer");
+
+
+    ringm::serviced!("crate");
 }
