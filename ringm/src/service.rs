@@ -122,7 +122,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                     #using_quote;
                     rings::service::registe_to_shared::<#struct_ident>().await;
 
-                    rings::rex::tracing::info!("Service registered with directy: {}", #struct_ident);
+                    rings::rex::tracing::info!("Service registered with directy: {}", #ident_name);
                 }
             }
         }
