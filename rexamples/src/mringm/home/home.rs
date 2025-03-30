@@ -1,23 +1,15 @@
-use std::any::Any;
 use rings::any::AnyTrait;
 use rings::rex::tokio_cron_scheduler;
 use rings::service::ServiceTrait;
+use std::any::Any;
 
 #[ringm::service(mringm, home, home)]
+#[ringm::default_any]
 pub struct Home {
     pub username: String,
     pub email: String,
 }
 
-impl AnyTrait for Home {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
 
 impl ServiceTrait for Home {
     fn name(&self) -> &str {

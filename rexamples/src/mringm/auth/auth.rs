@@ -1,8 +1,8 @@
- use rings::rex::tokio_cron_scheduler;
+use rings::rex::tokio_cron_scheduler;
 use rings::service::ServiceTrait;
 
- #[ringm::default_any]
- #[ringm::service(mringm, auth, auth)]
+#[ringm::service(mringm, auth, auth)]
+#[ringm::default_any]
 pub struct Auth {
     pub username: String,
     pub password: String,
