@@ -16,19 +16,6 @@ pub fn migrate_make_migrator(input: TokenStream) -> TokenStream {
     migrate::make_migrator(input)
 }
 
-// #[proc_macro_attribute]
-// pub fn ringm_service(_attr: TokenStream, item: TokenStream) -> TokenStream {
-//     let mod_path = module_path!();
-//     let output = quote! {
-//         #[ringm::service("abc")]
-//     };
-//
-//     let mut r = TokenStream::new();
-//     r.extend(TokenStream::from(output));
-//     r.extend(item);
-//
-//     r.into()
-// }
 
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
