@@ -90,7 +90,6 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 
     let marks = SERVICE_MACRO_MARKS.read().unwrap();
     let generated_functions = marks.iter().map(|(ident_name, module_args)| {
-
         let mode_path = join_crate(module_args);
         let module = join_crate(&vec![prefix_module.clone(), mode_path.clone(), ident_name.clone()]);
 
@@ -156,3 +155,4 @@ pub(crate) fn resolve(input: TokenStream) -> TokenStream {
 
     expanded.into()
 }
+

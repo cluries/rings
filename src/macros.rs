@@ -94,3 +94,19 @@ macro_rules! try_or_return {
         }
     };
 }
+
+
+#[macro_export]
+macro_rules! its_service {
+    () => {
+        pub async fn its_service() {
+             ringm::serviced!();
+        }
+    };
+    ($e:expr) => {
+        pub async fn its_service() {
+            ringm::serviced!(stringify!($e));
+        }
+    };
+}
+
