@@ -2,6 +2,7 @@ use std::any::Any;
 use rings::any::AnyTrait;
 use rings::rex::tokio_cron_scheduler;
 use rings::service::ServiceTrait;
+
 #[ringm::service(mringm, home, home)]
 pub struct Home {
     pub username: String,
