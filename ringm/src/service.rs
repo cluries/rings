@@ -38,7 +38,7 @@ pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
             let _in_module = module_path!();
 
             ringm::service_resolve!(#func_name, #input_module);
-            rings::service::registe_to_shared::<#struct_ident>();
+            rings::service::registe_to_shared::<#struct_ident>().await;
 
             // rings::rex::tracing::info!("---{} {}, {:?}",#func_name, #struct_ident, _in_module);
             println!("Service registered with name {}", #func_name);
