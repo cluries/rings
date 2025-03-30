@@ -80,7 +80,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             {
                 #using_quote
 
-                let _expand_mod_path = #module;
+                // let _expand_mod_path = #module;
                 let _expand = #func_ident().await;
             }
         }
@@ -103,10 +103,10 @@ pub(crate) fn resolve(input: TokenStream) -> TokenStream {
     SERVICE_MACRO_RESOLVES.write().unwrap().push(resolveed);
 
     let _mod_path = module_path!();
-    let vars = format!("Fn/Module {}::{}", args[1], _mod_path.to_string());
+    // let vars = format!("Fn/Module {}::{}", args[1], _mod_path.to_string());
 
     let expanded = quote! {
-        let _resolve_debug = #vars;
+        // let _resolve_debug = #vars;
         let _resolve_mod_path = module_path!();
     };
 
