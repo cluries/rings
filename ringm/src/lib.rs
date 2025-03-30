@@ -1,10 +1,10 @@
 use proc_macro::TokenStream;
 
+mod any;
 mod db;
 mod migrate;
 mod service;
 mod tools;
-mod any;
 
 #[proc_macro]
 pub fn migrate_using_macros(input: TokenStream) -> TokenStream {
@@ -40,11 +40,11 @@ pub fn serviced(input: TokenStream) -> TokenStream {
     service::expand(input)
 }
 
+#[cfg(feature = "use_func_register")]
 #[proc_macro]
 pub fn service_resolve(input: TokenStream) -> TokenStream {
     service::resolve(input)
 }
-
 
 #[proc_macro_attribute]
 pub fn default_any(attr: TokenStream, item: TokenStream) -> TokenStream {

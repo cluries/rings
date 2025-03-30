@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 rings = { path = "../." }
-ringm = { path = "../ringm" }
+ringm = { path = "../ringm" , features = ["use_func_register"]}
 ringb = { path = "../ringb" }

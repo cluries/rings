@@ -13,7 +13,7 @@ fn join_crate(parts: &Vec<String>) -> String {
     if parts.len() > 0 { parts.join("::").to_string() } else { String::new() }
 }
 
-///
+#[cfg(feature = "use_func_register")]
 pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = crate::tools::parse_input_string_vec(attr);
 
@@ -21,17 +21,23 @@ pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
     let struct_obj = parse_macro_input!(itemc as DeriveInput);
 
     let struct_ident = struct_obj.ident.clone();
+
     let struct_name = struct_obj.ident.to_string();
+
     let func_name = format!("ringm_generated_rings_service_register_{}", struct_name.to_lowercase());
     let func_ident = Ident::new(&func_name, proc_macro2::Span::call_site());
 
     SERVICE_MACRO_MARKS.write().unwrap().push((func_name.clone(), args.clone()));
 
-    let input_module = join_crate(&args);
-
     let defaults = quote! {
         #[derive(Default)]
     };
+
+    let mut merged = TokenStream::new();
+    merged.extend(TokenStream::from(defaults));
+    merged.extend(TokenStream::from(item));
+
+    let input_module = join_crate(&args);
 
     let function = quote! {
         pub async fn #func_ident() {
@@ -45,15 +51,35 @@ pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
+    merged.extend(TokenStream::from(function));
+
+    merged
+}
+
+#[cfg(not(feature = "use_func_register"))]
+pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let args = crate::tools::parse_input_string_vec(attr);
+
+    let itemc = item.clone();
+    let struct_obj = parse_macro_input!(itemc as DeriveInput);
+
+    let struct_name = struct_obj.ident.to_string();
+    SERVICE_MACRO_MARKS.write().unwrap().push((struct_name, args.clone()));
+
+    let defaults = quote! {
+        #[derive(Default)]
+    };
+
     let mut merged = TokenStream::new();
     merged.extend(TokenStream::from(defaults));
     merged.extend(TokenStream::from(item));
-    merged.extend(TokenStream::from(function));
+
     merged
 }
 
 /// input args:
 /// root crate ?
+
 pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let args = crate::tools::parse_input_string_vec(input);
 
@@ -61,11 +87,10 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let prefix_module = if args.is_empty() { "crate".to_string() } else { args.join("::") };
 
     let marks = SERVICE_MACRO_MARKS.read().unwrap();
-    let generated_functions = marks.iter().map(|(function_name, module_args)| {
-        let mode_path = join_crate(module_args);
+    let generated_functions = marks.iter().map(|(ident_name, module_args)| {
 
-        let module = join_crate(&vec![prefix_module.clone(), mode_path.clone(), function_name.clone()]);
-        let func_ident = Ident::new(&function_name, proc_macro2::Span::call_site());
+        let mode_path = join_crate(module_args);
+        let module = join_crate(&vec![prefix_module.clone(), mode_path.clone(), ident_name.clone()]);
 
         let using = syn::parse_str::<syn::Path>(&module).unwrap();
         let using_quote = if !mode_path.is_empty() {
@@ -76,12 +101,26 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             quote! {}
         };
 
-        quote! {
-            {
-                #using_quote
+        #[cfg(feature = "use_func_register")]
+        {
+            let func_ident = Ident::new(&ident_name, proc_macro2::Span::call_site());
+            quote! {
+                {
+                    #using_quote
+                    let _expand = #func_ident().await;
+                }
+            }
+        }
 
-                // let _expand_mod_path = #module;
-                let _expand = #func_ident().await;
+        #[cfg(not(feature = "use_func_register"))]
+        {
+            let struct_ident = Ident::new(&ident_name, proc_macro2::Span::call_site());
+            quote! {
+                {
+                    #using_quote;
+                    rings::service::registe_to_shared::<#struct_ident>().await;
+                    println!("Service registered with name {}", #ident_name);
+                }
             }
         }
     });
@@ -97,6 +136,8 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 
 /// input args:
 /// function_name, module_path
+///
+#[cfg(feature = "use_func_register")]
 pub(crate) fn resolve(input: TokenStream) -> TokenStream {
     let args = crate::tools::parse_input_string_vec(input);
     let resolveed = (args[0].clone(), args[1].clone());

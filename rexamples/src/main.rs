@@ -1,7 +1,5 @@
-use rings::any::AnyTrait;
 use rings::rex::{tokio, tokio_cron_scheduler};
 use rings::service::ServiceTrait;
-use std::any::Any;
 
 #[allow(dead_code, unused)]
 mod mringm;
