@@ -169,6 +169,7 @@ pub struct Web {
     pub bind: Option<String>,
     pub port: u16,
     pub middleware: Option<NestedMap>,
+    pub options: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Eq)]
@@ -189,7 +190,7 @@ impl Default for Log {
 
 impl Default for Web {
     fn default() -> Self {
-        Self { name: format!("Web-{}", crate::tools::rand::rand_str(8)), bind: None, port: 80, middleware: None }
+        Self { name: format!("Web-{}", crate::tools::rand::rand_str(8)), bind: None, port: 80, middleware: None, options: None }
     }
 }
 
@@ -233,11 +234,33 @@ pub struct Backend {
     pub kind: BackendKind,
     pub readonly: bool,
     pub connect: String,
+    pub options: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Model {
     pub backends: Vec<Backend>,
+}
+
+impl Model {
+    pub fn backend(&self, name: &str) -> Option<Backend> {
+        self.backends.iter().find(|backend| backend.name == name).cloned()
+    }
+}
+
+impl Rebit {
+    pub fn backend(&self, name: &str) -> Option<Backend> {
+        self.model.backend(name)
+    }
+
+    pub fn web(&self, name: &str) -> Option<Web> {
+        self.webs.iter().find(|web| web.name == name).cloned()
+    }
+
+    pub fn web_middleware(&self, name: &str, middleware_name: &str) -> Option<std::collections::HashMap<String, String>> {
+        self.web(name).and_then(|web| web.middleware).and_then(|mw| mw.get(middleware_name).cloned())
+    }
+
 }
 
 #[allow(unused)]
@@ -249,4 +272,7 @@ mod tests {
         print!("{:?}", settings().read().unwrap().clone().try_deserialize::<std::collections::HashMap<String, Value>>().unwrap());
         print!("{:?}", GetOption::array("webs"));
     }
+
+    #[test]
+    fn test_path_value() {}
 }
