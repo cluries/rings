@@ -110,3 +110,10 @@ macro_rules! its_service {
     };
 }
 
+#[macro_export]
+macro_rules! hey_service {
+    ($e:ident) => {{
+        $e::its_service().await
+    }};
+}
+
