@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-use_func_register = []
+serivce_macro_use_func = []
 
 
 [lib]

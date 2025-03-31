@@ -27,7 +27,7 @@ pub fn serviced(input: TokenStream) -> TokenStream {
     service::expand(input)
 }
 
-#[cfg(feature = "use_func_register")]
+#[cfg(feature = "serivce_macro_use_func")]
 #[proc_macro]
 pub fn service_resolve(input: TokenStream) -> TokenStream {
     service::resolve(input)

@@ -13,7 +13,7 @@ fn join_crate(parts: &Vec<String>) -> String {
     if parts.len() > 0 { parts.join("::").to_string() } else { String::new() }
 }
 
-#[cfg(feature = "use_func_register")]
+#[cfg(feature = "serivce_macro_use_func")]
 pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = crate::tools::parse_input_string_vec(attr);
 
@@ -47,8 +47,7 @@ pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
             rings::service::registe_to_shared::<#struct_ident>().await;
 
             // rings::rex::tracing::info!("---{} {}, {:?}",#func_name, #struct_ident, _in_module);
-            // println!("Service registered with name {}", #func_name);
-
+            println!("Service registered with function: {}", #func_name);
             rings::rex::tracing::info!("Service registered with function: {}", #func_name);
         }
     };
@@ -58,7 +57,7 @@ pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
     merged
 }
 
-#[cfg(not(feature = "use_func_register"))]
+#[cfg(not(feature = "serivce_macro_use_func"))]
 pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
     let args = crate::tools::parse_input_string_vec(attr);
 
@@ -102,7 +101,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             quote! {}
         };
 
-        #[cfg(feature = "use_func_register")]
+        #[cfg(feature = "serivce_macro_use_func")]
         {
             let func_ident = Ident::new(&ident_name, proc_macro2::Span::call_site());
             quote! {
@@ -113,14 +112,14 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             }
         }
 
-        #[cfg(not(feature = "use_func_register"))]
+        #[cfg(not(feature = "serivce_macro_use_func"))]
         {
             let struct_ident = Ident::new(&ident_name, proc_macro2::Span::call_site());
             quote! {
                 {
                     #using_quote;
                     rings::service::registe_to_shared::<#struct_ident>().await;
-
+                    println!("Service registered with directy: {}", #ident_name);
                     rings::rex::tracing::info!("Service registered with directy: {}", #ident_name);
                 }
             }
@@ -139,7 +138,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 /// input args:
 /// function_name, module_path
 ///
-#[cfg(feature = "use_func_register")]
+#[cfg(feature = "serivce_macro_use_func")]
 pub(crate) fn resolve(input: TokenStream) -> TokenStream {
     let args = crate::tools::parse_input_string_vec(input);
     let resolveed = (args[0].clone(), args[1].clone());
@@ -155,4 +154,3 @@ pub(crate) fn resolve(input: TokenStream) -> TokenStream {
 
     expanded.into()
 }
-

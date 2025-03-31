@@ -18,8 +18,7 @@ struct LanuchService {}
 
 #[tokio::main]
 async fn main() {
-
-    ringm::serviced!();
+    mringm::its_service().await;
 }
 
 

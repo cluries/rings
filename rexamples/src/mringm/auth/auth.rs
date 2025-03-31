@@ -1,7 +1,10 @@
 use rings::rex::tokio_cron_scheduler;
 use rings::service::ServiceTrait;
 
+const M: &str = "xxxx";
+
 #[ringm::service(mringm, auth, auth)]
+// #[ringm::service(M)]
 #[ringm::default_any]
 pub struct Auth {
     pub username: String,
