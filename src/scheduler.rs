@@ -10,16 +10,30 @@ use tracing::{error, info, warn};
 pub struct SchedulerManager {
     stage: Arc<RwLock<RingState>>,
     count: u64,
-    scheduler: Arc<ToKioRwLock<Option<JobScheduler>>>,
+    scheduler: Arc<ToKioRwLock<JobScheduler>>,
 }
 
 impl SchedulerManager {
-    pub(crate) fn new() -> Self {
-        Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: Arc::new(ToKioRwLock::new(None)) }
+    pub(crate) async fn new() -> Self {
+        let mut scheduler = JobScheduler::new().await.unwrap();
+        scheduler.set_shutdown_handler(Box::new(|| {
+            Box::pin(async move {
+                info!("scheduler.set_shutdown_handler called.");
+            })
+        }));
+
+        Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: Arc::new(ToKioRwLock::new(scheduler)) }
     }
 }
 
 pub const SCHEDULER_MANAGER_NAME: &str = "SchedulerManager";
+
+// macro_rules! epanic {
+//     ($ex:expr) => {
+//         error!($ex);
+//         panic!($ex);
+//     };
+// }
 
 impl SchedulerManager {
     pub fn debug(&self) {
@@ -43,17 +57,11 @@ impl crate::rings::RingsMod for SchedulerManager {
     }
 
     async fn initialize(&mut self) -> Result<(), crate::erx::Erx> {
-        let mut scheduler = JobScheduler::new().await.unwrap();
-        scheduler.set_shutdown_handler(Box::new(|| {
-            Box::pin(async move {
-                info!("scheduler shutdown");
-            })
-        }));
-
         let mut futures = vec![];
-
         let srv_manager = ServiceManager::shared().await;
+
         let managed: Vec<Arc<RwLock<Box<dyn ServiceTrait>>>> = srv_manager.managed_services();
+        let scheduler = self.scheduler.clone();
 
         for service in managed {
             match service.try_read() {
@@ -62,9 +70,11 @@ impl crate::rings::RingsMod for SchedulerManager {
                         let service_name = service.name().to_string();
                         let job_id = job.guid().to_string();
 
-                        let scheduler = &scheduler;
+                        let scheduler = Arc::clone(&scheduler);
                         futures.push(async move {
-                            match &scheduler.add(job).await {
+                            let scheduler = Arc::clone(&scheduler);
+                            let scher = scheduler.write().await;
+                            match scher.add(job).await {
                                 Ok(_) => {
                                     info!("Add schedule job[{}] from service[{}] SUCCESS", job_id, service_name);
                                 },
@@ -83,9 +93,6 @@ impl crate::rings::RingsMod for SchedulerManager {
 
         let scheduled_count = futures.len();
         futures_util::future::join_all(futures).await;
-
-        let mut write_lock = self.scheduler.write().await;
-        *write_lock = Some(scheduler);
 
         info!("scheduler manager {} load service scheduled count:{}", SCHEDULER_MANAGER_NAME, scheduled_count);
 
@@ -106,11 +113,8 @@ impl crate::rings::RingsMod for SchedulerManager {
         }
 
         let scheduler = Arc::clone(&self.scheduler);
-        let mut writer = scheduler.write().await;
-        if let Some(mut scheduler) = writer.take() {
-            if let Err(ex) = scheduler.shutdown().await {
-                error!("scheduler service lock poisoned: {}", ex);
-            }
+        if let Err(ex) = scheduler.write().await.shutdown().await {
+            error!("scheduler service lock poisoned: {}", ex);
         }
 
         *self.stage.try_write().map_err(crate::erx::smp)? = RingState::Terminating;
@@ -149,19 +153,14 @@ impl crate::rings::RingsMod for SchedulerManager {
         let scheduler = self.scheduler.clone();
         let run = async move {
             let scheduler = Arc::clone(&scheduler);
-            let mut wg = scheduler.write().await;
-            if let Some(manager) = wg.take() {
-                match manager.start().await {
-                    Ok(_) => {
-                        info!("scheduler start success");
-                    },
-                    Err(err) => {
-                        error!("scheduler failed to start: {}", err);
-                    },
-                }
-            } else {
-                error!("scheduler not taked");
-                panic!("scheduler not taked");
+            let mut scher = scheduler.write().await;
+            match scher.start().await {
+                Ok(_) => {
+                    info!("scheduler start success");
+                },
+                Err(err) => {
+                    error!("scheduler failed to start: {}", err);
+                },
             }
         };
 
@@ -181,39 +180,6 @@ impl crate::rings::RingsMod for SchedulerManager {
         i64::MAX
     }
 }
-
-/*
-
-impl crate::rings::RingsModAsync for SchedulerManager {
-    fn initialize_async(&mut self) -> impl Future<Output=()> + Send {
-        async {
-            let mut scheduler = JobScheduler::new().await.unwrap();
-            scheduler.set_shutdown_handler(Box::new(|| {
-                Box::pin(async move {
-                    tracing::info!("scheduler shutdown");
-                })
-            }));
-
-
-            self.scheduler = Some(scheduler);
-
-            *self.stage.write().unwrap() = RingState::Ready;
-        }
-    }
-
-    fn unregister_async(&mut self) -> impl Future<Output=()> + Send {
-        async {}
-    }
-
-    fn shutdown_async(&mut self) -> impl Future<Output=()> + Send {
-        async {}
-    }
-
-    fn fire_async(&mut self) -> impl Future<Output=()> + Send {
-        async {}
-    }
-}
-*/
 
 impl crate::any::AnyTrait for SchedulerManager {
     fn as_any(&self) -> &dyn std::any::Any {

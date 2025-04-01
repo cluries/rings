@@ -56,6 +56,9 @@ pub struct ServiceManager {
     managed: RwLock<Vec<Arc<RwLock<Box<dyn ServiceTrait>>>>>,
 }
 
+
+pub type Managed = Arc<RwLock<Box<dyn ServiceTrait>>>;
+
 impl ServiceManager {
     pub fn new(name: &str) -> Self {
         ServiceManager { name: name.to_string(), managed: RwLock::new(Vec::new()) }

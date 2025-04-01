@@ -70,8 +70,9 @@ impl AppBuilder {
     }
 
     pub async fn use_scheduler(&mut self) -> &mut Self {
-        let scheduler = crate::scheduler::SchedulerManager::new();
-        Arc::clone(&self.rings_app).try_write().unwrap().register_mod(scheduler).await;
+        let scheduler_manager = crate::scheduler::SchedulerManager::new().await;
+        let app = Arc::clone(&self.rings_app);
+        app.write().unwrap().register_mod(scheduler_manager).await;
         self
     }
 
