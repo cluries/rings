@@ -17,11 +17,22 @@ pub(crate) async fn shared_service_manager() -> &'static ServiceManager {
         .await
 }
 
+/// registe to shared service manager
+/// # Arguments
+/// * `name` - service name
+/// * `service` - service
 pub async fn registe_to_shared<T: ServiceTrait + Default>() {
     let shared_service_manager = shared_service_manager().await;
     shared_service_manager.register::<T>().expect("registration failed");
 }
 
+/// Service Trait
+/// # Methods
+/// * `name` - get service name
+/// * `initialize` - initialize service
+/// * `release` - release service
+/// * `ready` - check service is ready
+/// * `schedules` - get service schedules
 pub trait ServiceTrait: crate::any::AnyTrait + Send + Sync {
     fn name(&self) -> &str;
     fn initialize(&mut self);
@@ -51,23 +62,54 @@ pub trait ServiceTrait: crate::any::AnyTrait + Send + Sync {
 //     Box<dyn FnMut(Box<S>, &T) -> Result<Arc<RwLock<Box<dyn ServiceTrait>>>, E>>,
 // ) -> Arc<Vec<T>>;
 
+/// Service Manager
+/// # Fields
+/// * `name` - service manager name
+/// * `managed` - managed services
 pub struct ServiceManager {
     name: String,
     managed: RwLock<Vec<Arc<RwLock<Box<dyn ServiceTrait>>>>>,
 }
 
-
+/// Managed Service
+/// Arc<RwLock<Box<dyn ServiceTrait>>>
 pub type Managed = Arc<RwLock<Box<dyn ServiceTrait>>>;
 
+/// Service Manager
+/// # Fields
+/// * `name` - service manager name
+/// * `managed` - managed services
+/// # Methods
+/// * `new` - make new service manager
+/// * `name` - get service manager name
+/// * `managed_by_name` - get managed service by name
+/// * `managed_services` - get managed services
+/// * `register` - register service
+/// * `unregister` - unregister service
+/// * `get` - get managed service
+/// * `shared` - get shared service manager
 impl ServiceManager {
+    /// make new service manager
+    /// # Arguments
+    /// * `name` - service manager name
+    /// # Returns
+    /// * `ServiceManager` - service manager
     pub fn new(name: &str) -> Self {
         ServiceManager { name: name.to_string(), managed: RwLock::new(Vec::new()) }
     }
 
+    /// get service manager name
+    /// # Returns
+    /// * `&str` - service manager name
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// get managed service by name
+    /// # Arguments
+    /// * `name` - service name
+    /// # Returns
+    /// * `Option<Arc<RwLock<Box<dyn ServiceTrait>>>>` - managed service
     fn managed_by_name(&self, name: &str) -> Option<Arc<RwLock<Box<dyn ServiceTrait>>>> {
         self.managed
             .read()
@@ -80,10 +122,21 @@ impl ServiceManager {
             .cloned()
     }
 
+    /// get managed services
+    /// # Returns
+    /// * `Vec<Arc<RwLock<Box<dyn ServiceTrait>>>>` - managed services
+    /// # Panics
+    /// * `std::sync::PoisonError` - if managed services is poisoned
     pub fn managed_services(&self) -> Vec<Arc<RwLock<Box<dyn ServiceTrait>>>> {
         self.managed.read().unwrap().clone()
     }
 
+    /// register service
+    /// # Arguments
+    /// * `name` - service name
+    /// * `service` - service
+    /// # Returns
+    /// * `Result<Arc<RwLock<Box<dyn ServiceTrait>>>, Erx>` - managed service
     pub fn register<T>(&self) -> Result<Arc<RwLock<Box<dyn ServiceTrait>>>, Erx>
     where
         T: ServiceTrait + Default,
@@ -106,6 +159,11 @@ impl ServiceManager {
         }
     }
 
+    /// unregister service
+    /// # Arguments
+    /// * `name` - service name
+    /// # Returns
+    /// * `Result<(), Erx>` - unregister result
     pub fn unregister<T: ServiceTrait + Default>(&self) -> Result<(), Erx> {
         let name = T::default().name().to_owned();
 
@@ -126,10 +184,18 @@ impl ServiceManager {
         Ok(())
     }
 
+    /// get managed service
+    /// # Arguments
+    /// * `name` - service name
+    /// # Returns
+    /// * `Option<Arc<RwLock<Box<dyn ServiceTrait>>>>` - managed service
     pub fn get<T: ServiceTrait + Default>(&self) -> Option<Arc<RwLock<Box<dyn ServiceTrait>>>> {
         self.managed_by_name(T::default().name())
     }
 
+    /// get shared service manager
+    /// # Returns
+    /// * `&'static ServiceManager` - shared service manager
     pub async fn shared() -> &'static ServiceManager {
         shared_service_manager().await
     }

@@ -6,7 +6,7 @@ use tokio::sync::RwLock as ToKioRwLock;
 use tokio_cron_scheduler::JobScheduler;
 use tracing::{error, info, warn};
 
-/// SchedulerManager
+/// scheduler manager
 pub struct SchedulerManager {
     stage: Arc<RwLock<RingState>>,
     count: u64,
@@ -14,6 +14,7 @@ pub struct SchedulerManager {
 }
 
 impl SchedulerManager {
+    /// create a new scheduler manager
     pub(crate) async fn new() -> Self {
         let mut scheduler = JobScheduler::new().await.unwrap();
         scheduler.set_shutdown_handler(Box::new(|| {
@@ -36,10 +37,12 @@ pub const SCHEDULER_MANAGER_NAME: &str = "SchedulerManager";
 // }
 
 impl SchedulerManager {
+    /// debug info
     pub fn debug(&self) {
         info!("scheduler manager {} ", SCHEDULER_MANAGER_NAME);
     }
 
+    /// debug mut info
     pub fn debug_mut(&mut self) {
         self.count += 1;
         info!("scheduler manager {} mut counter:{}", SCHEDULER_MANAGER_NAME, self.count);
@@ -57,11 +60,11 @@ impl crate::rings::RingsMod for SchedulerManager {
     }
 
     async fn initialize(&mut self) -> Result<(), crate::erx::Erx> {
-        let mut futures = vec![];
+        let mut futures = vec![]; // Vec<Box<dyn Future<Output = ()> + Send>>;
         let srv_manager = ServiceManager::shared().await;
 
         let managed: Vec<Arc<RwLock<Box<dyn ServiceTrait>>>> = srv_manager.managed_services();
-        let scheduler = self.scheduler.clone();
+        let scheduler = self.scheduler.clone(); // Arc<ToKioRwLock<JobScheduler>>;
 
         for service in managed {
             match service.try_read() {
@@ -127,7 +130,7 @@ impl crate::rings::RingsMod for SchedulerManager {
 
         let stage = self.stage.clone();
         let watch_dog = async move {
-            let duration = tokio::time::Duration::from_millis(100);
+            let duration = tokio::time::Duration::from_millis(100); // 100ms
             let mut stage_read_lock_failures: i64 = 0;
             loop {
                 match stage.try_read() {
@@ -153,7 +156,7 @@ impl crate::rings::RingsMod for SchedulerManager {
         let scheduler = self.scheduler.clone();
         let run = async move {
             let scheduler = Arc::clone(&scheduler);
-            let mut scher = scheduler.write().await;
+            let scher = scheduler.write().await;
             match scher.start().await {
                 Ok(_) => {
                     info!("scheduler start success");
