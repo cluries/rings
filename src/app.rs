@@ -70,9 +70,9 @@ impl AppBuilder {
     }
 
     pub async fn use_scheduler(&mut self) -> &mut Self {
-        // TODO
-        panic!("not yet implemented");
-        // self
+        let scheduler = crate::scheduler::SchedulerManager::new();
+        Arc::clone(&self.rings_app).try_write().unwrap().register_mod(scheduler).await;
+        self
     }
 
     pub fn build(self) -> RingsApplication {
