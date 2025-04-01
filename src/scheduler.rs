@@ -2,6 +2,7 @@ use crate::rings::RingState;
 use crate::service::{ServiceManager, ServiceTrait};
 use async_trait::async_trait;
 use std::sync::{Arc, RwLock};
+use tokio::sync::RwLock as ToKioRwLock;
 use tokio_cron_scheduler::JobScheduler;
 use tracing::{error, info, warn};
 
@@ -9,12 +10,12 @@ use tracing::{error, info, warn};
 pub struct SchedulerManager {
     stage: Arc<RwLock<RingState>>,
     count: u64,
-    scheduler: Option<JobScheduler>,
+    scheduler: Arc<ToKioRwLock<Option<JobScheduler>>>,
 }
 
 impl SchedulerManager {
     pub(crate) fn new() -> Self {
-        Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: None }
+        Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: Arc::new(ToKioRwLock::new(None)) }
     }
 }
 
@@ -28,35 +29,6 @@ impl SchedulerManager {
     pub fn debug_mut(&mut self) {
         self.count += 1;
         info!("scheduler manager {} mut counter:{}", SCHEDULER_MANAGER_NAME, self.count);
-    }
-}
-
-impl SchedulerManager {
-    async fn load_service_scheduled(&self) {
-        let srv_manager = ServiceManager::shared().await;
-        let managed: Vec<Arc<RwLock<Box<dyn ServiceTrait>>>> = srv_manager.managed_services();
-
-        let mut scheduled_count = 0;
-        if let Some(scheduler) = self.scheduler.as_ref() {
-            let mut futures = vec![];
-            for service in managed {
-                match service.try_read() {
-                    Ok(service) => {
-                        for job in service.schedules() {
-                            futures.push(scheduler.add(job));
-                        }
-                    }
-                    Err(ex) => {
-                        error!("scheduler service lock poisoned: {}", ex);
-                    }
-                }
-            }
-
-            scheduled_count = futures.len();
-            futures_util::future::join_all(futures).await;
-        }
-
-        info!("scheduler manager {} load service scheduled count:{}", SCHEDULER_MANAGER_NAME, scheduled_count);
     }
 }
 
@@ -78,18 +50,44 @@ impl crate::rings::RingsMod for SchedulerManager {
             })
         }));
 
-        crate::service::shared_service_manager().await;
+        let mut futures = vec![];
 
-        self.scheduler = Some(scheduler);
+        let srv_manager = ServiceManager::shared().await;
+        let managed: Vec<Arc<RwLock<Box<dyn ServiceTrait>>>> = srv_manager.managed_services();
 
-        self.load_service_scheduled().await;
+        for service in managed {
+            match service.try_read() {
+                Ok(service) => {
+                    for job in service.schedules() {
+                        let service_name = service.name().to_string();
+                        let job_id = job.guid().to_string();
 
-        // let stage = self.stage.clone();
-        // let future = self.register_service_scheduled();
-        // tokio::spawn(async move {
-        //     future.await;
-        //     *stage.write().unwrap() = RingState::Ready;
-        // });
+                        let scheduler = &scheduler;
+                        futures.push(async move {
+                            match &scheduler.add(job).await {
+                                Ok(_) => {
+                                    info!("Add schedule job[{}] from service[{}] SUCCESS", job_id, service_name);
+                                },
+                                Err(e) => {
+                                    error!("Add schedule job[{}] from service[{}] FAILED, Error:{}.", job_id, service_name, e.to_string());
+                                },
+                            }
+                        });
+                    }
+                },
+                Err(ex) => {
+                    error!("scheduler service lock poisoned: {}", ex);
+                },
+            }
+        }
+
+        let scheduled_count = futures.len();
+        futures_util::future::join_all(futures).await;
+
+        let mut write_lock = self.scheduler.write().await;
+        *write_lock = Some(scheduler);
+
+        info!("scheduler manager {} load service scheduled count:{}", SCHEDULER_MANAGER_NAME, scheduled_count);
 
         Ok(())
     }
@@ -107,7 +105,9 @@ impl crate::rings::RingsMod for SchedulerManager {
             ));
         }
 
-        if let Some(scheduler) = self.scheduler.as_mut() {
+        let scheduler = Arc::clone(&self.scheduler);
+        let mut writer = scheduler.write().await;
+        if let Some(mut scheduler) = writer.take() {
             if let Err(ex) = scheduler.shutdown().await {
                 error!("scheduler service lock poisoned: {}", ex);
             }
@@ -132,11 +132,11 @@ impl crate::rings::RingsMod for SchedulerManager {
                         if stage == RingState::Terminating || stage == RingState::Terminated {
                             break;
                         }
-                    }
+                    },
                     Err(ex) => {
                         warn!("scheduler stage lock poisoned: {}", ex);
                         stage_read_lock_failures += 1;
-                    }
+                    },
                 }
                 tokio::time::sleep(duration).await;
             }
@@ -146,7 +146,24 @@ impl crate::rings::RingsMod for SchedulerManager {
             stage_read_lock_failures
         };
 
-        let run = async {};
+        let scheduler = self.scheduler.clone();
+        let run = async move {
+            let scheduler = Arc::clone(&scheduler);
+            let mut wg = scheduler.write().await;
+            if let Some(manager) = wg.take() {
+                match manager.start().await {
+                    Ok(_) => {
+                        info!("scheduler start success");
+                    },
+                    Err(err) => {
+                        error!("scheduler failed to start: {}", err);
+                    },
+                }
+            } else {
+                error!("scheduler not taked");
+                panic!("scheduler not taked");
+            }
+        };
 
         tokio::spawn(async {
             run.await;

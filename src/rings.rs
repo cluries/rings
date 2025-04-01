@@ -1,5 +1,4 @@
 use crate::any::AnyTrait;
-use crate::scheduler::SchedulerManager;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -173,14 +172,14 @@ impl R {
     pub async fn make(name: &str) -> RingsApplication {
         crate::log::logging_initialize().await;
 
-        let mut app = Rings {
+        let app = Rings {
             name: name.to_string(),
             mods: vec![],
             state: Arc::new(RwLock::new(RingState::Init)),
             moments: vec![Moment::now("make")],
         };
 
-        app.register_mod(SchedulerManager::new()).await;
+        // app.register_mod(SchedulerManager::new()).await;
 
         let arc: RingsApplication = Arc::new(RwLock::new(app));
 
