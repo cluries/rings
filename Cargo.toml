@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = [ "rexamples","ringb", "ringm"]
+members = ["rexamples", "ringb", "ringm"]
 
 [workspace.dependencies]
 aes = { version = "0.8" }
@@ -27,13 +27,13 @@ mlua = { version = "0.10", features = ["lua54", "vendored"] }
 ofb = { version = "0.6" }
 pem = { version = "3.0" }
 percent-encoding = { version = "2.3" }
-rand = { version = "0.8.5" }
+rand = { version = "0.8" }
 redis = { version = "0.29", features = ["tokio-comp", "json", "tcp_nodelay"] }
 regex = { version = "1" }
 reqwest = { version = "0.12", features = ["json"] }
 rsa = { version = "0.9" }
-sea-orm = { version = "1", features = ["sqlx-postgres", "postgres-array", "with-chrono", "with-json", "runtime-tokio", "macros", "with-bigdecimal"] }
-sea-orm-migration = { version = "1", features = ["sqlx-postgres"] }
+sea-orm = { version = "1", features = ["sqlx", "sqlx-postgres", "sqlx-sqlite", "postgres-array", "with-chrono", "with-json", "runtime-tokio", "macros", "with-bigdecimal"] }
+sea-orm-migration = { version = "1", features = ["sqlx-sqlite", "sqlx-postgres"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 sha1 = { version = "0.10" }

@@ -95,13 +95,12 @@ macro_rules! try_or_return {
     };
 }
 
-
 ///
 #[macro_export]
 macro_rules! its_service {
     () => {
         pub async fn its_service() {
-             ringm::serviced!();
+            ringm::serviced!();
         }
     };
     ($e:expr) => {
@@ -113,8 +112,5 @@ macro_rules! its_service {
 
 #[macro_export]
 macro_rules! hey_service {
-    ($e:ident) => {{
-        $e::its_service().await
-    }};
+    ($e:ident) => {{ $e::its_service().await }};
 }
-
