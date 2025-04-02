@@ -80,17 +80,17 @@ impl crate::rings::RingsMod for SchedulerManager {
                             match scher.add(job).await {
                                 Ok(_) => {
                                     info!("Add schedule job[{}] from service[{}] SUCCESS", job_id, service_name);
-                                },
+                                }
                                 Err(e) => {
                                     error!("Add schedule job[{}] from service[{}] FAILED, Error:{}.", job_id, service_name, e.to_string());
-                                },
+                                }
                             }
                         });
                     }
-                },
+                }
                 Err(ex) => {
                     error!("scheduler service lock poisoned: {}", ex);
-                },
+                }
             }
         }
 
@@ -129,7 +129,8 @@ impl crate::rings::RingsMod for SchedulerManager {
         *self.stage.write().unwrap() = RingState::Working;
 
         let stage = self.stage.clone();
-        let watch_dog = async move {
+        let dog = async move {
+            info!("scheduler manager [{}] fire, dog watch it....", SCHEDULER_MANAGER_NAME);
             let duration = tokio::time::Duration::from_millis(100); // 100ms
             let mut stage_read_lock_failures: i64 = 0;
             loop {
@@ -139,11 +140,11 @@ impl crate::rings::RingsMod for SchedulerManager {
                         if stage == RingState::Terminating || stage == RingState::Terminated {
                             break;
                         }
-                    },
+                    }
                     Err(ex) => {
                         warn!("scheduler stage lock poisoned: {}", ex);
                         stage_read_lock_failures += 1;
-                    },
+                    }
                 }
                 tokio::time::sleep(duration).await;
             }
@@ -160,16 +161,16 @@ impl crate::rings::RingsMod for SchedulerManager {
             match scher.start().await {
                 Ok(_) => {
                     info!("scheduler start success");
-                },
+                }
                 Err(err) => {
                     error!("scheduler failed to start: {}", err);
-                },
+                }
             }
         };
 
         tokio::spawn(async {
             run.await;
-            watch_dog.await;
+            dog.await;
         });
 
         Ok(())
