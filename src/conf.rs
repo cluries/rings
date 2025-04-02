@@ -33,6 +33,7 @@ pub fn rebit() -> &'static RwLock<Rebit> {
                     web: Default::default(),
                     model: Model { backends: None },
                     log: None,
+                    extends: None,
                 }
             } else {
                 r.unwrap_or_else(|e| panic!("rebit loading error: {}", e))
@@ -152,6 +153,7 @@ pub struct Rebit {
     pub web: Dict<Web>,
     pub model: Model,
     pub log: Option<Log>,
+    pub extends: Option<DictString>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -206,6 +208,7 @@ impl Default for Rebit {
             web: Default::default(),
             model: Model { backends: None },
             log: Default::default(),
+            extends: Default::default(),
         }
     }
 }
@@ -275,6 +278,10 @@ impl Rebit {
 
     pub fn web_middleware(&self, name: &str, middleware_name: &str) -> Option<DictString> {
         self.get_web(name).and_then(|web| web.middleware).and_then(|mw| mw.get(middleware_name).cloned())
+    }
+
+    pub fn get_extend(&self, name: &str) -> Option<String> {
+        self.extends.as_ref()?.get(name).cloned()
     }
 }
 
