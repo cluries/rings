@@ -268,18 +268,37 @@ impl Rebit {
         self.model.backend(name)
     }
 
+    /// has web config
+    /// # Returns
+    /// * `bool` - true if has web config
     pub fn has_web(&self) -> bool {
         self.web.len() > 0
     }
 
+    /// get web config
+    /// # Arguments
+    /// * `name` - web name
+    /// # Returns
+    /// * `Option<Web>` - web config
     pub fn get_web(&self, name: &str) -> Option<Web> {
         self.web.get(name).cloned()
     }
 
+    /// get web middleware
+    /// # Arguments
+    /// * `name` - web name
+    /// * `middleware_name` - middleware name
+    /// # Returns
+    /// * `Option<DictString>` - middleware options
     pub fn web_middleware(&self, name: &str, middleware_name: &str) -> Option<DictString> {
         self.get_web(name).and_then(|web| web.middleware).and_then(|mw| mw.get(middleware_name).cloned())
     }
 
+    /// get extend value
+    /// # Arguments
+    /// * `name` - extend name
+    /// # Returns
+    /// * `Option<String>` - extend value
     pub fn get_extend(&self, name: &str) -> Option<String> {
         self.extends.as_ref()?.get(name).cloned()
     }

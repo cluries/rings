@@ -9,13 +9,13 @@ pub mod javascript;
 pub mod luaction;
 pub mod middleware;
 pub mod request;
+pub mod route;
 pub mod session;
 pub mod signature;
 pub mod tools;
 pub mod types;
 pub mod url;
 pub mod validator;
-pub mod route;
 
 use crate::rings::{RingState, RingsMod, SafeRS};
 use crate::web::luaction::LuaAction;

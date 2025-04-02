@@ -46,6 +46,7 @@ tracing-appender = { version = "0.2" }
 tracing-serde = { version = "0.2" }
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = { version = "2", features = ["default", "serde"] }
+jsonwebtoken = { version = "9" }
 
 [dependencies]
 aes = { workspace = true }
@@ -87,3 +88,4 @@ tracing-appender = { workspace = true }
 tracing-serde = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
+jsonwebtoken = { workspace = true }
