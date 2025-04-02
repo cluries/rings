@@ -1,18 +1,19 @@
-name: RingsTestsLoad
-short: RING
+name: logos
+short: LOGO
 debug: false
 
+
 webs:
-  - name: api
+  api:
     port: 8080
 
 model:
   backends:
-    - name: postgre
+    postgre:
       kind: postgres
       readonly: false
       connect: ""
-    - name: redis
+    redis:
       kind: redis
       readonly: false
       connect: ""

@@ -25,7 +25,7 @@ use std::time::Duration;
 use tokio::sync::OnceCell;
 use tracing::{info, span, warn};
 
-use crate::conf::{Backend, BackendKind};
+use crate::conf::{Backend, BackendKind, Dict};
 use crate::web::url;
 
 /// DBResult is a type alias for erx::ResultE<T>
@@ -79,7 +79,7 @@ pub fn make_redis_client() -> erx::ResultE<redis::Client> {
 
 /// initialize model connection
 /// call once when application initialized
-pub async fn initialize_model_connection(backends: &Vec<Backend>) {
+pub async fn initialize_model_connection(backends: Dict<Backend>) {
     let span = span!(tracing::Level::INFO, "INITIALIZE MODEL");
     let _guard = span.enter();
 
@@ -88,12 +88,12 @@ pub async fn initialize_model_connection(backends: &Vec<Backend>) {
         return;
     }
 
-    async fn postgre(backend: &Backend) {
+    async fn postgre(backend: Backend) {
         info!("Connecting to postgres: {:?}", backend.connect);
         SHARED_DB_CONNECTION.get_or_init(|| async { new_database_connection(backend).await }).await;
     }
 
-    async fn redis(backend: &Backend) {
+    async fn redis(backend: Backend) {
         let connect_string = backend.connect.clone();
 
         let mut conn = SHARED_REDIS_CONNECT_STRING.write().unwrap();
@@ -104,9 +104,9 @@ pub async fn initialize_model_connection(backends: &Vec<Backend>) {
         info!("Connected to redis: {:?}", cli.get_connection_info());
     }
 
-    for backend in backends {
+    for (backend_name, backend) in backends {
         if backend.connect.len() < 1 {
-            warn!("Backend '{}' connect string is empty, pass", backend.name);
+            warn!("Backend '{}' connect string is empty, pass", backend_name);
             continue;
         }
 
@@ -118,10 +118,10 @@ pub async fn initialize_model_connection(backends: &Vec<Backend>) {
 }
 
 /// new database connection
-pub async fn new_database_connection(backend: &Backend) -> DatabaseConnection {
+pub async fn new_database_connection(backend: Backend) -> DatabaseConnection {
     match backend.kind {
         BackendKind::Redis => {
-            panic!("Redis Backend '{}' connect is not supported yet", backend.name);
+            panic!("Redis Backend use new_database_connection is not supported yet");
         },
         BackendKind::Postgres => (),
     };

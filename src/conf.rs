@@ -30,8 +30,8 @@ pub fn rebit() -> &'static RwLock<Rebit> {
                     name: "Rebit".to_string(),
                     short: "REBT".to_string(),
                     debug: true,
-                    webs: Default::default(),
-                    model: Model { backends: vec![] },
+                    web: Default::default(),
+                    model: Model { backends: None },
                     log: None,
                 }
             } else {
@@ -149,7 +149,7 @@ pub struct Rebit {
     pub name: String,
     pub short: String,
     pub debug: bool,
-    pub webs: Vec<Web>,
+    pub web: Dict<Web>,
     pub model: Model,
     pub log: Option<Log>,
 }
@@ -161,15 +161,18 @@ pub struct Log {
     pub dirs: String,
 }
 
-pub type NestedMap = std::collections::HashMap<String, std::collections::HashMap<String, String>>;
+pub type Dict<T> = std::collections::HashMap<String, T>;
+pub type DDict<T> = Dict<Dict<T>>;
+
+pub type DictString = Dict<String>;
+pub type DDictString = DDict<String>;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Web {
-    pub name: String,
-    pub bind: Option<String>,
     pub port: u16,
-    pub middleware: Option<NestedMap>,
-    pub options: Option<std::collections::HashMap<String, String>>,
+    pub bind: Option<String>,
+    pub middleware: Option<DDictString>,
+    pub options: Option<DictString>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Eq)]
@@ -190,7 +193,7 @@ impl Default for Log {
 
 impl Default for Web {
     fn default() -> Self {
-        Self { name: format!("Web-{}", crate::tools::rand::rand_str(8)), bind: None, port: 80, middleware: None, options: None }
+        Self { bind: None, port: 80, middleware: None, options: None }
     }
 }
 
@@ -199,9 +202,9 @@ impl Default for Rebit {
         Self {
             name: "Rings".to_string(),
             short: "RING".to_string(),
-            debug: true,
-            webs: Default::default(),
-            model: Model { backends: vec![] },
+            debug: false,
+            web: Default::default(),
+            model: Model { backends: None },
             log: Default::default(),
         }
     }
@@ -230,37 +233,49 @@ impl fmt::Display for BackendKind {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Backend {
-    pub name: String,
     pub kind: BackendKind,
     pub readonly: bool,
     pub connect: String,
-    pub options: Option<std::collections::HashMap<String, String>>,
+    pub options: Option<DictString>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Model {
-    pub backends: Vec<Backend>,
+    pub backends: Option<Dict<Backend>>,
 }
 
 impl Model {
     pub fn backend(&self, name: &str) -> Option<Backend> {
-        self.backends.iter().find(|backend| backend.name == name).cloned()
+        match &self.backends {
+            None => None,
+            Some(backends) => backends.get(name).cloned(),
+        }
     }
 }
 
 impl Rebit {
-    pub fn backend(&self, name: &str) -> Option<Backend> {
+    pub fn has_backend(&self) -> bool {
+        match &self.model.backends {
+            None => false,
+            Some(bs) => bs.len() > 0,
+        }
+    }
+
+    pub fn get_backend(&self, name: &str) -> Option<Backend> {
         self.model.backend(name)
     }
 
-    pub fn web(&self, name: &str) -> Option<Web> {
-        self.webs.iter().find(|web| web.name == name).cloned()
+    pub fn has_web(&self) -> bool {
+        self.web.len() > 0
     }
 
-    pub fn web_middleware(&self, name: &str, middleware_name: &str) -> Option<std::collections::HashMap<String, String>> {
-        self.web(name).and_then(|web| web.middleware).and_then(|mw| mw.get(middleware_name).cloned())
+    pub fn get_web(&self, name: &str) -> Option<Web> {
+        self.web.get(name).cloned()
     }
 
+    pub fn web_middleware(&self, name: &str, middleware_name: &str) -> Option<DictString> {
+        self.get_web(name).and_then(|web| web.middleware).and_then(|mw| mw.get(middleware_name).cloned())
+    }
 }
 
 #[allow(unused)]

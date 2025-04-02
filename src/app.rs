@@ -4,6 +4,7 @@ use crate::{
     web::make_web,
 };
 use std::sync::Arc;
+use tracing::warn;
 
 pub struct AppBuilder {
     rings_app: RingsApplication,
@@ -29,7 +30,15 @@ impl AppBuilder {
     pub async fn use_model(&mut self) -> &mut Self {
         let rebit = crate::conf::rebit().read().expect("Failed to read config rebit");
         let backends = &rebit.model.backends;
-        crate::model::initialize_model_connection(backends).await;
+        match backends {
+            None => {
+                warn!("No model backend found, pass init model connection.");
+            },
+            Some(backends) => {
+                let backends = backends.clone();
+                crate::model::initialize_model_connection(backends).await;
+            },
+        }
         self
     }
 
@@ -37,7 +46,8 @@ impl AppBuilder {
     pub async fn use_web(&mut self, reconfigor: Vec<AppBuilderWebReconfigor>) -> &mut Self {
         let rebit = crate::conf::rebit().read().expect("Failed to read config rebit");
 
-        if rebit.webs.is_empty() {
+        if !rebit.has_web() {
+            warn!("no web configuration found, pass init web.");
             return self;
         }
 
@@ -50,11 +60,12 @@ impl AppBuilder {
             },
         };
 
-        for wb in rebit.webs.iter() {
-            let find = reconfigor.iter().find(|r| r.0.eq(&wb.name));
+        let webs = rebit.web.clone();
+        for (wb_name, wb) in webs {
+            let find = reconfigor.iter().find(|r| r.0.eq(&wb_name));
             let (name, router_maker, reconf) = match find {
                 None => {
-                    tracing::warn!("Reconfigor not found web iterm: {}", wb.name);
+                    warn!("Reconfigor not found web iterm: {}", &wb_name);
                     continue;
                 },
                 Some(v) => v,
