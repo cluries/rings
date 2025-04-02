@@ -18,7 +18,7 @@ mod signature;
 pub trait Middleware {
     fn focus(&self, parts: &axum::http::request::Parts) -> bool;
 
-    fn exec(&self) -> Box<dyn Fn(axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response>>;
+    fn exec(&self) -> dyn FnMut(axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response>;
 }
 
 #[derive(Clone)]
@@ -27,12 +27,12 @@ where
     S: Clone + Send,
 {
     inner: S,
-    ware: Arc<Box<dyn Middleware>>,
+    ware: Arc<dyn Middleware>,
 }
 
 #[derive(Clone)]
 pub struct MiddleLayer {
-    ware: Arc<Box<dyn Middleware>>,
+    ware: Arc<dyn Middleware>,
 }
 
 impl<S> Layer<S> for MiddleLayer
@@ -47,7 +47,7 @@ where
 }
 
 impl MiddleLayer {
-    pub fn integrated(self, router: Router) -> Router {
+    pub fn integrated(&self, router: Router) -> Router {
         router.layer(ServiceBuilder::new().layer(self))
     }
 }
