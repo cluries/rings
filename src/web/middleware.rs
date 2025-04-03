@@ -1,92 +1,66 @@
-// pub struct Middleware {
-//     pub focus: fn(parts: &axum::http::request::Parts) -> bool,
-//     pub work: fn(request: axum::extract::Request, next: axum::middleware::Next) -> Option<axum::response::Response>,
-// }
+pub mod signature;
 
-use axum::response::IntoResponse;
+use axum::http::request::Parts;
 use axum::Router;
-use futures_util::future::BoxFuture;
-use serde::Serialize;
-use std::future::Future;
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use tower::{Layer, Service, ServiceBuilder};
 
-mod jwt;
-mod signature;
+#[derive(Clone)]
+pub enum CallM<R, S>
+where
+    R: Clone + Send + Sync,
+    S: Clone + Send + Sync,
+{
+    Request(R),
+    Response(S),
+}
 
 pub trait Middleware {
-    fn focus(&self, parts: &axum::http::request::Parts) -> bool;
+    type Arguments: Send + Sync + Clone;
 
-    fn exec(&self) -> dyn FnMut(axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response>;
+    fn make(args: Self::Arguments) -> Self;
+
+    fn focus(&self, parts: &Parts) -> bool;
+
+    fn priority(&self) -> i32;
+
+    fn call(&self) -> Box<dyn FnMut(axum::extract::Request) -> CallM<axum::extract::Request, axum::response::Response>>;
 }
 
-#[derive(Clone)]
-pub struct Middle<S>
-where
-    S: Clone + Send,
-{
-    inner: S,
-    ware: Arc<dyn Middleware>,
+pub struct R<M: Middleware> {
+    middleware: M,
 }
 
-#[derive(Clone)]
-pub struct MiddleLayer {
-    ware: Arc<dyn Middleware>,
-}
+impl<R, S> CallM<R, S> {
+    pub fn request(value: R) -> Self {
+        CallM::Request(value)
+    }
 
-impl<S> Layer<S> for MiddleLayer
-where
-    S: Clone + Send,
-{
-    type Service = Middle<S>;
+    pub fn response(value: S) -> Self {
+        CallM::Response(value)
+    }
 
-    fn layer(&self, inner: S) -> Self::Service {
-        Middle { inner, ware: Arc::clone(&self.ware) }
+    pub fn is_request(&self) -> bool {
+        matches!(self, CallM::Request(..))
+    }
+
+    pub fn is_response(&self) -> bool {
+        matches!(self, CallM::Response(..))
     }
 }
 
-impl MiddleLayer {
-    pub fn integrated(&self, router: Router) -> Router {
-        router.layer(ServiceBuilder::new().layer(self))
+impl<M: Middleware> R<M> {
+    pub fn new(middleware: M) -> Self {
+        Self { middleware }
+    }
+
+    pub fn using(&self, router: Router) -> Router {
+        router
     }
 }
 
-impl<S> Service<axum::extract::Request> for Middle<S>
-where
-    S: Service<axum::extract::Request, Response = axum::response::Response> + Send + Clone + 'static,
-    S::Future: Send + 'static,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+#[cfg(test)]
+mod tests {
+    struct TMiddle {}
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, request: axum::extract::Request) -> Self::Future {
-        let ware = Arc::clone(&self.ware);
-        let (parts, body) = request.into_parts();
-
-        if !ware.focus(&parts) {
-            let request = axum::extract::Request::from_parts(parts, body);
-            let future = self.inner.call(request);
-            return Box::pin(async move { Ok(future.await?) });
-        }
-
-        let mut inner = self.inner.clone();
-
-        Box::pin(async move {
-            let request = axum::extract::Request::from_parts(parts, body);
-            let f = ware.exec();
-            match f(request) {
-                Ok(request) => {
-                    let response: axum::response::Response = inner.call(request).await?;
-                    Ok(response)
-                },
-                Err(response) => Ok(response),
-            }
-        })
-    }
+    #[test]
+    fn test_middleware() {}
 }

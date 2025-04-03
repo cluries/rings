@@ -11,7 +11,6 @@ pub mod middleware;
 pub mod request;
 pub mod route;
 pub mod session;
-pub mod signature;
 pub mod tools;
 pub mod types;
 pub mod url;
