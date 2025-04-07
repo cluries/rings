@@ -1,17 +1,11 @@
 pub mod signature;
 
+use std::task::{Context, Poll};
 use axum::http::request::Parts;
 use axum::Router;
+use tower::Service;
 
-#[derive(Clone)]
-pub enum CallM<R, S>
-where
-    R: Clone + Send + Sync,
-    S: Clone + Send + Sync,
-{
-    Request(R),
-    Response(S),
-}
+pub type CallR = Result<axum::extract::Request, axum::response::Response>;
 
 pub trait Middleware {
     type Arguments: Send + Sync + Clone;
@@ -22,32 +16,14 @@ pub trait Middleware {
 
     fn priority(&self) -> i32;
 
-    fn call(&self) -> Box<dyn FnMut(axum::extract::Request) -> CallM<axum::extract::Request, axum::response::Response>>;
+    fn call(&self) -> Box<dyn FnMut(axum::extract::Request) -> CallR>;
 }
 
-pub struct R<M: Middleware> {
+pub struct LaunchPad<M: Middleware> {
     middleware: M,
 }
 
-impl<R, S> CallM<R, S> {
-    pub fn request(value: R) -> Self {
-        CallM::Request(value)
-    }
-
-    pub fn response(value: S) -> Self {
-        CallM::Response(value)
-    }
-
-    pub fn is_request(&self) -> bool {
-        matches!(self, CallM::Request(..))
-    }
-
-    pub fn is_response(&self) -> bool {
-        matches!(self, CallM::Response(..))
-    }
-}
-
-impl<M: Middleware> R<M> {
+impl<M: Middleware> LaunchPad<M> {
     pub fn new(middleware: M) -> Self {
         Self { middleware }
     }
@@ -56,6 +32,23 @@ impl<M: Middleware> R<M> {
         router
     }
 }
+
+impl<M, S, Request> Service<Request> for LaunchPad<S>
+where
+    S: Service<Request>,
+    M: Middleware,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = S::Future;
+
+    type MArgs = M::Arguments;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {}
+
+    fn call(&mut self, request: Request) -> Self::Future {}
+}
+
 
 #[cfg(test)]
 mod tests {
