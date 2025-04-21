@@ -64,6 +64,7 @@ macro_rules! rout {
     };
 }
 
+/// KeyLoader
 pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
 
 pub struct Signator {
