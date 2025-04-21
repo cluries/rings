@@ -66,7 +66,7 @@ const SECOND_DIV: i64 = SEQUENCE_BASE * 100;
 /// maybe min id value
 const MIN_VALUE: i64 = 1728747205481002100;
 
-/// get shared id factory
+/// gets shared id factory
 pub fn shared() -> &'static Factory {
     &_shared_factory
 }
