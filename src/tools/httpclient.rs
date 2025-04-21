@@ -5,7 +5,7 @@ use std::{str::FromStr, time::Duration};
 use crate::web::url::join as url_join;
 
 // 默认的User-Agent字符串
-static DEFAULT_USER_AGENT: &str = "Rings/1.0.0 (Linux; en-US; Iusworks.inc)";
+static DEFAULT_USER_AGENT: &str = "Rings (Linux; en-US; Iusworks.inc)";
 
 pub struct ClientBuilder {
     base: String,
