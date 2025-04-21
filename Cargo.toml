@@ -21,6 +21,7 @@ ctr = { version = "0.9" }
 futures-util = { version = "0.3", features = ["default"] }
 hex = { version = "0.4" }
 hmac = { version = "0.12" }
+jsonwebtoken = { version = "9" }
 lazy_static = { version = "1.5" }
 log = { version = "0.4" }
 mlua = { version = "0.10", features = ["lua54", "vendored"] }
@@ -46,7 +47,6 @@ tracing-appender = { version = "0.2" }
 tracing-serde = { version = "0.2" }
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = { version = "2", features = ["default", "serde"] }
-jsonwebtoken = { version = "9" }
 
 [dependencies]
 aes = { workspace = true }
@@ -63,6 +63,7 @@ ctr = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }
 hmac = { workspace = true }
+jsonwebtoken = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
 mlua = { workspace = true }
@@ -88,4 +89,3 @@ tracing-appender = { workspace = true }
 tracing-serde = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
-jsonwebtoken = { workspace = true }

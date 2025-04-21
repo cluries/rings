@@ -20,6 +20,10 @@ impl Context {
         self.ident = ident;
     }
 
+    pub fn get_ident_ref(&self) -> &str {
+        &self.ident
+    }
+
     pub fn get_ident(&self) -> String {
         self.ident.clone()
     }
@@ -34,5 +38,11 @@ impl Context {
 
     pub fn set_str(&mut self, key: &str, val: &str) {
         self.vals.insert(key.to_string(), val.to_string());
+    }
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self::new(String::new())
     }
 }
