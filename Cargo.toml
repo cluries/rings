@@ -24,6 +24,7 @@ hmac = { version = "0.12" }
 jsonwebtoken = { version = "9" }
 lazy_static = { version = "1.5" }
 log = { version = "0.4" }
+md5 = {version = "0.7.0"}
 mlua = { version = "0.10", features = ["lua54", "vendored"] }
 ofb = { version = "0.6" }
 pem = { version = "3.0" }
@@ -66,6 +67,7 @@ hmac = { workspace = true }
 jsonwebtoken = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
+md5 = {workspace = true}
 mlua = { workspace = true }
 ofb = { workspace = true }
 pem = { workspace = true }

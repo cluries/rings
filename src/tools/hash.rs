@@ -15,6 +15,12 @@ pub fn sha1(c: &str) -> String {
     hex::encode(hasher.finalize())
 }
 
+pub fn md5(c: &str) -> String {
+    use md5 as md5lib;
+    let digest = md5lib::compute(c.as_bytes());
+    format!("{:x}", digest)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -27,5 +33,10 @@ mod tests {
     #[test]
     fn test_ha1() {
         println!("{:?}", sha1("aaa"));
+    }
+    
+    #[test]
+    fn test_md5() {
+        println!("{:?}", md5("key"));
     }
 }
