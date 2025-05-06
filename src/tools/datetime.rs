@@ -8,7 +8,7 @@ pub struct Is;
 /// Yearmonth
 ///  
 pub struct Yearmonth {
-    pub yaar: i32,
+    pub year: i32,
     pub month: i32,
 }
 
@@ -118,17 +118,14 @@ impl Now {
 }
 
 impl Yearmonth {
-    pub fn new(yaar: i32, month: i32) -> Self {
-        Self { yaar, month }
+    pub fn new(year: i32, month: i32) -> Self {
+        Self { year, month }
     }
 
-    pub fn with_now() -> Self {
-        let now = chrono::Utc::now();
-        Self { yaar: now.year(), month: now.month() as i32 }
-    }
+
 
     pub fn month_days(&self) -> i32 {
-        let year = self.yaar;
+        let year = self.year;
         let month = self.month;
         let days = if Is::leap(year) {
             if month == 2 {
@@ -151,7 +148,7 @@ impl Yearmonth {
     }
 
     pub fn year_days(&self) -> i32 {
-        let year = self.yaar;
+        let year = self.year;
         let days = if Is::leap(year) { 366 } else { 365 };
         days
     }
@@ -159,19 +156,6 @@ impl Yearmonth {
 
 /// Timestamp
 ///
-/// # Examples
-///
-/// ```rust
-/// use rings_core::datetime::{Timestamp, Now};
-///
-/// let timestamp = Timestamp::with_now();
-/// println!("{}", timestamp.nanos);
-/// println!("{}", timestamp.micros());     
-/// println!("{}", timestamp.millis());
-/// println!("{}", timestamp.seconds());
-/// println!("{}", timestamp.date_utc());
-/// println!("{}", timestamp.date_local());
-/// ```
 ///
 /// # Fields
 ///
