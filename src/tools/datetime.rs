@@ -5,6 +5,13 @@ use crate::erx;
 pub struct Now;
 pub struct Is;
 
+/// Yearmonth
+///  
+pub struct Yearmonth {
+    pub yaar: i32,
+    pub month: i32,
+}
+
 pub struct Timestamp {
     pub nanos: i64,
 }
@@ -110,69 +117,163 @@ impl Now {
     }
 }
 
-impl Timestamp {
-    pub fn with(timestamp: i64) -> Self {
-        // 根据timestamp的大小推断时间单位并转换为纳秒
-        let nanos = if timestamp > 1_000_000_000_000_000_000 {
-            // 已经是纳秒
-            timestamp
-        } else if timestamp > 1_000_000_000_000_000 {
-            // 微秒
-            timestamp * 1_000
-        } else if timestamp > 1_000_000_000_000 {
-            // 毫秒
-            timestamp * 1_000_000
-        } else {
-            // 秒
-            timestamp
-        };
-
-        Self { nanos }
+impl Yearmonth {
+    pub fn new(yaar: i32, month: i32) -> Self {
+        Self { yaar, month }
     }
 
+    pub fn with_now() -> Self {
+        let now = chrono::Utc::now();
+        Self { yaar: now.year(), month: now.month() as i32 }
+    }
+
+    pub fn month_days(&self) -> i32 {
+        let year = self.yaar;
+        let month = self.month;
+        let days = if Is::leap(year) {
+            if month == 2 {
+                29
+            } else if month == 4 || month == 6 || month == 9 || month == 11 {
+                30
+            } else {
+                31
+            }
+        } else {
+            if month == 2 {
+                28
+            } else if month == 4 || month == 6 || month == 9 || month == 11 {
+                30
+            } else {
+                31
+            }
+        };
+        days
+    }
+
+    pub fn year_days(&self) -> i32 {
+        let year = self.yaar;
+        let days = if Is::leap(year) { 366 } else { 365 };
+        days
+    }
+}
+
+/// Timestamp
+///
+/// # Examples
+///
+/// ```rust
+/// use rings_core::datetime::{Timestamp, Now};
+///
+/// let timestamp = Timestamp::with_now();
+/// println!("{}", timestamp.nanos);
+/// println!("{}", timestamp.micros());     
+/// println!("{}", timestamp.millis());
+/// println!("{}", timestamp.seconds());
+/// println!("{}", timestamp.date_utc());
+/// println!("{}", timestamp.date_local());
+/// ```
+///
+/// # Fields
+///
+/// * `nanos` - The nanos.          
+///     
+/// # Methods
+///     
+/// * `with_now` - with now to timestamp.
+/// * `with_nanos` - with nanos to timestamp.
+/// * `with_micros` - with micros to timestamp.
+/// * `with_millis` - with millis to timestamp.
+/// * `with_seconds` - with seconds to timestamp.
+/// * `micros` - to micros.
+/// * `millis` - to millis.
+/// * `seconds` - to seconds.
+/// * `date_utc` - to utc datetime.
+/// * `date_local` - to local datetime.
+///     
+impl Timestamp {
+    /// with now to timestamp
+    ///
+    /// # Returns
+    ///
+    /// * `Timestamp` - The timestamp.
     pub fn with_now() -> Self {
         Self { nanos: chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default() }
     }
 
-    // pub fn with_nanos(nanos: i64) -> Self {
-    //     Self {
-    //         nanos,
-    //     }
-    // }
-    //
-    // pub fn with_micros(micros: i64) -> Self {
-    //     Self {
-    //         nanos: micros * 1000,
-    //     }
-    // }
-    //
-    // pub fn with_millis(millis: i64) -> Self {
-    //     Self {
-    //         nanos: millis * 1000 * 1000,
-    //     }
-    // }
-    //
-    // pub fn with_seconds(seconds: i64) -> Self {
-    //     Self {
-    //         nanos: seconds * 1000 * 1000 * 1000,
-    //     }
-    // }
+    /// with nanos to timestamp
+    ///
+    /// # Arguments
+    ///
+    /// * `nanos` - The nanos.
+    ///
+    /// # Returns           
+    ///
+    /// * `Timestamp` - The timestamp.
+    pub fn with_nanos(nanos: i64) -> Self {
+        Self { nanos }
+    }
 
+    /// with micros to timestamp
+    ///       
+    /// # Arguments
+    ///
+    /// * `micros` - The micros.
+    ///
+    /// # Returns
+    ///
+    /// * `Timestamp` - The timestamp.
+    pub fn with_micros(micros: i64) -> Self {
+        Self { nanos: micros * 1000 }
+    }
+
+    /// with millis to timestamp
+    ///
+    /// # Arguments
+    ///
+    /// * `millis` - The millis.
+    ///
+    /// # Returns
+    ///
+    /// * `Timestamp` - The timestamp.
+    pub fn with_millis(millis: i64) -> Self {
+        Self { nanos: millis * 1000 * 1000 }
+    }
+
+    /// with seconds to timestamp
+    ///
+    /// # Arguments
+    ///
+    /// * `seconds` - The seconds.
+    ///
+    /// # Returns
+    ///
+    /// * `Timestamp` - The timestamp.
+    pub fn with_seconds(seconds: i64) -> Self {
+        Self { nanos: seconds * 1000 * 1000 * 1000 }
+    }
+
+    /// to micros
     pub fn micros(&self) -> i64 {
         self.nanos / 1000
     }
 
+    /// to millis
     pub fn millis(&self) -> i64 {
         self.nanos / 1000 / 1000
     }
+
+    /// to seconds
     pub fn seconds(&self) -> i64 {
         self.nanos / 1000 / 1000 / 1000
     }
 
+    /// to utc datetime
     pub fn date_utc(&self) -> chrono::DateTime<chrono::Utc> {
         chrono::Utc.timestamp_nanos(self.nanos)
     }
 
+    /// to local datetime
+    ///
     pub fn date_local(&self) -> chrono::DateTime<chrono::Local> {
         chrono::Local.timestamp_nanos(self.nanos)
     }
