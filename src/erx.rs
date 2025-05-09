@@ -37,70 +37,103 @@ pub fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
     move |err: T| Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() }
 }
 
-/// Fuzz: 模糊错误
-pub static FUZZ: &str = "FUZZ";
+pub enum PreL4 {
+    /// Fuzz: 模糊错误
+    FUZZ,
+    /// Common: 通用错误
+    COMM,
+    /// Middleware: 中间件错误
+    MIDL,
+    /// Service: 服务错误
+    SERV,
+    /// Model: 模型错误
+    MODE,
+    /// Action: Action错误
+    ACTN,
+    /// Undefined: 未定义错误
+    UNDF,
+    /// Task: Task错误
+    TASK,
+    /// Cron: Cron错误
+    CRON,
+    ///
+    OTHE,
+}
 
-/// Common: 通用错误
-pub static COMM: &str = "COMM";
+impl PreL4 {
+    pub fn four(&self) -> &'static str {
+        match self {
+            PreL4::FUZZ => "FUZZ",
+            PreL4::COMM => "COMM",
+            PreL4::MIDL => "MIDL",
+            PreL4::SERV => "SERV",
+            PreL4::MODE => "MODE",
+            PreL4::ACTN => "ACTN",
+            PreL4::UNDF => "UNDF",
+            PreL4::TASK => "TASK",
+            PreL4::CRON => "CRON",
+            PreL4::OTHE => "OTHE",
+        }
+    }
+}
 
-/// Middleware: 中间件错误
-pub static MIDL: &str = "MIDL";
+impl Into<&'static str> for PreL4 {
+    fn into(self) -> &'static str {
+        self.four()
+    }
+}
 
-/// Service: 服务错误
-pub static SERV: &str = "SERV";
-
-/// Model: 模型错误
-pub static MODE: &str = "MODE";
-
-/// Action: Action错误
-pub static ACTN: &str = "ACTN";
-
-/// Undefined: 未定义错误
-pub static UNDF: &str = "UNDF";
-
-pub static TASK: &str = "TASK";
+impl Into<String> for PreL4 {
+    fn into(self) -> String {
+        self.four().to_string()
+    }
+}
 
 pub struct Layouted;
 
 impl Layouted {
     /// fuzz_udf: 模糊未定义错误
     pub fn fuzz_udf(detail: &str) -> LayoutedC {
-        LayoutedC::new(FUZZ, UNDF, detail)
+        LayoutedC::new(PreL4::FUZZ.into(), PreL4::UNDF.into(), detail)
     }
 
     /// fuzz: 模糊错误
     pub fn fuzz(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(FUZZ, category, detail)
+        LayoutedC::new(PreL4::FUZZ.into(), category, detail)
     }
 
     /// common: 通用错误
     pub fn common(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(COMM, category, detail)
+        LayoutedC::new(PreL4::COMM.into(), category, detail)
     }
 
     /// middleware: 中间件错误
     pub fn middleware(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(MIDL, category, detail)
+        LayoutedC::new(PreL4::MIDL.into(), category, detail)
     }
 
     /// service: 服务错误
     pub fn service(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(SERV, category, detail)
+        LayoutedC::new(PreL4::SERV.into(), category, detail)
     }
 
     /// model: 模型错误
     pub fn model(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(MODE, category, detail)
+        LayoutedC::new(PreL4::MODE.into(), category, detail)
     }
 
     /// action: Action错误
     pub fn action(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(ACTN, category, detail)
+        LayoutedC::new(PreL4::ACTN.into(), category, detail)
     }
 
     /// task: Task错误
     pub fn task(category: &str, detail: &str) -> LayoutedC {
-        LayoutedC::new(TASK, category, detail)
+        LayoutedC::new(PreL4::TASK.into(), category, detail)
+    }
+
+    pub fn cron(category: &str, detail: &str) -> LayoutedC {
+        LayoutedC::new(PreL4::CRON.into(), category, detail)
     }
 }
 
@@ -295,7 +328,7 @@ impl Into<(String, String, String, String)> for LayoutedC {
 
 impl Default for LayoutedC {
     fn default() -> Self {
-        LayoutedC { application: APP_SHORT.clone(), domain: UNDF.into(), category: UNDF.into(), detail: UNDF.into() }
+        LayoutedC { application: APP_SHORT.clone(), domain: PreL4::UNDF.into(), category: PreL4::UNDF.into(), detail: PreL4::UNDF.into() }
     }
 }
 
