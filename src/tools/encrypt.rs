@@ -1,7 +1,7 @@
 use crate::erx;
 
 use base64::Engine;
-use rand::Rng;
+use rand::{Rng, RngCore};
 
 use block_padding::{Padding, Pkcs7};
 use ofb::cipher::StreamCipher;
@@ -18,6 +18,40 @@ use rsa::{
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey}, Pkcs1v15Encrypt, RsaPrivateKey,
     RsaPublicKey,
 };
+
+/// Rand 库升级到0.9过后，和rasa库的rand_core::RngCore不兼容，需要适配一下
+/// implement rsa::rand_core::RngCore for CompatRng
+/// implement rsa::rand_core::CryptoRng for CompatRng
+pub struct CompatRng<T: Rng> {
+    inner: T,
+}
+
+impl<T: Rng> CompatRng<T> {
+    pub fn thread_rng() -> CompatRng<rand::rngs::ThreadRng> {
+        CompatRng { inner: rand::rngs::ThreadRng::default() }
+    }
+}
+
+impl<T: Rng> rsa::rand_core::CryptoRng for CompatRng<T> {}
+
+impl<T: Rng> rsa::rand_core::RngCore for CompatRng<T> {
+    fn next_u32(&mut self) -> u32 {
+        self.inner.next_u32()
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.inner.next_u64()
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.inner.fill_bytes(dest);
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rsa::rand_core::Error> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
+}
 
 /// 表示AES加密算法的不同模式
 #[derive(Debug)]
@@ -89,7 +123,7 @@ impl AESMode {
     }
 
     pub fn generate_iv() -> Vec<u8> {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let mut iv = vec![0u8; AESMode::BIT128_BLOCK_SIZE];
         rng.fill(&mut iv[..]);
         iv
@@ -278,7 +312,7 @@ impl RSAPadding {
         match self {
             RSAPadding::PKCS1v15 => {
                 let key: RsaPublicKey = DecodeRsaPublicKey::from_pkcs1_pem(public_key).map_err(erx::smp)?;
-                let mut rng = rand::thread_rng();
+                let mut rng = CompatRng::<rand::rngs::ThreadRng>::thread_rng();
                 let result = key.encrypt(&mut rng, Pkcs1v15Encrypt, payload).map_err(erx::smp)?;
                 Ok(result)
             },
@@ -318,7 +352,7 @@ pub struct RSAUtils;
 
 impl RSAUtils {
     pub fn gen_key_pair(bits: RSABits) -> Result<(String, String), erx::Erx> {
-        let mut rng = rand::thread_rng();
+        let mut rng = CompatRng::<rand::rngs::ThreadRng>::thread_rng();
         let private_key = RsaPrivateKey::new(&mut rng, bits.bits()).map_err(erx::smp)?;
         let public_key = RsaPublicKey::from(&private_key);
 

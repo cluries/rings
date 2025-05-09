@@ -4,59 +4,59 @@ use rand::Rng;
 
 pub fn rand_bool() -> bool {
     use rand::Rng;
-    let mut rng = rand::thread_rng();
-    rng.gen()
+    let mut rng = rand::rng();
+    rng.random()
 }
 
 pub fn rand_i64(min: i64, max: i64) -> i64 {
     use rand::Rng;
-    let mut rng = rand::thread_rng();
-    rng.gen_range(min..max)
+    let mut rng = rand::rng();
+    rng.random_range(min..max)
 }
 
 pub fn rand_f64(min: f64, max: f64) -> f64 {
     use rand::Rng;
-    let mut rng = rand::thread_rng();
-    rng.gen_range(min..max)
+    let mut rng = rand::rng();
+    rng.random_range(min..max)
 }
 
 pub fn rand_str(len: usize) -> String {
     use rand::Rng;
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut s = String::new();
     for _ in 0..len {
-        s.push(rng.gen_range('a'..='z'));
+        s.push(rng.random_range('a'..='z'));
     }
     s
 }
 
 fn _rand_date_numbers(rng: &mut ThreadRng) -> (i32, i32, i32) {
     let year_end = chrono::Utc::now().year();
-    let year = rng.gen_range(1970..year_end);
-    let month = rng.gen_range(1..13);
+    let year = rng.random_range(1970..year_end);
+    let month = rng.random_range(1..13);
     let day = if month == 2 {
-        rng.gen_range(1..29)
+        rng.random_range(1..29)
     } else if month == 4 || month == 6 || month == 9 || month == 11 {
-        rng.gen_range(1..31)
+        rng.random_range(1..31)
     } else {
-        rng.gen_range(1..32)
+        rng.random_range(1..32)
     };
 
     (year, month, day)
 }
 
 pub fn rand_date() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let (year, month, day) = _rand_date_numbers(&mut rng);
     format!("{}-{}-{}", year, month, day)
 }
 
 pub fn rand_datetime() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let (year, month, day) = _rand_date_numbers(&mut rng);
-    let hour = rng.gen_range(0..24);
-    let minute = rng.gen_range(0..60);
-    let second = rng.gen_range(0..60);
+    let hour = rng.random_range(0..24);
+    let minute = rng.random_range(0..60);
+    let second = rng.random_range(0..60);
     format!("{}-{}-{} {}:{}:{}", year, month, day, hour, minute, second)
 }
 
