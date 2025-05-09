@@ -30,6 +30,7 @@ impl<M: Middleware> LaunchPad<M> {
 }
 
 #[cfg(test)]
+#[allow(unused)]
 mod tests {
     struct TMiddle {}
 

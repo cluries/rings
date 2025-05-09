@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // Except is use in controller/action.
-// wrapper some defined error.
+// wrapper some pre defined error.
 // except object can fast convert to response
 #[derive(Serialize, Deserialize, Clone, PartialOrd, PartialEq)]
 pub enum Except {
@@ -29,6 +29,8 @@ pub struct ExceptGrow {
 }
 
 impl Except {
+
+    /// convert to response object
     pub fn out<T>(&self) -> Out<T>
     where
         T: Serialize,
