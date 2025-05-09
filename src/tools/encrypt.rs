@@ -1,7 +1,7 @@
 use crate::erx;
 
 use base64::Engine;
-use rand::{Rng, RngCore};
+use rand::Rng;
 
 use block_padding::{Padding, Pkcs7};
 use ofb::cipher::StreamCipher;
@@ -399,84 +399,123 @@ impl Encrypt {
     }
 }
 
-#[test]
-fn test_ecb_encrypt() {
-    let key = "1234567890123456";
-    let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::ECB };
-    let end = c.encrypt(input).unwrap();
-    let ded = c.decrypt(&end).unwrap();
+#[cfg(test)]
+#[allow(unused_imports)]
+mod tests {
+    use super::*;
 
-    println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
-    println!("{:?}", String::from_utf8(ded).unwrap());
-}
+    static PRINT_INFO: bool = false;
 
-#[test]
-fn test_cbc_encrypt() {
-    let key = "1234567890123456";
-    let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::CBC { iv: key.as_bytes().to_vec() } };
-    let end = c.encrypt(input).unwrap();
-    let ded = c.decrypt(&end).unwrap();
+    #[test]
+    fn test_ecb_encrypt() {
+        let key = "1234567890123456";
+        let input = "1234567890123456".as_bytes();
+        let c = Encrypt::AES { key: key.to_string(), mode: AESMode::ECB };
+        let end = c.encrypt(input).unwrap();
+        let ded = c.decrypt(&end).unwrap();
 
-    println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
-    println!("{:?}", String::from_utf8(ded).unwrap());
-}
+        assert_eq!(input, ded);
 
-#[test]
-fn test_cfb_encrypt() {
-    let key = "1234567890123456";
-    let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::CFB { iv: key.as_bytes().to_vec() } };
-    let end = c.encrypt(input).unwrap();
-    let ded = c.decrypt(&end).unwrap();
+        if PRINT_INFO {
+            println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
+            println!("{:?}", String::from_utf8(ded).unwrap());
+        }
+    }
 
-    println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
-    println!("{:?}", String::from_utf8(ded).unwrap());
-}
+    #[test]
+    fn test_cbc_encrypt() {
+        let key = "1234567890123456";
+        let input = "1234567890123456".as_bytes();
+        let c = Encrypt::AES { key: key.to_string(), mode: AESMode::CBC { iv: key.as_bytes().to_vec() } };
+        let end = c.encrypt(input).unwrap();
+        let ded = c.decrypt(&end).unwrap();
 
-#[test]
-fn test_ofb_encrypt() {
-    let key = "1234567890123456";
-    let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::OFB { iv: key.as_bytes().to_vec() } };
-    let end = c.encrypt(input).unwrap();
-    let ded = c.decrypt(&end).unwrap();
+        assert_eq!(input, ded);
 
-    println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
-    println!("{:?}", String::from_utf8(ded).unwrap());
-}
+        if PRINT_INFO {
+            println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
+            println!("{:?}", String::from_utf8(ded).unwrap());
+        }
+    }
 
-#[test]
-fn test_ctr_encrypt() {
-    let key = "1234567890123456";
-    let input = "1234567890123456".as_bytes();
-    let c = Encrypt::AES { key: key.to_string(), mode: AESMode::CTR { iv: key.as_bytes().to_vec() } };
-    let end = c.encrypt(input).unwrap();
-    let ded = c.decrypt(&end).unwrap();
+    #[test]
+    fn test_cfb_encrypt() {
+        let key = "1234567890123456";
+        let input = "1234567890123456".as_bytes();
+        let c = Encrypt::AES { key: key.to_string(), mode: AESMode::CFB { iv: key.as_bytes().to_vec() } };
+        let end = c.encrypt(input).unwrap();
+        let ded = c.decrypt(&end).unwrap();
 
-    println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
-    println!("{:?}", String::from_utf8(ded).unwrap());
-}
+        assert_eq!(input, ded);
 
-#[test]
-fn test_ras_pairs() {
-    let (pri, pbb) = RSAUtils::gen_key_pair(RSABits::K1).unwrap();
-    println!("{:?}", pri);
-    println!("{:?}", pbb);
-}
+        if PRINT_INFO {
+            println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
+            println!("{:?}", String::from_utf8(ded).unwrap());
+        }
+    }
 
-#[test]
-fn test_rsa() {
-    let input = "1234567890123456".as_bytes();
+    #[test]
+    fn test_ofb_encrypt() {
+        let key = "1234567890123456";
+        let input = "1234567890123456".as_bytes();
+        let c = Encrypt::AES { key: key.to_string(), mode: AESMode::OFB { iv: key.as_bytes().to_vec() } };
+        let end = c.encrypt(input).unwrap();
+        let ded = c.decrypt(&end).unwrap();
 
-    let (pri, pbb) = RSAUtils::gen_key_pair(RSABits::K2).unwrap();
+        assert_eq!(input, ded);
 
-    let c = Encrypt::RSA { private_key: pri, public_key: pbb, padding: RSAPadding::PKCS1v15 };
+        if PRINT_INFO {
+            println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
+            println!("{:?}", String::from_utf8(ded).unwrap());
+        }
+    }
 
-    let end = c.encrypt(input).unwrap();
-    let ded = c.decrypt(&end).unwrap();
+    #[test]
+    fn test_ctr_encrypt() {
+        let key = "1234567890123456";
+        let input = "1234567890123456".as_bytes();
+        let c = Encrypt::AES { key: key.to_string(), mode: AESMode::CTR { iv: key.as_bytes().to_vec() } };
+        let end = c.encrypt(input).unwrap();
+        let ded = c.decrypt(&end).unwrap();
 
-    println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
-    println!("{:?}", String::from_utf8(ded).unwrap());
+        assert_eq!(input, ded);
+
+        if PRINT_INFO {
+            println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
+            println!("{:?}", String::from_utf8(ded).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_ras_pairs() {
+        let (pri, pbb) = RSAUtils::gen_key_pair(RSABits::K1).unwrap();
+
+        assert!(pri.len() > 10);
+        assert!(pbb.len() > 10);
+        assert_ne!(pri, pbb);
+
+        if PRINT_INFO {
+            println!("{:?}", pri);
+            println!("{:?}", pbb);
+        }
+    }
+
+    #[test]
+    fn test_rsa() {
+        let input = "1234567890123456".as_bytes();
+
+        let (pri, pbb) = RSAUtils::gen_key_pair(RSABits::K2).unwrap();
+
+        let c = Encrypt::RSA { private_key: pri, public_key: pbb, padding: RSAPadding::PKCS1v15 };
+
+        let end = c.encrypt(input).unwrap();
+        let ded = c.decrypt(&end).unwrap();
+
+        assert_eq!(input, ded);
+
+        if PRINT_INFO {
+            println!("{:?}", base64::prelude::BASE64_STANDARD.encode(&end));
+            println!("{:?}", String::from_utf8(ded).unwrap());
+        }
+    }
 }
