@@ -1,4 +1,4 @@
-use rings::rex::{tokio, tokio_cron_scheduler};
+use rings::prelude::{tokio, tokio_cron_scheduler};
 use rings::service::ServiceTrait;
 
 #[allow(dead_code, unused)]

@@ -1,4 +1,4 @@
-use rings::rex::tokio_cron_scheduler;
+use rings::prelude::tokio_cron_scheduler;
 use rings::service::ServiceTrait;
 
 const M: &str = "xxxx";

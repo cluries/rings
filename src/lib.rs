@@ -22,4 +22,5 @@ pub mod tools;
 pub mod web;
 
 /// re export
-pub mod rex;
+pub mod prelude;
+pub use prelude::*;

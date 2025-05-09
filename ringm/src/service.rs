@@ -46,9 +46,9 @@ pub(crate) fn mark(attr: TokenStream, item: TokenStream) -> TokenStream {
             ringm::service_resolve!(#func_name, #input_module);
             rings::service::registe_to_shared::<#struct_ident>().await;
 
-            // rings::rex::tracing::info!("---{} {}, {:?}",#func_name, #struct_ident, _in_module);
+            // rings::prelude::tracing::info!("---{} {}, {:?}",#func_name, #struct_ident, _in_module);
             println!("Service registered with function: {}", #func_name);
-            rings::rex::tracing::info!("Service registered with function: {}", #func_name);
+            rings::prelude::tracing::info!("Service registered with function: {}", #func_name);
         }
     };
 
@@ -120,7 +120,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                     #using_quote;
                     rings::service::registe_to_shared::<#struct_ident>().await;
                     println!("Service registered with directy: {}", #ident_name);
-                    rings::rex::tracing::info!("Service registered with directy: {}", #ident_name);
+                    rings::prelude::tracing::info!("Service registered with directy: {}", #ident_name);
                 }
             }
         }
