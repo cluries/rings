@@ -75,6 +75,26 @@ impl PreL4 {
             PreL4::OTHE => "OTHE",
         }
     }
+
+    pub fn from_str(s: &str) -> Option<PreL4> {
+        match s.to_uppercase().as_str() {
+            "FUZZ" => Some(PreL4::FUZZ),
+            "COMM" => Some(PreL4::COMM),
+            "MIDL" => Some(PreL4::MIDL),
+            "SERV" => Some(PreL4::SERV),
+            "MODE" => Some(PreL4::MODE),
+            "ACTN" => Some(PreL4::ACTN),
+            "UNDF" => Some(PreL4::UNDF),
+            "TASK" => Some(PreL4::TASK),
+            "CRON" => Some(PreL4::CRON),
+            "OTHE" => Some(PreL4::OTHE),
+            _ => None,
+        }
+    }
+
+    pub fn layoutc(&self, category: &str, detail: &str) -> LayoutedC {
+        LayoutedC::new(self.four(), category, detail)
+    }
 }
 
 impl Into<&'static str> for PreL4 {

@@ -1,17 +1,18 @@
+ 
 #[macro_export]
 macro_rules! s {
     ($s:expr) => {
         String::from($s)
     };
 }
-
+ 
 #[macro_export]
 macro_rules! ms {
     ($x:ident) => {
         stringify!($x)
     };
 }
-
+ 
 #[macro_export]
 macro_rules! mst {
     ($x:ident) => {
