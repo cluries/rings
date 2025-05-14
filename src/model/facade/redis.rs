@@ -39,6 +39,10 @@ impl Redis {
         Redis { logit: true, client: crate::model::make_redis_client().unwrap() }
     }
 
+    pub fn new(c: redis::Client) -> Self {
+        Redis { logit: true, client: c }
+    }
+
     pub fn exists(&self, key: &str) -> bool {
         let mut conn = conn_mut!(self, false);
         conn.exists(key).unwrap_or_else(unwra(self.logit, false))
@@ -169,4 +173,17 @@ impl Redis {
     }
 }
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_redis_value() {
+        let c = rds();
+        println!("{:?}", c.set_ex::<_, String>("test_ttl", 1024, 10));
+        println!("{:?}", c.ttl("test_ttl"));
+    }
+
+    fn rds() -> Redis {
+        Redis::new(redis::Client::open("redis://127.0.0.1").unwrap())
+    }
+}
