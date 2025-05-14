@@ -1,11 +1,12 @@
 pub mod coffee;
 pub mod conf;
 pub mod dbms;
+pub mod facade;
 pub mod jsons;
 pub mod preset;
 pub mod sql;
 pub mod status;
-mod value;
+pub mod value;
 pub mod zero;
 
 use crate::erx;

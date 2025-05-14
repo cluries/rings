@@ -67,7 +67,7 @@ hmac = { workspace = true }
 jsonwebtoken = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
-md5 = {workspace = true}
+md5 = { workspace = true }
 mlua = { workspace = true }
 ofb = { workspace = true }
 pem = { workspace = true }
