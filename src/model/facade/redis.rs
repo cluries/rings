@@ -1,5 +1,5 @@
 use crate::erx;
-use redis::Commands;
+use redis::{Commands, FromRedisValue, ToRedisArgs};
 use std::fmt::Display;
 
 pub struct Redis {
@@ -34,10 +34,10 @@ where
     }
 }
 
-pub type FacadeResult<T> = erx::ResultE<T>;
-pub type BoolResult = FacadeResult<bool>;
-pub type FloatResult = FacadeResult<f64>;
-pub type IntegerResult = FacadeResult<i64>;
+pub type Facade<T> = erx::ResultE<T>;
+pub type FacadeBool = Facade<bool>;
+pub type FacadeFloat = Facade<f64>;
+pub type FacadeInt = Facade<i64>;
 
 macro_rules! redis_c {
     // 基本形式：方法名、参数列表、返回类型（默认调用参数与参数名一致）
@@ -53,12 +53,14 @@ macro_rules! redis_c {
             self.get_connection()?.$redis_method($($arg_name),*).map_err(erx::smp)
         }
     };
+
     // 支持泛型参数的方法
     ($method_name:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
         pub fn $method_name<$($generic)*>(&self, $($arg_name: $arg_type),*) -> $return_type {
             self.get_connection()?.$method_name($($arg_name),*).map_err(erx::smp)
         }
     };
+
     // 支持泛型参数且显式指定 Redis 方法名
     ($method_name:ident, redis: $redis_method:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
         pub fn $method_name<$($generic)*>(&self, $($arg_name: $arg_type),*) -> $return_type {
@@ -80,53 +82,70 @@ impl Redis {
         self.client.get_connection().map_err(erx::smp)
     }
 
-    redis_c!(exists, (key: &str), BoolResult);
-    redis_c!(ttl, (key: &str), FacadeResult<i64>);
-    redis_c!(del, (key: &str), BoolResult);
-    redis_c!(persist, (key: &str), BoolResult);
-    redis_c!(expire, (key: &str, seconds: i64), BoolResult);
-    redis_c!(expire_at, (key: &str, expire_at: i64), BoolResult);
-    redis_c!(rename, (key: K, nkey: N), BoolResult, generics: [K: redis::ToRedisArgs, N: redis::ToRedisArgs]);
-    redis_c!(rename_nx, (key: K, nkey: N), BoolResult, generics: [K: redis::ToRedisArgs, N: redis::ToRedisArgs]);
+    redis_c!(exists, (key: &str), FacadeBool);
+    redis_c!(ttl, (key: &str), FacadeInt);
+    redis_c!(del, (key: &str), FacadeBool);
+    redis_c!(persist, (key: &str), FacadeBool);
+    redis_c!(expire, (key: &str, seconds: i64), FacadeBool);
+    redis_c!(expire_at, (key: &str, expire_at: i64), FacadeBool);
+    redis_c!(expire_time,  (key: &str), FacadeInt);
+    redis_c!(rename, (key: K, nkey: N), FacadeBool, generics: [K: ToRedisArgs, N: ToRedisArgs]);
+    redis_c!(rename_nx, (key: K, nkey: N), FacadeBool, generics: [K: ToRedisArgs, N: ToRedisArgs]);
 
-    redis_c!(get, (key: &str), FacadeResult<RV>, generics: [RV: redis::FromRedisValue]);
-    redis_c!(getset, (key: &str, val: V), FacadeResult<V>, generics: [V: redis::ToRedisArgs + redis::FromRedisValue]);
-    redis_c!(getdel, redis: get_del, (key: &str), FacadeResult<RV>, generics: [RV: redis::FromRedisValue]);
-    redis_c!(hget, (key: &str, field: F), FacadeResult<RV>, generics: [F: redis::ToRedisArgs, RV: redis::FromRedisValue]);
-    redis_c!(hgetall, (key: &str), FacadeResult<RV>, generics: [RV: redis::FromRedisValue]);
+    redis_c!(get, (key: &str), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(getset, (key: &str, val: V), Facade<V>, generics: [V: ToRedisArgs + FromRedisValue]);
+    redis_c!(getdel, redis: get_del, (key: &str), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(hget, (key: &str, field: F), Facade<RV>, generics: [F: ToRedisArgs, RV: FromRedisValue]);
+    redis_c!(hgetall, (key: &str), Facade<RV>, generics: [RV: FromRedisValue]);
 
-    redis_c!(append, (key: &str, val: V), BoolResult, generics: [V: redis::ToRedisArgs]);
+    redis_c!(append, (key: &str, val: V), FacadeBool, generics: [V: ToRedisArgs]);
 
-    redis_c!(set, (key: &str, val: T), BoolResult, generics: [T: redis::ToRedisArgs]);
-    redis_c!(set_ex, (key: &str, val: T, ttl: u64), BoolResult, generics: [T: redis::ToRedisArgs]);
-    redis_c!(set_nx, (key: &str, val: T), BoolResult, generics: [T: redis::ToRedisArgs]);
+    redis_c!(set, (key: &str, val: T), FacadeBool, generics: [T: ToRedisArgs]);
+    redis_c!(set_ex, (key: &str, val: T, seconds: u64), FacadeBool, generics: [T: ToRedisArgs]);
+    redis_c!(set_nx, (key: &str, val: T), FacadeBool, generics: [T: ToRedisArgs]);
 
-    redis_c!(hset, (key: &str, field: F, val: V), BoolResult, generics: [F: redis::ToRedisArgs, V: redis::ToRedisArgs]);
-    redis_c!(hset_nx, (key: &str, field: F, val: V), BoolResult, generics: [F: redis::ToRedisArgs, V: redis::ToRedisArgs]);
-    redis_c!(hset_multiple, (key: &str, values: &[(F, V)]), BoolResult, generics: [F: redis::ToRedisArgs, V: redis::ToRedisArgs]);
-    redis_c!(hdel, (key: &str, field: F), BoolResult, generics: [F: redis::ToRedisArgs]);
-    redis_c!(hlen, (key: &str), FacadeResult<RV>, generics: [RV: redis::FromRedisValue]);
-    redis_c!(hkeys, (key: &str), FacadeResult<T>, generics: [T: redis::FromRedisValue]);
-    redis_c!(hvals, (key: &str), FacadeResult<T>, generics: [T: redis::FromRedisValue]);
+    redis_c!(hexists, (key: &str,field: F), FacadeBool, generics: [F: ToRedisArgs]);
+    redis_c!(httl, (key: &str,field: F), FacadeInt, generics: [F: ToRedisArgs]);
+    redis_c!(hset, (key: &str, field: F, val: V), FacadeBool, generics: [F: ToRedisArgs, V: ToRedisArgs]);
+    redis_c!(hset_nx, (key: &str, field: F, val: V), FacadeBool, generics: [F: ToRedisArgs, V: ToRedisArgs]);
+    redis_c!(hset_multiple, (key: &str, values: &[(F, V)]), FacadeBool, generics: [F: ToRedisArgs, V: ToRedisArgs]);
+    redis_c!(hdel, (key: &str, field: F), FacadeBool, generics: [F: ToRedisArgs]);
+    redis_c!(hlen, (key: &str), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(hkeys, (key: &str), Facade<T>, generics: [T: FromRedisValue]);
+    redis_c!(hvals, (key: &str), Facade<T>, generics: [T: FromRedisValue]);
 
-    redis_c!(incr, (key: &str, val: T), FacadeResult<T>, generics: [T: redis::ToRedisArgs + redis::FromRedisValue]);
-    redis_c!(decr, (key: &str, val: T), FacadeResult<T>, generics: [T: redis::ToRedisArgs + redis::FromRedisValue]);
+    redis_c!(incr, (key: &str, delta: D), Facade<D>, generics: [D: ToRedisArgs + FromRedisValue]);
+    redis_c!(decr, (key: &str, delta: D), Facade<D>, generics: [D: ToRedisArgs + FromRedisValue]);
 
-    redis_c!(mset, (items: &[(K, V)]), BoolResult, generics: [K: redis::ToRedisArgs, V: redis::ToRedisArgs]);
-    redis_c!(set_multiple, redis: mset, (items: &[(K, V)]), BoolResult, generics: [K: redis::ToRedisArgs, V: redis::ToRedisArgs]);
+    redis_c!(mset, (items: &[(K, V)]), FacadeBool, generics: [K: ToRedisArgs, V: ToRedisArgs]);
+    redis_c!(set_multiple, redis: mset, (items: &[(K, V)]), FacadeBool, generics: [K: ToRedisArgs, V: ToRedisArgs]);
+
+    redis_c!(getbit, (key: &str, offset:usize), FacadeBool);
+    redis_c!(bitcount, (key: &str), FacadeInt);
+    redis_c!(bitcount_range, (key: &str, start:usize, end:usize), FacadeInt);
+    redis_c!(setbit, (key: &str, offset:usize, value:bool), FacadeBool);
+
+    redis_c!(strlen, (key: &str), FacadeInt);
+
+    redis_c!(sadd, (key: &str, member: M), FacadeBool, generics: [M: ToRedisArgs]);
+    redis_c!(scard, (key: &str), FacadeInt);
+    redis_c!(smembers, (key: &str), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(srandmember, (key: &str), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(srandmember_multiple, (key: &str, count: usize), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(srem, (key: &str, member: M), FacadeBool, generics: [M: ToRedisArgs]);
+
 
     /// Set the value of one or more fields of a given hash key, and optionally set their expiration
-    pub fn hset_ex<F: redis::ToRedisArgs, V: redis::ToRedisArgs>(&self, key: &str, ttl: u64, values: &[(F, V)]) -> BoolResult {
+    pub fn hset_ex<F: ToRedisArgs, V: ToRedisArgs>(&self, key: &str, ttl: u64, values: &[(F, V)]) -> FacadeBool {
         let exo = redis::HashFieldExpirationOptions::default();
         exo.set_expiration(redis::SetExpiry::EX(ttl));
         self.get_connection()?.hset_ex(key, &exo, values).map_err(erx::smp)
     }
 
     /// Get the value of a key and set expiration
-    pub fn get_ex<RV: redis::FromRedisValue>(&self, key: &str, expire_at: u64) -> FacadeResult<RV> {
+    pub fn get_ex<RV: FromRedisValue>(&self, key: &str, expire_at: u64) -> Facade<RV> {
         self.get_connection()?.get_ex(key, redis::Expiry::EX(expire_at)).map_err(erx::smp)
     }
-
 }
 
 #[cfg(test)]
@@ -143,7 +162,7 @@ mod tests {
         last: String,
     }
 
-    impl redis::ToRedisArgs for Name {
+    impl ToRedisArgs for Name {
         fn write_redis_args<W>(&self, out: &mut W)
         where
             W: ?Sized + RedisWrite,
@@ -152,7 +171,7 @@ mod tests {
         }
     }
 
-    impl redis::FromRedisValue for Name {
+    impl FromRedisValue for Name {
         fn from_redis_value(v: &Value) -> RedisResult<Self> {
             match v {
                 Value::BulkString(d) => Ok(serde_json::from_slice(d)?),
