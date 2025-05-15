@@ -34,7 +34,38 @@ where
     }
 }
 
-pub type BoolResult = erx::ResultE<bool>;
+pub type FacadeResult<T> = erx::ResultE<T>;
+pub type BoolResult = FacadeResult<bool>;
+pub type FloatResult = FacadeResult<f64>;
+pub type IntegerResult = FacadeResult<i64>;
+
+macro_rules! redis_c {
+    // 基本形式：方法名、参数列表、返回类型（默认调用参数与参数名一致）
+    ($method_name:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty) => {
+        pub fn $method_name(&self, $($arg_name: $arg_type),*) -> $return_type {
+            self.get_connection()?.$method_name($($arg_name),*).map_err(erx::smp)
+        }
+    };
+
+    // 支持显式指定 Redis 方法名
+    ($method_name:ident, redis: $redis_method:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty) => {
+        pub fn $method_name(&self, $($arg_name: $arg_type),*) -> $return_type {
+            self.get_connection()?.$redis_method($($arg_name),*).map_err(erx::smp)
+        }
+    };
+    // 支持泛型参数的方法
+    ($method_name:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
+        pub fn $method_name<$($generic)*>(&self, $($arg_name: $arg_type),*) -> $return_type {
+            self.get_connection()?.$method_name($($arg_name),*).map_err(erx::smp)
+        }
+    };
+    // 支持泛型参数且显式指定 Redis 方法名
+    ($method_name:ident, redis: $redis_method:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
+        pub fn $method_name<$($generic)*>(&self, $($arg_name: $arg_type),*) -> $return_type {
+            self.get_connection()?.$redis_method($($arg_name),*).map_err(erx::smp)
+        }
+    };
+}
 
 impl Redis {
     pub fn shared() -> Self {
@@ -45,155 +76,59 @@ impl Redis {
         Redis { logit: true, client: c }
     }
 
-    pub fn exists(&self, key: &str) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.exists(key).map_err(erx::smp)
+    pub fn get_connection(&self) -> erx::ResultE<redis::Connection> {
+        self.client.get_connection().map_err(erx::smp)
     }
 
-    pub fn ttl(&self, key: &str) -> erx::ResultE<i64> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.ttl(key).map_err(erx::smp)
-    }
+    redis_c!(exists, (key: &str), BoolResult);
+    redis_c!(ttl, (key: &str), FacadeResult<i64>);
+    redis_c!(del, (key: &str), BoolResult);
+    redis_c!(persist, (key: &str), BoolResult);
+    redis_c!(expire, (key: &str, seconds: i64), BoolResult);
+    redis_c!(expire_at, (key: &str, expire_at: i64), BoolResult);
+    redis_c!(rename, (key: K, nkey: N), BoolResult, generics: [K: redis::ToRedisArgs, N: redis::ToRedisArgs]);
+    redis_c!(rename_nx, (key: K, nkey: N), BoolResult, generics: [K: redis::ToRedisArgs, N: redis::ToRedisArgs]);
 
-    pub fn get<RV: redis::FromRedisValue>(&self, key: &str) -> erx::ResultE<RV> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.get(key).map_err(erx::smp)
-    }
+    redis_c!(get, (key: &str), FacadeResult<RV>, generics: [RV: redis::FromRedisValue]);
+    redis_c!(getset, (key: &str, val: V), FacadeResult<V>, generics: [V: redis::ToRedisArgs + redis::FromRedisValue]);
+    redis_c!(getdel, redis: get_del, (key: &str), FacadeResult<RV>, generics: [RV: redis::FromRedisValue]);
+    redis_c!(hget, (key: &str, field: F), FacadeResult<RV>, generics: [F: redis::ToRedisArgs, RV: redis::FromRedisValue]);
+    redis_c!(hgetall, (key: &str), FacadeResult<RV>, generics: [RV: redis::FromRedisValue]);
 
-    pub fn getset<V: redis::ToRedisArgs + redis::FromRedisValue>(&self, key: &str, val: V) -> erx::ResultE<V> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.getset(key, val).map_err(erx::smp)
-    }
+    redis_c!(append, (key: &str, val: V), BoolResult, generics: [V: redis::ToRedisArgs]);
 
-    /// Get the value of a key and delete it
-    pub fn getdel<RV: redis::FromRedisValue>(&self, key: &str) -> erx::ResultE<RV> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.get_del(key).map_err(erx::smp)
-    }
+    redis_c!(set, (key: &str, val: T), BoolResult, generics: [T: redis::ToRedisArgs]);
+    redis_c!(set_ex, (key: &str, val: T, ttl: u64), BoolResult, generics: [T: redis::ToRedisArgs]);
+    redis_c!(set_nx, (key: &str, val: T), BoolResult, generics: [T: redis::ToRedisArgs]);
 
-    pub fn hget<F: redis::ToRedisArgs, RV: redis::FromRedisValue>(&self, key: &str, field: F) -> erx::ResultE<RV> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.hget(key, field).map_err(erx::smp)
-    }
+    redis_c!(hset, (key: &str, field: F, val: V), BoolResult, generics: [F: redis::ToRedisArgs, V: redis::ToRedisArgs]);
+    redis_c!(hset_nx, (key: &str, field: F, val: V), BoolResult, generics: [F: redis::ToRedisArgs, V: redis::ToRedisArgs]);
+    redis_c!(hset_multiple, (key: &str, values: &[(F, V)]), BoolResult, generics: [F: redis::ToRedisArgs, V: redis::ToRedisArgs]);
+    redis_c!(hdel, (key: &str, field: F), BoolResult, generics: [F: redis::ToRedisArgs]);
+    redis_c!(hlen, (key: &str), FacadeResult<RV>, generics: [RV: redis::FromRedisValue]);
+    redis_c!(hkeys, (key: &str), FacadeResult<T>, generics: [T: redis::FromRedisValue]);
+    redis_c!(hvals, (key: &str), FacadeResult<T>, generics: [T: redis::FromRedisValue]);
 
-    pub fn hgetall<RV: redis::FromRedisValue>(&self, key: &str) -> erx::ResultE<RV> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.hgetall(key).map_err(erx::smp)
-    }
+    redis_c!(incr, (key: &str, val: T), FacadeResult<T>, generics: [T: redis::ToRedisArgs + redis::FromRedisValue]);
+    redis_c!(decr, (key: &str, val: T), FacadeResult<T>, generics: [T: redis::ToRedisArgs + redis::FromRedisValue]);
 
-    pub fn del(&self, key: &str) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.del(key).map_err(erx::smp)
-    }
-
-    pub fn expire(&self, key: &str, ttl: i64) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.expire(key, ttl).map_err(erx::smp)
-    }
-
-    /// Set the expiration for a key as a UNIX timestamp.
-    pub fn expire_at(&self, key: &str, timestamp: i64) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.expire_at(key, timestamp).map_err(erx::smp)
-    }
-
-    /// Remove the expiration from a key.
-    pub fn persist(&self, key: &str) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.persist(key).map_err(erx::smp)
-    }
-
-    pub fn set<T: redis::ToRedisArgs>(&self, key: &str, val: T) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        self.client.get_connection().map_err(erx::smp)?.set(key, val).map_err(erx::smp)
-    }
-
-    pub fn set_ex<T: redis::ToRedisArgs>(&self, key: &str, val: T, ttl: u64) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.set_ex(key, val, ttl).map_err(erx::smp)
-    }
-
-    pub fn set_nx<T: redis::ToRedisArgs>(&self, key: &str, val: T) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.set_nx(key, val).map_err(erx::smp)
-    }
-
-    pub fn set_multiple<K: redis::ToRedisArgs, V: redis::ToRedisArgs>(&self, items: &[(K, V)]) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.mset(items).map_err(erx::smp)
-    }
-
-    pub fn rename<K: redis::ToRedisArgs, N: redis::ToRedisArgs>(&self, key: K, nkey: N) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.rename(key, nkey).map_err(erx::smp)
-    }
-
-    /// Rename a key, only if the new key does not exist.
-    pub fn rename_nx<K: redis::ToRedisArgs, N: redis::ToRedisArgs>(&self, key: K, nkey: N) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.rename_nx(key, nkey).map_err(erx::smp)
-    }
-
-    /// Append a value to a key.
-    pub fn append<V: redis::ToRedisArgs>(&self, key: &str, val: V) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.append(key, val).map_err(erx::smp)
-    }
-
-    pub fn hset<F: redis::ToRedisArgs, V: redis::ToRedisArgs>(&self, key: &str, field: F, val: V) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.hset(key, field, val).map_err(erx::smp)
-    }
+    redis_c!(mset, (items: &[(K, V)]), BoolResult, generics: [K: redis::ToRedisArgs, V: redis::ToRedisArgs]);
+    redis_c!(set_multiple, redis: mset, (items: &[(K, V)]), BoolResult, generics: [K: redis::ToRedisArgs, V: redis::ToRedisArgs]);
 
     /// Set the value of one or more fields of a given hash key, and optionally set their expiration
     pub fn hset_ex<F: redis::ToRedisArgs, V: redis::ToRedisArgs>(&self, key: &str, ttl: u64, values: &[(F, V)]) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
         let exo = redis::HashFieldExpirationOptions::default();
         exo.set_expiration(redis::SetExpiry::EX(ttl));
-        conn.hset_ex(key, &exo, values).map_err(erx::smp)
+        self.get_connection()?.hset_ex(key, &exo, values).map_err(erx::smp)
     }
 
-    pub fn hset_nx<F: redis::ToRedisArgs, V: redis::ToRedisArgs>(&self, key: &str, field: F, val: V) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.hset_nx(key, field, val).map_err(erx::smp)
+    /// Get the value of a key and set expiration
+    pub fn get_ex<RV: redis::FromRedisValue>(&self, key: &str, expire_at: u64) -> FacadeResult<RV> {
+        self.get_connection()?.get_ex(key, redis::Expiry::EX(expire_at)).map_err(erx::smp)
     }
 
-    pub fn hset_multiple<F: redis::ToRedisArgs, V: redis::ToRedisArgs>(&self, key: &str, values: &[(F, V)]) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.hset_multiple(key, values).map_err(erx::smp)
-    }
-
-    pub fn hdel<F: redis::ToRedisArgs>(&self, key: &str, field: F) -> BoolResult {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.hdel(key, field).map_err(erx::smp)
-    }
-
-    pub fn hlen<RV: redis::FromRedisValue>(&self, key: &str) -> erx::ResultE<RV> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.hlen(key).map_err(erx::smp)
-    }
-
-    pub fn hkeys<T: redis::FromRedisValue>(&self, key: &str) -> erx::ResultE<T> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.hkeys(key).map_err(erx::smp)
-    }
-
-    pub fn hvals<T: redis::FromRedisValue>(&self, key: &str) -> erx::ResultE<T> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.hvals(key).map_err(erx::smp)
-    }
-
-    pub fn incr<T: redis::ToRedisArgs + redis::FromRedisValue>(&self, key: &str, val: T) -> erx::ResultE<T> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.incr(key, val).map_err(erx::smp)
-    }
-
-    ///
-    pub fn decr<T: redis::ToRedisArgs + redis::FromRedisValue>(&self, key: &str, val: T) -> erx::ResultE<T> {
-        let mut conn = self.client.get_connection().map_err(erx::smp)?;
-        conn.decr(key, val).map_err(erx::smp)
-    }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
