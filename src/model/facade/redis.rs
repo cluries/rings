@@ -82,6 +82,7 @@ impl Redis {
         self.client.get_connection().map_err(erx::smp)
     }
 
+    /// Determine if a key exists.
     redis_c!(exists, (key: &str), FacadeBool);
     redis_c!(ttl, (key: &str), FacadeInt);
     redis_c!(del, (key: &str), FacadeBool);
