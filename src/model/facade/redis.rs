@@ -177,7 +177,6 @@ impl Redis {
     redis_c!(hpttl, (field:F), FacadeInt, generics: [F: ToRedisArgs]);
     redis_c!(hexpire_time, (field:F), FacadeInt, generics: [F: ToRedisArgs]);
 
-
     //bit
     redis_c!(getbit, (offset:usize), FacadeBool);
     redis_i!(bitcount);
@@ -185,6 +184,13 @@ impl Redis {
     redis_c!(setbit, (offset:usize, value:bool), FacadeBool);
 
     // list operations
+    redis_c!(blpop, (timeout: f64), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(brpop, (timeout: f64), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(lindex, (index: isize), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_i!(llen);
+    redis_c!(lpush, (value: V), FacadeBool, generics: [V: ToRedisArgs]);
+    redis_c!(lpush_exists, (value: V), FacadeBool, generics: [V: ToRedisArgs]);
+
 
 
     //set commands
