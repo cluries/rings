@@ -39,93 +39,6 @@ pub type FacadeBool = Facade<bool>;
 pub type FacadeFloat = Facade<f64>;
 pub type FacadeInt = Facade<i64>;
 
-// macro_rules! redis_c {
-//     // 基本形式：方法名、参数列表、返回类型（默认调用参数与参数名一致）
-//     ($method_name:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty) => {
-//         pub fn $method_name(&self, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$method_name($($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 支持显式指定 Redis 方法名
-//     ($method_name:ident, redis: $redis_method:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty) => {
-//         pub fn $method_name(&self, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$redis_method($($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 支持泛型参数的方法
-//     ($method_name:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
-//         pub fn $method_name<$($generic)*>(&self, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$method_name($($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 支持泛型参数且显式指定 Redis 方法名
-//     ($method_name:ident, redis: $redis_method:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
-//         pub fn $method_name<$($generic)*>(&self, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$redis_method($($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-// }
-// macro_rules! redis_c {
-//     // 基本形式：方法名、额外参数（不包括 key）、返回类型，默认 key: K 和 generics: [K: ToRedisArgs]
-//     ($method_name:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty) => {
-//         pub fn $method_name<K: ToRedisArgs>(&self, key: K, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$method_name(key, $($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 基本形式 + no_key：不添加 key: K
-//     ($method_name:ident, no_key, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty) => {
-//         pub fn $method_name(&self, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$method_name($($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 支持显式指定 Redis 方法名
-//     ($method_name:ident, redis: $redis_method:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty) => {
-//         pub fn $method_name<K: ToRedisArgs>(&self, key: K, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$redis_method(key, $($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 支持显式指定 Redis 方法名 + no_key：不添加 key: K
-//     ($method_name:ident, redis: $redis_method:ident, no_key, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty) => {
-//         pub fn $method_name(&self, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$redis_method($($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 支持额外泛型参数（例如 RV: FromRedisValue）
-//     ($method_name:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
-//         pub fn $method_name<K: ToRedisArgs, $($generic)*>(&self, key: K, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$method_name(key, $($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 支持额外泛型参数 + no_key：不添加 key: K
-//     ($method_name:ident, no_key, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
-//         pub fn $method_name<$($generic)*>(&self, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$method_name($($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 支持额外泛型参数且显式指定 Redis 方法名
-//     ($method_name:ident, redis: $redis_method:ident, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
-//         pub fn $method_name<K: ToRedisArgs, $($generic)*>(&self, key: K, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$redis_method(key, $($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-//
-//     // 支持额外泛型参数且显式指定 Redis 方法名 + no_key：不添加 key: K
-//     ($method_name:ident, redis: $redis_method:ident, no_key, ($($arg_name:ident: $arg_type:ty),*), $return_type:ty, generics: [$($generic:tt)*]) => {
-//         pub fn $method_name<$($generic)*>(&self, $($arg_name: $arg_type),*) -> $return_type {
-//             self.get_connection()?.$redis_method($($arg_name),*).map_err(erx::smp)
-//         }
-//     };
-// }
-
 macro_rules! redis_c {
     // 基本形式：方法名、额外参数（不包括 key）、返回类型
     ($method_name:ident, ($($arg_name:ident: $arg_type:ty $(=> $transform:expr)?),*), $return_type:ty) => {
@@ -216,22 +129,32 @@ impl Redis {
     redis_c!(getset,(val:V), Facade<RV>, generics: [V: ToRedisArgs, RV: FromRedisValue]);
     redis_c!(getdel, redis: get_del, (), Facade<RV>,  generics: [RV: FromRedisValue]);
     redis_c!(get_del, (), Facade<RV>, generics:[RV: FromRedisValue]);
+    redis_c!(getrange, (from:isize, to:isize), Facade<RV>, generics: [RV: FromRedisValue]);
     redis_c!(append, (val: V), FacadeBool, generics: [V: ToRedisArgs]);
     redis_c!(set, (val: V), FacadeBool, generics: [V: ToRedisArgs]);
     redis_c!(mset, no_key, (items: &[(K, V)]), FacadeBool, generics: [K:ToRedisArgs, V: ToRedisArgs]);
-    redis_c!(set_multiple, no_key, (items: &[(K, V)]), FacadeBool, generics: [K: ToRedisArgs, V: ToRedisArgs]);
+    // redis_c!(set_multiple, no_key, (items: &[(K, V)]), FacadeBool, generics: [K: ToRedisArgs, V: ToRedisArgs]);
+    redis_c!(set_options, (value:V, options:redis::SetOptions), FacadeBool, generics: [V: ToRedisArgs]);
     redis_c!(set_ex, (val: V,  seconds: u64), FacadeBool, generics: [V: ToRedisArgs]);
     redis_c!(set_nx, (val: V), FacadeBool, generics: [V: ToRedisArgs]);
+    redis_c!(setrange, (from:isize, to:isize, value:V), FacadeBool, generics: [V: ToRedisArgs]);
+    redis_c!(mset_nx, no_key, (items: &[(K, V)]),FacadeInt, generics: [K:ToRedisArgs, V: ToRedisArgs]);
     redis_c!(incr, (delta: D), Facade<V>, generics: [D: ToRedisArgs , V: FromRedisValue]);
     redis_c!(decr, (delta: D), Facade<V>, generics: [D: ToRedisArgs , V: FromRedisValue]);
 
     //hash
     redis_c!(hexists, (field: F), FacadeBool, generics: [F: ToRedisArgs]);
     redis_c!(hget, (field: F), Facade<RV>, generics: [F: ToRedisArgs, RV: FromRedisValue]);
+
+    redis_c!(hget_ex, (fields: F, expire_at: u64 => {
+        redis::Expiry::EX(expire_at)
+    }), Facade<RV>, generics: [F: ToRedisArgs, RV: FromRedisValue]);
+
     redis_c!(hgetall, ( ), Facade<RV>, generics: [RV: FromRedisValue]);
     redis_c!(hget_del, ( field: F), Facade<RV>, generics: [F: ToRedisArgs, RV: FromRedisValue]);
     redis_c!(httl, ( field: F), FacadeInt, generics: [F: ToRedisArgs]);
     redis_c!(hset, ( field: F, val: V), FacadeBool, generics: [F: ToRedisArgs, V: ToRedisArgs]);
+
     redis_c!(hset_ex, (
             expire_at: u64 => &{
                 redis::HashFieldExpirationOptions::default()
@@ -242,14 +165,18 @@ impl Redis {
             values: &[(F, V)]
         ), FacadeBool, generics: [F: ToRedisArgs, V: ToRedisArgs]);
 
-    redis_c!(hpersist, (field: F), FacadeBool, generics: [F: ToRedisArgs]);
     redis_c!(hset_nx, (field: F, val: V), FacadeBool, generics: [F: ToRedisArgs, V: ToRedisArgs]);
     redis_c!(hset_multiple, (values: &[(F, V)]), FacadeBool, generics: [F: ToRedisArgs, V: ToRedisArgs]);
     redis_c!(hdel, (field: F), FacadeBool, generics: [F: ToRedisArgs]);
-    redis_c!(hkeys, ( ), Facade<T>, generics: [T: FromRedisValue]);
-    redis_c!(hvals, ( ), Facade<T>, generics: [T: FromRedisValue]);
+    redis_c!(hpersist, (field: F), FacadeBool, generics: [F: ToRedisArgs]);
+    redis_c!(hkeys, (), Facade<T>, generics: [T: FromRedisValue]);
+    redis_c!(hvals, (), Facade<T>, generics: [T: FromRedisValue]);
     redis_c!(hincr, (field: F, delta: D), Facade<RV>, generics: [F: ToRedisArgs, D:  ToRedisArgs ,RV:FromRedisValue]);
     redis_i!(hlen);
+    redis_c!(httl, (field:F), FacadeInt, generics: [F: ToRedisArgs]);
+    redis_c!(hpttl, (field:F), FacadeInt, generics: [F: ToRedisArgs]);
+    redis_c!(hexpire_time, (field:F), FacadeInt, generics: [F: ToRedisArgs]);
+
 
     //bit
     redis_c!(getbit, (offset:usize), FacadeBool);
@@ -257,11 +184,14 @@ impl Redis {
     redis_c!(bitcount_range, (start:usize, end:usize), FacadeInt);
     redis_c!(setbit, (offset:usize, value:bool), FacadeBool);
 
+    // list operations
+
+
     //set commands
     redis_c!(sadd, (member: M), FacadeBool, generics: [M: ToRedisArgs]);
     redis_i!(scard, sdiff);
     redis_c!(sdiffstore, (dest: &str), FacadeInt);
-    redis_c!(smove, (dst: DK, member: M), FacadeBool,  generics: [DK:ToRedisArgs, M: ToRedisArgs]);
+    redis_c!(smove, (dst: DK, member: M), FacadeBool,  generics: [DK: ToRedisArgs, M: ToRedisArgs]);
     redis_b!(sunion);
     redis_c!(sunionstore, (dst: DK), FacadeBool,  generics: [DK:ToRedisArgs] );
     redis_c!(sismember, (member:M), FacadeInt,  generics: [M: ToRedisArgs]);
@@ -276,7 +206,7 @@ impl Redis {
     redis_c!(zadd_multiple, (items: &[(S, M)]), FacadeBool, generics: [S: ToRedisArgs, M: ToRedisArgs]);
     redis_i!(zcard);
     redis_c!(zcount, (min: M, max: M), FacadeInt, generics: [M: ToRedisArgs]);
-    redis_c!(zincr, ( member: M, delta: D), Facade<D>, generics: [M: ToRedisArgs, D: ToRedisArgs + FromRedisValue]);
+    redis_c!(zincr, (member: M, delta:D), Facade<RV>, generics: [M: ToRedisArgs, D: ToRedisArgs, RV: FromRedisValue]);
 }
 
 #[cfg(test)]
