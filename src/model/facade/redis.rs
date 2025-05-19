@@ -137,7 +137,7 @@ impl Redis {
     redis_c!(set_options, (value:V, options:redis::SetOptions), FacadeBool, generics: [V: ToRedisArgs]);
     redis_c!(set_ex, (val: V,  seconds: u64), FacadeBool, generics: [V: ToRedisArgs]);
     redis_c!(set_nx, (val: V), FacadeBool, generics: [V: ToRedisArgs]);
-    redis_c!(setrange, (from:isize, to:isize, value:V), FacadeBool, generics: [V: ToRedisArgs]);
+    redis_c!(setrange, (offset:isize, value:V), FacadeBool, generics: [V: ToRedisArgs]);
     redis_c!(mset_nx, no_key, (items: &[(K, V)]),FacadeInt, generics: [K:ToRedisArgs, V: ToRedisArgs]);
     redis_c!(incr, (delta: D), Facade<V>, generics: [D: ToRedisArgs , V: FromRedisValue]);
     redis_c!(decr, (delta: D), Facade<V>, generics: [D: ToRedisArgs , V: FromRedisValue]);
@@ -152,7 +152,6 @@ impl Redis {
 
     redis_c!(hgetall, ( ), Facade<RV>, generics: [RV: FromRedisValue]);
     redis_c!(hget_del, ( field: F), Facade<RV>, generics: [F: ToRedisArgs, RV: FromRedisValue]);
-    redis_c!(httl, ( field: F), FacadeInt, generics: [F: ToRedisArgs]);
     redis_c!(hset, ( field: F, val: V), FacadeBool, generics: [F: ToRedisArgs, V: ToRedisArgs]);
 
     redis_c!(hset_ex, (
@@ -190,8 +189,6 @@ impl Redis {
     redis_i!(llen);
     redis_c!(lpush, (value: V), FacadeBool, generics: [V: ToRedisArgs]);
     redis_c!(lpush_exists, (value: V), FacadeBool, generics: [V: ToRedisArgs]);
-
-
 
     //set commands
     redis_c!(sadd, (member: M), FacadeBool, generics: [M: ToRedisArgs]);
