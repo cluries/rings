@@ -183,16 +183,34 @@ impl Redis {
     redis_c!(setbit, (offset:usize, value:bool), FacadeBool);
 
     // list operations
+    redis_c!(blmove, (dstkey: D, src_dir: redis::Direction, dst_dir: redis::Direction, timeout: f64), Facade<RV>, generics: [D:ToRedisArgs, RV: FromRedisValue]);
+    redis_c!(blmpop, no_key, (timeout: f64, numkeys: usize, key: K, dir: redis::Direction, count: usize), Facade<RV>, generics: [K:ToRedisArgs, RV: FromRedisValue]);
     redis_c!(blpop, (timeout: f64), Facade<RV>, generics: [RV: FromRedisValue]);
     redis_c!(brpop, (timeout: f64), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(brpoplpush, (dstkey: D, timeout: f64), Facade<RV>, generics: [D:ToRedisArgs, RV: FromRedisValue]);
     redis_c!(lindex, (index: isize), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(linsert_before, (pivot: P, value: V), FacadeBool, generics: [P: ToRedisArgs, V: ToRedisArgs]);
+    redis_c!(linsert_after, (pivot: P, value: V), FacadeBool, generics: [P: ToRedisArgs, V: ToRedisArgs]);
     redis_i!(llen);
+    redis_c!(lmove, (dstkey: D, src_dir: redis::Direction, dst_dir: redis::Direction), FacadeBool, generics: [D: ToRedisArgs]);
+    redis_c!(lmpop, no_key, (numkeys: usize, key: K, dir: redis::Direction, count: usize), Facade<RV>, generics: [K: ToRedisArgs, RV: FromRedisValue]);
+    redis_c!(lpop, (count: Option<core::num::NonZeroUsize>), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(lpos, (value: V, options: redis::LposOptions), Facade<RV>, generics: [V:ToRedisArgs, RV: FromRedisValue]);
     redis_c!(lpush, (value: V), FacadeBool, generics: [V: ToRedisArgs]);
     redis_c!(lpush_exists, (value: V), FacadeBool, generics: [V: ToRedisArgs]);
+    redis_c!(lrange, (start: isize, stop: isize),  Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(lrem, (count: isize, value: V),  Facade<RV>, generics: [V: ToRedisArgs, RV: FromRedisValue]);
+    redis_c!(ltrim, (start: isize, stop: isize),  Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(lset, (index: isize, value: V),  Facade<RV>, generics: [V: ToRedisArgs, RV: FromRedisValue]);
+    redis_c!(rpop, (count: Option<core::num::NonZeroUsize>), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(rpoplpush, (dstkey: D), Facade<RV>, generics: [D:ToRedisArgs, RV: FromRedisValue]);
+    redis_c!(rpush, (value: V), FacadeBool, generics: [V: ToRedisArgs]);
+    redis_c!(rpush_exists, (value: V), FacadeBool, generics: [V: ToRedisArgs]);
 
     //set commands
     redis_c!(sadd, (member: M), FacadeBool, generics: [M: ToRedisArgs]);
-    redis_i!(scard, sdiff);
+    redis_i!(scard);
+    redis_c!(sdiff, (), Facade<RV>, generics: [RV: FromRedisValue]);
     redis_c!(sdiffstore, (dest: &str), FacadeInt);
     redis_c!(smove, (dst: DK, member: M), FacadeBool,  generics: [DK: ToRedisArgs, M: ToRedisArgs]);
     redis_b!(sunion);
