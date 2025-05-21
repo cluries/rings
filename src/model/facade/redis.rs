@@ -211,16 +211,19 @@ impl Redis {
     redis_c!(sadd, (member: M), FacadeBool, generics: [M: ToRedisArgs]);
     redis_i!(scard);
     redis_c!(sdiff, (), Facade<RV>, generics: [RV: FromRedisValue]);
-    redis_c!(sdiffstore, (dest: &str), FacadeInt);
-    redis_c!(smove, (dst: DK, member: M), FacadeBool,  generics: [DK: ToRedisArgs, M: ToRedisArgs]);
-    redis_b!(sunion);
-    redis_c!(sunionstore, (dst: DK), FacadeBool,  generics: [DK:ToRedisArgs] );
-    redis_c!(sismember, (member:M), FacadeInt,  generics: [M: ToRedisArgs]);
+    redis_c!(sdiffstore, no_key, (dest: D, keys:K), FacadeInt, generics: [D: ToRedisArgs, K: ToRedisArgs]);
+    redis_c!(sinter, (), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(sinterstore, no_key, (dest: D, keys:K), FacadeInt, generics: [D: ToRedisArgs, K: ToRedisArgs]);
+    redis_c!(sismember, (member:M), FacadeBool,  generics: [M: ToRedisArgs]);
+    redis_c!(smismember, (member:M), Facade<Vec<i8>>,  generics: [M: ToRedisArgs]);
     redis_c!(smembers, (), Facade<RV>, generics: [RV: FromRedisValue]);
+    redis_c!(smove, no_key, (srckey: S, dstkey: D, member: M), FacadeBool, generics: [S: ToRedisArgs, D: ToRedisArgs, M: ToRedisArgs]);
     redis_c!(spop, (), Facade<RV>, generics: [RV: FromRedisValue]);
     redis_c!(srandmember, (), Facade<RV>, generics: [RV: FromRedisValue]);
     redis_c!(srandmember_multiple, (count: usize), Facade<RV>, generics: [RV: FromRedisValue]);
     redis_c!(srem, (member: M), FacadeBool, generics: [M: ToRedisArgs]);
+    redis_c!(sunion, (), Facade<RV>,  generics: [RV: FromRedisValue]);
+    redis_c!(sunionstore, no_key, (dstkey: D, keys: K), Facade<RV>, generics: [ D: ToRedisArgs, K: ToRedisArgs, RV: FromRedisValue]);
 
     // sorted set commands
     redis_c!(zadd, (score: S, member: M), FacadeBool, generics: [S: ToRedisArgs, M: ToRedisArgs]);
