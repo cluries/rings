@@ -231,6 +231,17 @@ impl Redis {
     redis_i!(zcard);
     redis_c!(zcount, (min: M, max: M), FacadeInt, generics: [M: ToRedisArgs]);
     redis_c!(zincr, (member: M, delta:D), Facade<RV>, generics: [M: ToRedisArgs, D: ToRedisArgs, RV: FromRedisValue]);
+    redis_c!(zinterstore, no_key, (dest: D, keys:K), FacadeInt, generics: [D: ToRedisArgs, K: ToRedisArgs]);
+    redis_c!(zinterstore_min, no_key, (dest: D, keys:K), FacadeInt, generics: [D: ToRedisArgs, K: ToRedisArgs]);
+    redis_c!(zinterstore_max, no_key, (dest: D, keys:K), FacadeInt, generics: [D: ToRedisArgs, K: ToRedisArgs]);
+    redis_c!(zinterstore_weights, no_key, (dest: D, keys:&[(K, W)]), FacadeInt, generics: [D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs]);
+    redis_c!(zinterstore_max_weights, no_key, (dest: D, keys:&[(K, W)]), FacadeInt, generics: [D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs]);
+    redis_c!(zlexcount, (min: M, max: MM), FacadeInt, generics: [M: ToRedisArgs, MM: ToRedisArgs]);
+    redis_c!(bzpopmax, (timeout:f64), FacadeInt );
+    redis_c!(bzpopmin, (timeout:f64), FacadeInt );
+    redis_c!(zpopmax, (count:isize), FacadeInt );
+    redis_c!(zpopmin, (count:isize), FacadeInt );
+
 }
 
 #[cfg(test)]
