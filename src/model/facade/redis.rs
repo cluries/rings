@@ -2,11 +2,13 @@ use crate::erx;
 use redis::{Commands, FromRedisValue, ToRedisArgs};
 use std::fmt::Display;
 
+#[allow(dead_code)]
 pub struct Redis {
     logit: bool,
     client: redis::Client,
 }
 
+#[allow(unused)]
 macro_rules! conn_mut {
     ($i:expr, $s:expr) => {
         match $i.client.get_connection() {
@@ -38,6 +40,48 @@ pub type Facade<T> = erx::ResultE<T>;
 pub type FacadeBool = Facade<bool>;
 pub type FacadeFloat = Facade<f64>;
 pub type FacadeInt = Facade<i64>;
+
+pub mod rs {
+    use redis::FromRedisValue;
+
+    #[derive(Debug)]
+    pub struct Zpoped {
+        pub member: String,
+        pub score: f64,
+    }
+
+    #[derive(Debug)]
+    pub struct Bzpoped {
+        pub key: String,
+        pub member: String,
+        pub score: f64,
+    }
+    impl FromRedisValue for Zpoped {
+        fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
+            match v {
+                redis::Value::Array(ref items) if items.len() == 2 => {
+                    let member: String = redis::from_redis_value(&items[0])?;
+                    let score: f64 = redis::from_redis_value(&items[1])?;
+                    Ok(Zpoped { member, score })
+                },
+                _ => Err(redis::RedisError::from((redis::ErrorKind::TypeError, "Expected a bulk response with 3 elements for BZPOPMAX"))),
+            }
+        }
+    }
+    impl FromRedisValue for Bzpoped {
+        fn from_redis_value(v: &redis::Value) -> redis::RedisResult<Self> {
+            match v {
+                redis::Value::Array(ref items) if items.len() == 3 => {
+                    let key: String = redis::from_redis_value(&items[0])?;
+                    let member: String = redis::from_redis_value(&items[1])?;
+                    let score: f64 = redis::from_redis_value(&items[2])?;
+                    Ok(Bzpoped { key, member, score })
+                },
+                _ => Err(redis::RedisError::from((redis::ErrorKind::TypeError, "Expected a bulk response with 3 elements for BZPOPMAX"))),
+            }
+        }
+    }
+}
 
 macro_rules! redis_c {
     // 基本形式：方法名、额外参数（不包括 key）、返回类型
@@ -237,11 +281,11 @@ impl Redis {
     redis_c!(zinterstore_weights, no_key, (dest: D, keys:&[(K, W)]), FacadeInt, generics: [D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs]);
     redis_c!(zinterstore_max_weights, no_key, (dest: D, keys:&[(K, W)]), FacadeInt, generics: [D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs]);
     redis_c!(zlexcount, (min: M, max: MM), FacadeInt, generics: [M: ToRedisArgs, MM: ToRedisArgs]);
-    redis_c!(bzpopmax, (timeout:f64), FacadeInt );
-    redis_c!(bzpopmin, (timeout:f64), FacadeInt );
-    redis_c!(zpopmax, (count:isize), FacadeInt );
-    redis_c!(zpopmin, (count:isize), FacadeInt );
 
+    redis_c!(bzpopmax, (timeout:f64), Facade<rs::Bzpoped>);
+    redis_c!(bzpopmin, (timeout:f64), Facade<rs::Bzpoped>);
+    redis_c!(zpopmax, (count:isize),  Facade<rs::Zpoped> );
+    redis_c!(zpopmin, (count:isize),  Facade<rs::Zpoped> );
 }
 
 #[cfg(test)]
