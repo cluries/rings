@@ -19,12 +19,17 @@ pub type ResultE<T> = Result<T, Erx>;
 /// ResultEX = ResultE<()>;
 pub type ResultEX = ResultE<()>;
 
+pub type ExtraItem = (String, String);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Erx {
     code: LayoutedC,
     message: String,
-    extra: Vec<(String, String)>,
+    extra: Vec<ExtraItem>,
 }
+
+pub const EEK_ID: &'static str = "ID";
+pub const EEK_TYPE: &'static str = "TYPE";
 
 pub static LAYOUTED_C_ZERO: &'static str = "0000";
 
@@ -199,6 +204,14 @@ impl Erx {
 
     pub fn extra(&self) -> &Vec<(String, String)> {
         &self.extra
+    }
+
+    pub fn extra_val(&self, key: &str) -> Option<String> {
+        if self.extra.len() < 1 {
+            None
+        } else {
+            self.extra.iter().find(|e| e.0.eq(key)).and_then(|e| Some(e.1.clone()))
+        }
     }
 
     pub fn extra_mut(&mut self) -> &mut Vec<(String, String)> {
