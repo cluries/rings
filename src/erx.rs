@@ -19,29 +19,32 @@ pub type ResultE<T> = Result<T, Erx>;
 /// ResultEX = ResultE<()>;
 pub type ResultEX = ResultE<()>;
 
-pub type ExtraItem = (String, String);
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Erx {
     code: LayoutedC,
     message: String,
-    extra: Vec<ExtraItem>,
+    extra: Vec<(String, String)>,
 }
 
-pub const EEK_ID: &'static str = "ID";
-pub const EEK_TYPE: &'static str = "TYPE";
+/// Layouted: Some predefined Layouted methods
+pub struct Layouted;
 
+/// Zero
 pub static LAYOUTED_C_ZERO: &'static str = "0000";
 
+/// smp: simple convert T: ToString to Erx
 pub fn smp<T: ToString>(error: T) -> Erx {
     Erx { code: Default::default(), message: error.to_string(), extra: Vec::new() }
 }
 
+/// amp: return a function that convert T: ToString to Erx
 pub fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
     let additional = additional.to_string();
     move |err: T| Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() }
 }
 
+
+/// Predefined Layouted Code with length 4
 pub enum PreL4 {
     /// Fuzz: 模糊错误
     FUZZ,
@@ -114,7 +117,7 @@ impl Into<String> for PreL4 {
     }
 }
 
-pub struct Layouted;
+
 
 impl Layouted {
     /// fuzz_udf: 模糊未定义错误
@@ -202,22 +205,33 @@ impl Erx {
         &mut self.message
     }
 
+    /// get extra
     pub fn extra(&self) -> &Vec<(String, String)> {
         &self.extra
     }
 
+    /// get extra value, if not exists, return None
     pub fn extra_val(&self, key: &str) -> Option<String> {
         if self.extra.len() < 1 {
-            None
-        } else {
-            self.extra.iter().find(|e| e.0.eq(key)).and_then(|e| Some(e.1.clone()))
-        }
+            return None;
+        } 
+
+        self.extra.iter().find(|e| e.0.eq(key)).and_then(|e| Some(e.1.clone()))
     }
+
+    /// get extra value, if not exists, return defaults
+    pub fn extral_val_d(&self, key: &str, defaults: String) -> String {
+        self.extra_val(key).unwrap_or(defaults)
+    }
+
 
     pub fn extra_mut(&mut self) -> &mut Vec<(String, String)> {
         &mut self.extra
     }
 
+
+    /// add extra
+    /// if key exists, replace value
     pub fn add_extra(&mut self, key: &str, value: &str) {
         for (k, v) in self.extra.iter_mut() {
             if *k == key {
@@ -228,6 +242,8 @@ impl Erx {
         self.extra.push((key.to_string(), value.to_string()));
     }
 
+    /// get extra and convert to HashMap
+    /// if have same key, the last value will be used
     pub fn extra_map(&self) -> HashMap<String, String> {
         let m: HashMap<String, String> = HashMap::from_iter(self.extra.clone());
         m
@@ -407,3 +423,5 @@ impl From<(String, String, String, String)> for LayoutedC {
         LayoutedC { application: value.0, domain: value.1, category: value.2, detail: value.3 }
     }
 }
+
+

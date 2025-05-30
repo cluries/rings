@@ -3,6 +3,7 @@
 use crate::erx;
 
 
+use chrono::{Datelike, TimeZone};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -66,10 +67,14 @@ const SECOND_DIV: i64 = SEQUENCE_BASE * 100;
 /// maybe min id value
 const MIN_VALUE: i64 = 1728747205481002100;
 
+const BILL_MILLIS_START_YEAR: i64 = 2025;
+
 /// gets shared id factory
 pub fn shared() -> &'static Factory {
     &_shared_factory
 }
+
+
 
 impl Factory {
     pub fn new(sharding: i64) -> Factory {
@@ -255,6 +260,46 @@ fn base62_to_decimal(base62: &str) -> u64 {
     }
 
     decimal
+}
+
+
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct BillMillis {
+    millis: i64,
+    billmillis: i64,
+}
+
+impl BillMillis  {
+
+    pub fn with_millis(millis: i64) -> BillMillis {
+        BillMillis { millis: millis, billmillis:0 }
+    }
+
+    pub fn with_second(second: i64) -> BillMillis {
+        BillMillis { millis: second * 1000,  billmillis:0 }
+    }
+
+    pub fn with_billmillis(billmillis: i64) -> BillMillis {
+        BillMillis { millis: 0, billmillis: billmillis  }
+    }
+
+    pub fn millis(&self) -> i64 {
+        self.millis
+    }
+
+    pub fn billmillis(&self) -> i64 {
+        self.billmillis
+    }
+
+}
+
+pub fn year_from_millis(millis: i64) -> i64 {
+    match chrono::Utc.timestamp_millis_opt(millis) {
+        chrono::MappedLocalTime::Single(dt) => dt.year() as i64,
+        _ => 0
+    }
 }
 
 #[cfg(test)]
