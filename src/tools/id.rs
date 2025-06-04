@@ -264,7 +264,7 @@ fn base62_to_decimal(base62: &str) -> u64 {
 
 
 
-
+ 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct BillMillis {
     millis: i64,
@@ -274,7 +274,7 @@ pub struct BillMillis {
 impl BillMillis  {
 
     pub fn with_millis(millis: i64) -> BillMillis {
-        BillMillis { millis: millis, billmillis:0 }
+        BillMillis { millis, billmillis:0 }
     }
 
     pub fn with_second(second: i64) -> BillMillis {
@@ -282,7 +282,7 @@ impl BillMillis  {
     }
 
     pub fn with_billmillis(billmillis: i64) -> BillMillis {
-        BillMillis { millis: 0, billmillis: billmillis  }
+        BillMillis { millis: 0, billmillis }
     }
 
     pub fn millis(&self) -> i64 {
@@ -301,6 +301,8 @@ pub fn year_from_millis(millis: i64) -> i64 {
         _ => 0
     }
 }
+
+
 
 #[cfg(test)]
 #[allow(unused)]

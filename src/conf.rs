@@ -1,4 +1,5 @@
-use config::{Config, Value};
+use crate::erx;
+use config::{Config, ConfigError, Value};
 use serde::{Deserialize, Serialize};
 ///  struct GetDefault;
 ///  struct GetOption;
@@ -13,10 +14,54 @@ use std::fmt;
 use std::str::FromStr;
 use std::sync::{OnceLock, RwLock};
 
+//get or default
+pub struct GetDefault;
+pub struct GetOption;
+pub struct Has;
+
 /// get settings
+/// it's not recommand to call settings() directly
+/// use rebit get Rebit instance or use GetOption::xxx | GetDefaults::xxx | Has::has
+///
 pub fn settings() -> &'static RwLock<Config> {
     static CONFIG: OnceLock<RwLock<Config>> = OnceLock::new();
     CONFIG.get_or_init(|| RwLock::new(init_config()))
+}
+
+/// get extends config with config file name
+pub fn extends(file: &str) -> &'static Config {
+    static EXTENDS: OnceLock<RwLock<std::collections::HashMap<&'static str, Config>>> = OnceLock::new();
+    let extends = EXTENDS.get_or_init(|| RwLock::new(std::collections::HashMap::new()));
+
+    match extends.read() {
+        Ok(read) => {
+            if read.contains_key(file) {
+                let c = read.get(file).unwrap();
+                return unsafe { &*(c as *const Config) };
+            }
+        },
+        Err(er) => {
+            panic!("{}", er)
+        },
+    };
+
+    match extends.write() {
+        Ok(mut write) => {
+            let c = {
+                let conf = config::File::with_name(file).required(true);
+                let builder = Config::builder().add_source(conf);
+                builder.build().unwrap()
+            };
+
+            let key = Box::leak(file.to_owned().into_boxed_str());
+            write.insert(key, c).unwrap();
+        },
+        Err(er) => {
+            panic!("{}", er)
+        },
+    }
+
+    unsafe { &*(extends.read().unwrap().get(file).unwrap() as *const Config) }
 }
 
 /// get rebit instance
@@ -123,17 +168,29 @@ macro_rules! make_setting_getter {
     };
 }
 
-//get or default
-pub struct GetDefault;
-pub struct GetOption;
-pub struct Has;
-
 make_setting_getter!(string, String, get_string);
 make_setting_getter!(boolean, bool, get_bool);
 make_setting_getter!(int, i64, get_int);
 make_setting_getter!(float, f64, get_float);
 make_setting_getter!(table, std::collections::HashMap<String, Value>, get_table);
 make_setting_getter!(array, Vec<Value>, get_array);
+
+impl GetOption {
+    pub fn get<'de, T: Deserialize<'de>>(key: &str) -> Option<T> {
+        match settings().read() {
+            Ok(guard) => guard.get(key).ok(),
+            Err(_) => None,
+        }
+    }
+}
+impl GetDefault {
+    pub fn get<'de, T: Deserialize<'de>>(key: &str, default: T) -> T {
+        match settings().read() {
+            Ok(guard) => guard.get(key).unwrap_or(default),
+            Err(_) => default,
+        }
+    }
+}
 
 impl Has {
     pub fn has<T: for<'a> serde::Deserialize<'a>>(k: &str) -> bool {
@@ -163,10 +220,16 @@ pub struct Log {
     pub dirs: String,
 }
 
+///HashMap<String, T>
 pub type Dict<T> = std::collections::HashMap<String, T>;
+
+/// HashMap<String, HashMap<String,T>>
 pub type DDict<T> = Dict<Dict<T>>;
 
+/// HashMap<String, String>
 pub type DictString = Dict<String>;
+
+/// HashMap<String, HashMap<String, String>>
 pub type DDictString = DDict<String>;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -308,12 +371,30 @@ impl Rebit {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::tests::tools::project_dir;
+
     #[test]
     fn tests() {
-        print!("{:?}", settings().read().unwrap().clone().try_deserialize::<std::collections::HashMap<String, Value>>().unwrap());
-        print!("{:?}", GetOption::array("webs"));
+        // print!("{:?}", settings().read().unwrap().clone().try_deserialize::<std::collections::HashMap<String, Value>>().unwrap());
+        println!("{:?}", GetOption::string("name"));
+        println!("{:?}", GetOption::table("model.backends.postgre"));
     }
 
     #[test]
-    fn test_path_value() {}
+    fn test_path_value() {
+        #[derive(Debug, Deserialize, Serialize, Clone)]
+        struct Port {
+            pub tcp: i32,
+            pub udp: i32,
+        }
+
+        println!("{:?}", GetOption::get::<Vec<Port>>("providers.cnpc.management.ports"));
+    }
+
+    #[test]
+    fn test_extends() {
+        let tests_load = format!("{}/tests_load.yml", project_dir().to_string_lossy());
+        let c = extends(&tests_load);
+        println!("{:?}", c);
+    }
 }

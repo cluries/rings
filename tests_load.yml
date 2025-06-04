@@ -17,3 +17,25 @@ model:
       kind: redis
       readonly: false
       connect: ""
+
+providers:
+  cnpc:
+    kind: energy
+    tier: 1
+    api:
+      merchant: iusworks
+      key: logoslogoslogoslogoslogos
+      limit:
+        crycle: 120
+        max: 600
+      roles:
+        - merchant
+        - admin
+        - system
+        - rd
+    management:
+      ports:
+        - tcp: 8080
+          udp: 8080
+        - tcp: 8443
+          udp: 8443
