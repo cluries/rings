@@ -24,6 +24,8 @@ static OKP: &str = "OK(";
 static ERP: &str = "ERR(";
 
 impl Status {
+
+    /// parse from string
     pub fn parse(formated: &str) -> crate::erx::ResultE<Self> {
         let formated = formated.trim();
         if formated.len() < 1 {

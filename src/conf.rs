@@ -1,5 +1,4 @@
-use crate::erx;
-use config::{Config, ConfigError, Value};
+use config::{Config, Value};
 use serde::{Deserialize, Serialize};
 ///  struct GetDefault;
 ///  struct GetOption;
@@ -23,12 +22,21 @@ pub struct Has;
 /// it's not recommand to call settings() directly
 /// use rebit get Rebit instance or use GetOption::xxx | GetDefaults::xxx | Has::has
 ///
+/// # Returns
+/// * `&'static RwLock<Config>` - config instance
 pub fn settings() -> &'static RwLock<Config> {
     static CONFIG: OnceLock<RwLock<Config>> = OnceLock::new();
     CONFIG.get_or_init(|| RwLock::new(init_config()))
 }
 
 /// get extends config with config file name
+/// # Arguments
+/// * `file` - config file name
+/// # Returns
+/// * `&'static Config` - config instance
+/// # Panics
+/// * if file not found
+/// * if file not valid
 pub fn extends(file: &str) -> &'static Config {
     static EXTENDS: OnceLock<RwLock<std::collections::HashMap<&'static str, Config>>> = OnceLock::new();
     let extends = EXTENDS.get_or_init(|| RwLock::new(std::collections::HashMap::new()));
@@ -54,7 +62,7 @@ pub fn extends(file: &str) -> &'static Config {
             };
 
             let key = Box::leak(file.to_owned().into_boxed_str());
-            write.insert(key, c).unwrap();
+            write.insert(key, c);
         },
         Err(er) => {
             panic!("{}", er)
@@ -65,6 +73,8 @@ pub fn extends(file: &str) -> &'static Config {
 }
 
 /// get rebit instance
+/// # Returns
+/// * `&'static RwLock<Rebit>` - rebit instance
 pub fn rebit() -> &'static RwLock<Rebit> {
     static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
     REBIT.get_or_init(|| {
@@ -87,6 +97,9 @@ pub fn rebit() -> &'static RwLock<Rebit> {
     })
 }
 
+/// init config
+/// # Returns
+/// * `Config` - config instance
 // #[cfg(not(test))]
 fn init_config() -> Config {
     //development production testing
@@ -202,6 +215,15 @@ impl Has {
     }
 }
 
+/// Rebit config
+/// # Fields
+/// * `name` - rebit name
+/// * `short` - rebit short name
+/// * `debug` - rebit debug mode
+/// * `web` - rebit web config
+/// * `model` - rebit model config
+/// * `log` - rebit log config
+/// * `extends` - rebit extends config
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Rebit {
     pub name: String,
@@ -213,6 +235,11 @@ pub struct Rebit {
     pub extends: Option<DictString>,
 }
 
+/// Rebit log config
+/// # Fields
+/// * `level` - rebit log level
+/// * `console` - rebit log console
+/// * `dirs` - rebit log dirs   
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Log {
     pub level: String,
@@ -220,7 +247,7 @@ pub struct Log {
     pub dirs: String,
 }
 
-///HashMap<String, T>
+/// HashMap<String, T>
 pub type Dict<T> = std::collections::HashMap<String, T>;
 
 /// HashMap<String, HashMap<String,T>>
@@ -232,6 +259,12 @@ pub type DictString = Dict<String>;
 /// HashMap<String, HashMap<String, String>>
 pub type DDictString = DDict<String>;
 
+/// Rebit web config
+/// # Fields
+/// * `port` - rebit web port
+/// * `bind` - rebit web bind
+/// * `middleware` - rebit web middleware
+/// * `options` - rebit web options
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Web {
     pub port: u16,
@@ -240,11 +273,17 @@ pub struct Web {
     pub options: Option<DictString>,
 }
 
+
+/// BackendKind
+/// # Fields
+/// * `Redis` - redis backend
+/// * `Postgres` - postgres backend
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Eq)]
 pub enum BackendKind {
     Redis,
     Postgres,
 }
+
 
 impl Default for Log {
     fn default() -> Self {
@@ -279,6 +318,11 @@ impl Default for Rebit {
 impl FromStr for BackendKind {
     type Err = String;
 
+    /// parse string to BackendKind
+    /// # Arguments
+    /// * `s` - string
+    /// # Returns
+    /// * `Result<Self, Self::Err>` - BackendKind       
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "redis" => Ok(BackendKind::Redis),
@@ -391,6 +435,7 @@ mod tests {
         println!("{:?}", GetOption::get::<Vec<Port>>("providers.cnpc.management.ports"));
     }
 
+    /// test extends
     #[test]
     fn test_extends() {
         let tests_load = format!("{}/tests_load.yml", project_dir().to_string_lossy());

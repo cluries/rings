@@ -42,8 +42,8 @@ macro_rules! web_route_merge {
     };
 }
 
-#[derive(Clone)]
-pub struct WebState {}
+// #[derive(Clone)]
+// pub struct WebState {}
 
 pub struct Web {
     name: String,
