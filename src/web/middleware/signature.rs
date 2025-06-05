@@ -65,7 +65,7 @@ macro_rules! rout {
 }
 
 /// KeyLoader
-pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
+pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output=Result<String, Erx>> + Send>> + Send + Sync>;
 
 pub struct Signator {
     rear: String, // 后门，开发时候方便用
@@ -144,7 +144,13 @@ impl Signator {
         let mut conn = self.redis_client.get_multiplexed_tokio_connection().await.map_err(erx::smp)?;
 
         let name = format!("XR:{}", xu);
-        let score: i64 = conn.zscore(name.as_str(), xr.as_str()).await.map_err(erx::smp)?;
+        let name = "WORKS".to_string();
+        let xr = "WORKS".to_string();
+
+        let score: Option<i64> = conn.zscore(name.as_str(), xr.as_str()).await.map_err(erx::smp)?;
+        // let score_rs: redis::RedisResult<i64> = conn.zscore(name.as_str(), xr.as_str()).await;
+        // let score:i64 = 0;
+        let score = score.unwrap_or(0);
         let current: i64 = chrono::Local::now().timestamp();
 
         if (current - score).abs() < self.nonce_lifetime {
@@ -217,7 +223,7 @@ where
 
 impl<S> Service<axum::extract::Request> for SigMiddle<S>
 where
-    S: Service<axum::extract::Request, Response = axum::response::Response> + Send + Clone + 'static,
+    S: Service<axum::extract::Request, Response=axum::response::Response> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
     type Response = S::Response;
@@ -245,7 +251,7 @@ where
                 Ok(request) => {
                     let response: axum::response::Response = inner.call(request).await?;
                     Ok(response)
-                },
+                }
                 Err(response) => Ok(response),
             }
         })
@@ -279,7 +285,6 @@ struct Debug {
     server: String,
     client: String,
 }
-
 
 
 impl Payload {
@@ -323,7 +328,7 @@ impl Payload {
                             Err(err) => Err(err.to_string()),
                         }
                     }
-                },
+                }
                 Err(err) => Err(err.to_string()),
             };
 
