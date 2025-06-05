@@ -1,5 +1,11 @@
 /// signature.rs:
 /// an api middleware for signature
+///
+/// Usage:
+///  let rear = signator_conf.get("rear").cloned().unwrap_or_default();
+///  let layer = SigLayer::with_rear(&redis_url, key_loader, excludes, rear);
+///  layer.integrated(router)
+
 use crate::erx::{Erx, Layouted, LayoutedC};
 use crate::tools::hash;
 use crate::web::api::Out;
