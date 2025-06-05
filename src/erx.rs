@@ -43,7 +43,6 @@ pub fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
     move |err: T| Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() }
 }
 
-
 /// Predefined Layouted Code with length 4
 pub enum PreL4 {
     /// Fuzz: 模糊错误
@@ -116,8 +115,6 @@ impl Into<String> for PreL4 {
         self.four().to_string()
     }
 }
-
-
 
 impl Layouted {
     /// fuzz_udf: 模糊未定义错误
@@ -205,6 +202,26 @@ impl Erx {
         &mut self.message
     }
 
+    pub fn description(&self) -> String {
+        let mut description = self.code.layout_string();
+        description.push_str(" ");
+        description.push_str(&self.message);
+        if self.extra.is_empty() {
+            return description;
+        }
+
+        description.push_str(" { ");
+
+        self.extra.iter().for_each(|x| {
+            description.push_str(&format!("{}={} ,", x.0, x.1));
+        });
+
+        description.remove(description.len() - 1);
+        description.push_str(" }");
+
+        description
+    }
+
     /// get extra
     pub fn extra(&self) -> &Vec<(String, String)> {
         &self.extra
@@ -214,7 +231,7 @@ impl Erx {
     pub fn extra_val(&self, key: &str) -> Option<String> {
         if self.extra.len() < 1 {
             return None;
-        } 
+        }
 
         self.extra.iter().find(|e| e.0.eq(key)).and_then(|e| Some(e.1.clone()))
     }
@@ -224,11 +241,9 @@ impl Erx {
         self.extra_val(key).unwrap_or(defaults)
     }
 
-
     pub fn extra_mut(&mut self) -> &mut Vec<(String, String)> {
         &mut self.extra
     }
-
 
     /// add extra
     /// if key exists, replace value
@@ -423,5 +438,3 @@ impl From<(String, String, String, String)> for LayoutedC {
         LayoutedC { application: value.0, domain: value.1, category: value.2, detail: value.3 }
     }
 }
-
-

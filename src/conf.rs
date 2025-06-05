@@ -31,12 +31,11 @@ pub fn settings() -> &'static RwLock<Config> {
 
 /// get extends config with config file name
 /// # Arguments
-/// * `file` - config file name
+/// * `file` - config file name (full path please)
 /// # Returns
 /// * `&'static Config` - config instance
 /// # Panics
-/// * if file not found
-/// * if file not valid
+/// * if file not found or invalid
 pub fn extends(file: &str) -> &'static Config {
     static EXTENDS: OnceLock<RwLock<std::collections::HashMap<&'static str, Config>>> = OnceLock::new();
     let extends = EXTENDS.get_or_init(|| RwLock::new(std::collections::HashMap::new()));
@@ -51,7 +50,7 @@ pub fn extends(file: &str) -> &'static Config {
         Err(er) => {
             panic!("{}", er)
         },
-    };
+    }
 
     match extends.write() {
         Ok(mut write) => {
@@ -273,7 +272,6 @@ pub struct Web {
     pub options: Option<DictString>,
 }
 
-
 /// BackendKind
 /// # Fields
 /// * `Redis` - redis backend
@@ -283,7 +281,6 @@ pub enum BackendKind {
     Redis,
     Postgres,
 }
-
 
 impl Default for Log {
     fn default() -> Self {
