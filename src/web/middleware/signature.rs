@@ -252,6 +252,12 @@ where
     }
 }
 
+static XU: &str = "X-U";
+static XT: &str = "X-T";
+static XR: &str = "X-R";
+static XS: &str = "X-S";
+static DS: &str = "X-DEVELOPMENT-SKIP";
+
 struct Payload {
     method: String,
     path: String,
@@ -260,7 +266,7 @@ struct Payload {
     xt: Option<String>,
     xr: Option<String>,
     xs: Option<String>,
-    ds: Option<String>, //dev_skip
+    ds: Option<String>, // X-DEVELOPMENT-SKIP
 
     queries: HashMap<String, String>,
     body: Option<serde_json::Value>,
@@ -274,11 +280,7 @@ struct Debug {
     client: String,
 }
 
-static XU: &str = "X-U";
-static XT: &str = "X-T";
-static XR: &str = "X-R";
-static XS: &str = "X-S";
-static DS: &str = "X-DEVELOPMENT-SKIP";
+
 
 impl Payload {
     async fn from_request(req: axum::extract::Request) -> Result<Self, String> {
