@@ -144,9 +144,6 @@ impl Signator {
         let mut conn = self.redis_client.get_multiplexed_tokio_connection().await.map_err(erx::smp)?;
 
         let name = format!("XR:{}", xu);
-        let name = "WORKS".to_string();
-        let xr = "WORKS".to_string();
-
         let score: Option<i64> = conn.zscore(name.as_str(), xr.as_str()).await.map_err(erx::smp)?;
         // let score_rs: redis::RedisResult<i64> = conn.zscore(name.as_str(), xr.as_str()).await;
         // let score:i64 = 0;
