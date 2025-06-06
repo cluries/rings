@@ -118,13 +118,10 @@ macro_rules! hey_service {
 
 
 #[macro_export]
-macro_rules! include_seaorm {
+macro_rules! use_seaorm_min {
     () => {
         #[allow(unused_imports)]
-        use sea_orm::ActiveValue::NotSet;
-        
-        #[allow(unused_imports)]
-        use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder};
+        use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, Condition, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder};
     };
 }
 
