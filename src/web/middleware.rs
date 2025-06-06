@@ -1,39 +1,41 @@
 pub mod signature;
+pub mod jwt;
 
-use axum::http::request::Parts;
-use axum::Router;
 
-pub trait Middleware {
-    type Arguments: Send + Sync + Clone;
+// use axum::http::request::Parts;
+// use axum::Router;
 
-    fn make(args: Self::Arguments) -> Self;
+// pub trait Middleware {
+//     type Arguments: Send + Sync + Clone;
 
-    fn focus(&self, parts: &Parts) -> bool;
+//     fn make(args: Self::Arguments) -> Self;
 
-    fn priority(&self) -> i32;
+//     fn focus(&self, parts: &Parts) -> bool;
 
-    fn call(&self) -> Box<dyn FnMut(axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response>>;
-}
+//     fn priority(&self) -> i32;
 
-pub struct LaunchPad<M: Middleware> {
-    middleware: M,
-}
+//     fn call(&self) -> Box<dyn FnMut(axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response>>;
+// }
 
-impl<M: Middleware> LaunchPad<M> {
-    pub fn new(middleware: M) -> Self {
-        Self { middleware }
-    }
+// pub struct LaunchPad<M: Middleware> {
+//     middleware: M,
+// }
 
-    pub fn using(&self, router: Router) -> Router {
-        router
-    }
-}
+// impl<M: Middleware> LaunchPad<M> {
+//     pub fn new(middleware: M) -> Self {
+//         Self { middleware }
+//     }
 
-#[cfg(test)]
-#[allow(unused)]
-mod tests {
-    struct TMiddle {}
+//     pub fn using(&self, router: Router) -> Router {
+//         router
+//     }
+// }
 
-    #[test]
-    fn test_middleware() {}
-}
+// #[cfg(test)]
+// #[allow(unused)]
+// mod tests {
+//     struct TMiddle {}
+
+//     #[test]
+//     fn test_middleware() {}
+// }
