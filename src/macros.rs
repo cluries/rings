@@ -115,3 +115,16 @@ macro_rules! its_service {
 macro_rules! hey_service {
     ($e:ident) => {{ $e::its_service().await }};
 }
+
+
+#[macro_export]
+macro_rules! include_seaorm {
+    () => {
+        #[allow(unused_imports)]
+        use sea_orm::ActiveValue::NotSet;
+        
+        #[allow(unused_imports)]
+        use sea_orm::{ActiveModelTrait, ColumnTrait, Condition, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder};
+    };
+}
+

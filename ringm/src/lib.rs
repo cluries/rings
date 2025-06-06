@@ -5,6 +5,7 @@ mod db;
 mod migrate;
 mod service;
 mod tools;
+mod seaorm;
 
 #[proc_macro]
 pub fn migrate_using_macros(input: TokenStream) -> TokenStream {
@@ -36,4 +37,9 @@ pub fn service_resolve(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn default_any(attr: TokenStream, item: TokenStream) -> TokenStream {
     any::default_any(attr, item)
+}
+
+#[proc_macro]
+pub fn seaorm_mo(input: TokenStream) -> TokenStream {
+    seaorm::define_normals(input)
 }
