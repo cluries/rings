@@ -32,6 +32,23 @@ pub struct Layouted;
 /// Zero
 pub static LAYOUTED_C_ZERO: &'static str = "0000";
 
+pub fn describe_error(e: &dyn std::error::Error) -> String {
+    let mut description = e.to_string();
+    let mut current = e.source();
+    while let Some(source) = current {
+        description.push_str(&format!("\nCaused by: {}", source));
+        current = source.source();
+    }
+    description
+}
+
+/// emp
+pub fn emp<T: std::error::Error>(error: T) -> Erx {
+    let extra = vec![(String::from("ORIGIN"), describe_error(&error))];
+    let message = error.to_string();
+    Erx { code: Default::default(), message, extra }
+}
+
 /// smp: simple convert T: ToString to Erx
 pub fn smp<T: ToString>(error: T) -> Erx {
     Erx { code: Default::default(), message: error.to_string(), extra: Vec::new() }

@@ -6,7 +6,7 @@ pub mod jsons;
 pub mod preset;
 pub mod sql;
 pub mod status;
-pub mod value;
+pub mod results;
 pub mod zero;
 
 use crate::erx;
@@ -29,23 +29,6 @@ use tracing::{info, span, warn};
 use crate::conf::{Backend, BackendKind, Dict};
 use crate::web::url;
 
-/// DBResult is a type alias for erx::ResultE<T>
-/// actually it is Result<T, erx::Erx>
-pub type DBResult<T> = erx::ResultE<T>;
-
-/// DBResults is a type alias for erx::ResultE<Vec<T>>
-/// actually it is Result<Vec<T>, erx::Erx>
-pub type DBResults<T> = erx::ResultE<Vec<T>>;
-
-/// DBResultsRelated is a struct that contains results, total, offset
-/// designed for pagination results/// : Vec<T> stored current page results
-/// total: usize stored total results matched query
-/// offset: usize stored offset
-pub struct DBResultsRelated<T> {
-    results: Vec<T>,
-    total: usize,
-    offset: usize,
-}
 
 /// get shared DatabaseConnection
 /// panic if error
@@ -161,20 +144,6 @@ pub async fn new_database_connection(backend: Backend) -> DatabaseConnection {
     }
 
     Database::connect(opt).await.expect("Database connection failed")
-}
-
-impl<T> DBResultsRelated<T> {
-    pub fn results(&self) -> &Vec<T> {
-        &self.results
-    }
-
-    pub fn total(&self) -> usize {
-        self.total
-    }
-
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
 }
 
 /// shared database connection

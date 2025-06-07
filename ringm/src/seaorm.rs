@@ -23,13 +23,13 @@ pub(crate) fn define_normals(input: TokenStream) -> TokenStream {
     let name = input.name;
     let predications = input.predications;
 
-    let retrieve = format_ident!("{}Retrieve", name);
-    let persist = format_ident!("{}Persist", name);
+    let retrieve = format_ident!("{}Retriever", name);
+    let persist = format_ident!("{}Repository", name);
 
-    let m_alias = format_ident!("{}M", name);
-    let e_alias = format_ident!("{}E", name);
-    let c_alias = format_ident!("{}C", name);
-    let a_alias = format_ident!("{}A", name);
+    let m_alias = format_ident!("{}Mde", name);
+    let e_alias = format_ident!("{}Ent", name);
+    let c_alias = format_ident!("{}Col", name);
+    let a_alias = format_ident!("{}Amd", name);
 
     let expanded = quote! {
         pub struct #retrieve;
@@ -39,6 +39,7 @@ pub(crate) fn define_normals(input: TokenStream) -> TokenStream {
         pub type #e_alias = crate::entity::#predications::Entity;
         pub type #c_alias = crate::entity::#predications::Column;
         pub type #a_alias = crate::entity::#predications::ActiveModel;
+
     };
 
     expanded.into()
