@@ -1,6 +1,6 @@
 use crate::erx;
 
-pub type One<T> = erx::ResultE<T>;
+pub type One<T> = erx::ResultE<Option<T>>;
 pub type Many<T> = erx::ResultE<Vec<T>>;
 
 pub struct Related<T> {
