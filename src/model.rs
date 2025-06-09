@@ -6,7 +6,7 @@ pub mod jsons;
 pub mod preset;
 pub mod sql;
 pub mod status;
-pub mod results;
+pub mod rs;
 pub mod zero;
 
 use crate::erx;
