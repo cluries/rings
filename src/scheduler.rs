@@ -1,3 +1,5 @@
+use std::str::FromStr;
+use crate::erx;
 use crate::rings::RingState;
 use crate::service::{ServiceManager, ServiceTrait};
 use async_trait::async_trait;
@@ -5,6 +7,7 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::RwLock as ToKioRwLock;
 use tokio_cron_scheduler::JobScheduler;
 use tracing::{error, info, warn};
+use uuid::Uuid;
 
 /// scheduler manager
 pub struct SchedulerManager {
@@ -24,6 +27,19 @@ impl SchedulerManager {
         }));
 
         Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: Arc::new(ToKioRwLock::new(scheduler)) }
+    }
+
+    pub async fn add_job(&mut self, job: tokio_cron_scheduler::Job) -> erx::ResultE<String> {
+        let scheduler = Arc::clone(&self.scheduler);
+        let guard = scheduler.try_write().map_err(erx::smp)?;
+        guard.add(job).await.map(Into::into).map_err(erx::smp)
+    }
+
+    pub async fn remove_job(&mut self, job_id: String) -> erx::ResultE<()> {
+        let scheduler = Arc::clone(&self.scheduler);
+        let guard = scheduler.try_write().map_err(erx::smp)?;
+        let uuid = Uuid::from_str(&job_id).map_err(erx::smp)?;
+        guard.remove(&uuid).await.map_err(erx::smp)
     }
 }
 
@@ -80,17 +96,17 @@ impl crate::rings::RingsMod for SchedulerManager {
                             match scher.add(job).await {
                                 Ok(_) => {
                                     info!("Add schedule job[{}] from service[{}] SUCCESS", job_id, service_name);
-                                }
+                                },
                                 Err(e) => {
                                     error!("Add schedule job[{}] from service[{}] FAILED, Error:{}.", job_id, service_name, e.to_string());
-                                }
+                                },
                             }
                         });
                     }
-                }
+                },
                 Err(ex) => {
                     error!("scheduler service lock poisoned: {}", ex);
-                }
+                },
             }
         }
 
@@ -140,11 +156,11 @@ impl crate::rings::RingsMod for SchedulerManager {
                         if stage == RingState::Terminating || stage == RingState::Terminated {
                             break;
                         }
-                    }
+                    },
                     Err(ex) => {
                         warn!("scheduler stage lock poisoned: {}", ex);
                         stage_read_lock_failures += 1;
-                    }
+                    },
                 }
                 tokio::time::sleep(duration).await;
             }
@@ -161,10 +177,10 @@ impl crate::rings::RingsMod for SchedulerManager {
             match scher.start().await {
                 Ok(_) => {
                     info!("scheduler start success");
-                }
+                },
                 Err(err) => {
                     error!("scheduler failed to start: {}", err);
-                }
+                },
             }
         };
 
