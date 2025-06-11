@@ -67,7 +67,7 @@ const SECOND_DIV: i64 = SEQUENCE_BASE * 100;
 /// maybe min id value
 const MIN_VALUE: i64 = 1728747205481002100;
 
-const BILL_MILLIS_START_YEAR: i64 = 2025;
+// const BILL_MILLIS_START_YEAR: i64 = 2025;
 
 /// gets shared id factory
 pub fn shared() -> &'static Factory {

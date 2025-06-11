@@ -1,6 +1,8 @@
+#[allow(unused_imports, dead_code)]
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation, Algorithm};
 
 
+#[allow(unused_imports, dead_code)]
 #[derive(Clone)]
 pub struct JwtConfig {
     /// 密钥

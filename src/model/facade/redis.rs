@@ -288,8 +288,13 @@ impl Redis {
     redis_c!(zpopmin, (count:isize),  Facade<rs::Zpoped> );
 }
 
+
+#[allow(dead_code)]
 #[cfg(test)]
 mod tests {
+
+
+
     use super::*;
     use redis::{RedisError, RedisResult, RedisWrite, Value};
     use serde::{Deserialize, Serialize};
