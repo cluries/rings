@@ -193,10 +193,18 @@ impl ServiceManager {
         self.managed_by_name(T::default().name())
     }
 
+    /// get managed service, then invoke
+    /// # Arguments
+    /// * `invoke` - invoke function
+    /// # Returns
+    /// * `Result<Fut::Output, Erx>` - invoke result
+    /// 
+    /// # Examples
     ///  let r = m.using::<TestService, _, _>(|srv| {
     ///      let r = srv.rnd();
     ///      async move { r }
     ///  }).await;
+    /// 
     pub async fn using<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
     where
         T: ServiceTrait + Default,
@@ -212,10 +220,19 @@ impl ServiceManager {
         Ok(output)
     }
 
+    /// get managed service, then invoke
+    /// # Arguments
+    /// * `invoke` - invoke function
+    /// # Returns
+    /// * `Result<Fut::Output, Erx>` - invoke result
+    /// 
+    /// # Examples
+    /// 
     ///  let r = m.using_mut::<TestService, _, _>(|srv| {
     ///      let r = srv.rnd();
     ///      async move { r }
     ///  }).await;
+    /// 
     pub async fn using_mut<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
     where
         T: ServiceTrait + Default,
@@ -234,6 +251,7 @@ impl ServiceManager {
 
         Ok(output)
     }
+
 
     /// get shared service manager
     /// # Returns
