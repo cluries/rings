@@ -193,6 +193,41 @@ impl ServiceManager {
         self.managed_by_name(T::default().name())
     }
 
+    ///
+    pub async fn using<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
+    where
+        T: ServiceTrait + Default,
+        F: Fn(&T) -> Fut,
+        Fut: std::future::Future,
+    {
+        let name = T::default().name().to_owned();
+        let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' was not registered!", &name)))?;
+        let read_guard = managed.try_read().map_err(crate::erx::smp)?;
+
+        let service = (&*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::new(format!("Service '{}' cast error", &name).as_str()))?;
+        let output = invoke(service).await;
+        Ok(output)
+    }
+
+    ///
+    pub async fn using_mut<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
+    where
+        T: ServiceTrait + Default,
+        F: Fn(&mut T) -> Fut,
+        Fut: std::future::Future,
+    {
+        let name = T::default().name().to_owned();
+        let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' was not registered!", &name)))?;
+        let mut write_guard = managed.try_write().map_err(crate::erx::smp)?;
+
+        let service = (&mut *write_guard)
+            .as_any_mut()
+            .downcast_mut::<T>()
+            .ok_or(Erx::new(format!("Service '{}' cast error", &name).as_str()))?;
+        let output = invoke(service).await;
+        Ok(output)
+    }
+
     /// get shared service manager
     /// # Returns
     /// * `&'static ServiceManager` - shared service manager
@@ -206,11 +241,26 @@ impl ServiceManager {
 mod tests {
     use super::*;
     use crate::any::AnyTrait;
+    use crate::tools::rand::rand_i64;
     use std::any::Any;
+
     #[tokio::test]
     async fn test_service_manager() {
         let m = shared_service_manager().await;
         m.register::<TestService>();
+
+        // let arc = m.get::<TestService>().unwrap();
+        // let mut guard = arc.write().unwrap();
+        // assert_eq!((*guard).name(), "testservice");
+        //
+        // let t = (&mut *guard).as_any_mut().downcast_mut::<TestService>().unwrap();
+        //
+        // println!("{}", t.iam());
+        //
+        // println!("{}", t.iam_mut());
+
+        // let r = m.using::<TestService, _, _>(|srv| async move { 123 }).await;
+        // println!("{:#?}", r);
     }
 
     struct TestService {}
@@ -248,6 +298,20 @@ mod tests {
 
         fn schedules(&self) -> Vec<Job> {
             Vec::new()
+        }
+    }
+
+    impl TestService {
+        fn iam(&self) -> String {
+            String::from("iam")
+        }
+
+        fn iam_mut(&mut self) -> String {
+            String::from("iam mutable")
+        }
+
+        fn rnd(&self) -> i64 {
+            rand_i64(1, 100)
         }
     }
 }

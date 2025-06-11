@@ -7,6 +7,7 @@ pub mod define;
 pub mod except;
 pub mod javascript;
 pub mod luaction;
+pub mod messages;
 pub mod middleware;
 pub mod request;
 pub mod route;
@@ -15,7 +16,6 @@ pub mod tools;
 pub mod types;
 pub mod url;
 pub mod validator;
-pub mod messages;
 
 use crate::rings::{RingState, RingsMod, SafeRS};
 use crate::web::luaction::LuaAction;

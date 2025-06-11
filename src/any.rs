@@ -29,6 +29,12 @@ pub trait AnyTraitImplMut<T>: AnyTrait {
 
 pub trait AnyTraitImpl<T>: AnyTraitImplRef<T> + AnyTraitImplMut<T> {}
 
-
-
-
+// impl<T: std::any::Any + Send + Sync> AnyTrait for T {
+//     fn as_any(&self) -> &dyn std::any::Any {
+//         self
+//     }
+//
+//     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+//         self
+//     }
+// }
