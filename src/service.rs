@@ -231,6 +231,7 @@ impl ServiceManager {
             .downcast_mut::<T>()
             .ok_or(Erx::new(format!("Service '{}' cast error", &name).as_str()))?;
         let output = invoke(service).await;
+
         Ok(output)
     }
 
