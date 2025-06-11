@@ -193,7 +193,10 @@ impl ServiceManager {
         self.managed_by_name(T::default().name())
     }
 
-    ///
+    ///  let r = m.using::<TestService, _, _>(|srv| {
+    ///      let r = srv.rnd();
+    ///      async move { r }
+    ///  }).await;
     pub async fn using<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
     where
         T: ServiceTrait + Default,
@@ -209,7 +212,10 @@ impl ServiceManager {
         Ok(output)
     }
 
-    ///
+    ///  let r = m.using_mut::<TestService, _, _>(|srv| {
+    ///      let r = srv.rnd();
+    ///      async move { r }
+    ///  }).await;
     pub async fn using_mut<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
     where
         T: ServiceTrait + Default,
@@ -259,8 +265,13 @@ mod tests {
         //
         // println!("{}", t.iam_mut());
 
-        // let r = m.using::<TestService, _, _>(|srv| async move { 123 }).await;
-        // println!("{:#?}", r);
+        let r = m
+            .using::<TestService, _, _>(|srv| {
+                let r = srv.rnd();
+                async move { r }
+            })
+            .await;
+        println!("==={:#?}", r);
     }
 
     struct TestService {}
