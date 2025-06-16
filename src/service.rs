@@ -110,7 +110,7 @@ impl ServiceManager {
     /// * `name` - service name
     /// # Returns
     /// * `Option<Arc<RwLock<Box<dyn ServiceTrait>>>>` - managed service
-    fn managed_by_name(&self, name: &str) -> Option<Arc<RwLock<Box<dyn ServiceTrait>>>> {
+    pub fn managed_by_name(&self, name: &str) -> Option<Arc<RwLock<Box<dyn ServiceTrait>>>> {
         self.managed
             .read()
             .ok()?
@@ -253,12 +253,20 @@ impl ServiceManager {
     }
 
 
+
+
+
     /// get shared service manager
     /// # Returns
     /// * `&'static ServiceManager` - shared service manager
     pub async fn shared() -> &'static ServiceManager {
         shared_service_manager().await
     }
+}
+
+#[macro_export]
+macro_rules! ds {
+    () => {};
 }
 
 #[cfg(test)]
@@ -268,6 +276,7 @@ mod tests {
     use crate::any::AnyTrait;
     use crate::tools::rand::rand_i64;
     use std::any::Any;
+
 
     #[tokio::test]
     async fn test_service_manager() {
