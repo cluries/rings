@@ -62,7 +62,8 @@ const MILLIS_BASE: i64 = 10_000_000;
 const SEQUENCE_BASE: i64 = 100;
 
 /// maybe min id value
-const MIN_VALUE: i64 = 1000843709510389600;
+const MIN_VALUE: i64 = 1_000_000_000_000_000_000;
+const MAX_VALUE: i64 = 1_000_000_000_000_000_000;
 
 /// gets shared id factory
 pub fn shared() -> &'static Factory {
@@ -77,6 +78,8 @@ struct ShorterMills {
 impl ShorterMills {
     const START: i64 = 1650;
     const DIVBASE: i64 = 1_000_000_000;
+
+
 
     pub fn with_mills(mills: i64) -> ShorterMills {
         let angel = mills / Self::DIVBASE - Self::START;
@@ -107,6 +110,10 @@ impl ShorterMills {
     }
 }
 
+fn current_millis() -> i64 {
+    chrono::Utc::now().timestamp_millis()
+}
+
 impl Factory {
     pub fn new(name: &str, sharding: i64) -> Factory {
         Factory { name: name.to_owned(), sharding: sharding % MAX_SHARDING, sequence: RwLock::new((0, 0)) }
@@ -128,12 +135,8 @@ impl Factory {
         self.sequence.read().unwrap().0
     }
 
-    fn current_millis() -> i64 {
-        chrono::Utc::now().timestamp_millis()
-    }
-
     pub fn make(&self) -> erx::ResultE<Id> {
-        let millis = Self::current_millis();
+        let millis = current_millis();
         let mut seq: i64 = 0;
         let mut sequence = self.sequence.try_write().map_err(erx::smp)?;
 
@@ -159,7 +162,7 @@ impl Factory {
             return Ok(vec![]);
         }
 
-        let millis = Self::current_millis();
+        let millis = current_millis();
         let mut seq: i64 = 0;
         let mut sequence = self.sequence.try_write().map_err(erx::smp)?;
 
@@ -347,8 +350,12 @@ mod tests {
 
     #[test]
     fn test_try() {
+        println!("{}", i64::MAX);
+
+        println!("{}", Id::from(i64::MAX).description());
+
         for i in 4..9 {
-            println!("{}", id!().unwrap());
+            println!("{}", id!().unwrap().description());
         }
     }
 
@@ -360,7 +367,7 @@ mod tests {
             assert_eq!(mills, ShorterMills::with_shorter(s.shorter()).mills());
         };
 
-        i(Factory::current_millis());
-        i(Factory::current_millis() + 120312412);
+        i(current_millis());
+        i(current_millis() + 120312412);
     }
 }
