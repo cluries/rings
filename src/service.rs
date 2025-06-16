@@ -4,6 +4,7 @@ use tokio::sync::OnceCell;
 use tokio_cron_scheduler::Job;
 
 
+
 #[macro_export]
 macro_rules! with_service_read {
     ($shared:expr, $service_type:path, $var:ident, $code:block) => {{
@@ -11,10 +12,10 @@ macro_rules! with_service_read {
         let managed = $shared.managed_by_name(&__service_name);
         match managed {
             Some(managed) => {
-                 let read_guard = managed.try_read();
-                 match read_guard {
+                 let write_guard = managed.try_read();
+                 match write_guard {
                     Ok(guard) => {
-                        let service = (&*guard).as_any().downcast_ref()::<$service_type>();
+                        let service = (&*guard).as_any().downcast_ref::<$service_type>();
                         match service {
                             Some($var) => Ok($code),
                             None => Err(rings::erx::Erx::new(&format!("service downcast_ref error: {}", __service_name)))
@@ -56,6 +57,7 @@ macro_rules! with_service_write {
         }
     }};
 }
+
 
 
 
@@ -210,7 +212,7 @@ impl ServiceManager {
                 let warp = Arc::new(RwLock::new(Box::new(ctx) as Box<dyn ServiceTrait>));
                 write_guard.push(Arc::clone(&warp));
                 Ok(warp)
-            },
+            }
             Err(er) => Err(Erx::new(er.to_string().as_str())),
         }
     }
@@ -233,7 +235,7 @@ impl ServiceManager {
             Err(ex) => {
                 tracing::error!("{}", ex);
                 true
-            },
+            }
             Ok(srv) => !srv.name().eq(name.as_str()),
         });
 
@@ -254,13 +256,13 @@ impl ServiceManager {
     /// * `invoke` - invoke function
     /// # Returns
     /// * `Result<Fut::Output, Erx>` - invoke result
-    /// 
+    ///
     /// # Examples
     ///  let r = m.using::<TestService, _, _>(|srv| {
     ///      let r = srv.rnd();
     ///      async move { r }
     ///  }).await;
-    /// 
+    ///
     pub async fn using<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
     where
         T: ServiceTrait + Default,
@@ -281,14 +283,14 @@ impl ServiceManager {
     /// * `invoke` - invoke function
     /// # Returns
     /// * `Result<Fut::Output, Erx>` - invoke result
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     ///  let r = m.using_mut::<TestService, _, _>(|srv| {
     ///      let r = srv.rnd();
     ///      async move { r }
     ///  }).await;
-    /// 
+    ///
     pub async fn using_mut<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
     where
         T: ServiceTrait + Default,
@@ -307,9 +309,6 @@ impl ServiceManager {
 
         Ok(output)
     }
-
-
-
 
 
     /// get shared service manager
