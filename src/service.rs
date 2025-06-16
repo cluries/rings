@@ -3,6 +3,62 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::OnceCell;
 use tokio_cron_scheduler::Job;
 
+
+#[macro_export]
+macro_rules! with_service_read {
+    ($shared:expr, $service_type:path, $var:ident, $code:block) => {{
+        let __service_name = <$service_type as Default>::default().name().to_owned();
+        let managed = $shared.managed_by_name(&__service_name);
+        match managed {
+            Some(managed) => {
+                 let read_guard = managed.try_read();
+                 match read_guard {
+                    Ok(guard) => {
+                        let service = (&*guard).as_any().downcast_ref()::<$service_type>();
+                        match service {
+                            Some($var) => Ok($code),
+                            None => Err(rings::erx::Erx::new(&format!("service downcast_ref error: {}", __service_name)))
+                        }
+                    },
+                    Err(err) =>  Err(rings::erx::smp(err))
+                }
+            },
+            None => {
+                Err(rings::erx::Erx::new(&format!("service {} is not managed", __service_name)))
+            }
+        }
+    }};
+}
+
+
+#[macro_export]
+macro_rules! with_service_write {
+    ($shared:expr, $service_type:path, $var:ident, $code:block) => {{
+        let __service_name = <$service_type as Default>::default().name().to_owned();
+        let managed = $shared.managed_by_name(&__service_name);
+        match managed {
+            Some(managed) => {
+                 let write_guard = managed.try_write();
+                 match write_guard {
+                    Ok(mut guard) => {
+                        let service = (&mut *guard).as_any_mut().downcast_mut::<$service_type>();
+                        match service {
+                            Some($var) => Ok($code),
+                            None => Err(rings::erx::Erx::new(&format!("service downcast_mut error: {}", __service_name)))
+                        }
+                    },
+                    Err(err) =>  Err(rings::erx::smp(err))
+                }
+            },
+            None => {
+                Err(rings::erx::Erx::new(&format!("service {} is not managed", __service_name)))
+            }
+        }
+    }};
+}
+
+
+
 static SHARED_MANAGER: OnceCell<ServiceManager> = OnceCell::const_new();
 
 static SHARED_SERVICE_NAME: &str = "SharedServiceManager";
