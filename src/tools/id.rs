@@ -3,7 +3,6 @@
 use crate::erx;
 
 
-use chrono::{Datelike, TimeZone};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -51,22 +50,19 @@ macro_rules! id {
 // }
 
 /// max sequence
-const MAX_SEQUENCE: i64 = 999;
+const MAX_SEQUENCE: i64 = 9999;
 
 /// max sharding
 const MAX_SHARDING: i64 = 99;
 
 /// millis base
-const MILLIS_BASE: i64 = 1000000;
+const MILLIS_BASE: i64 = 10_000_000;
 
 /// sequence base
 const SEQUENCE_BASE: i64 = 100;
 
-/// second div base
-const SECOND_DIV: i64 = SEQUENCE_BASE * 100;
-
 /// maybe min id value
-const MIN_VALUE: i64 = 1728747205481002100;
+const MIN_VALUE: i64 = 1000843709510389600;
 
 /// gets shared id factory
 pub fn shared() -> &'static Factory {
@@ -78,27 +74,27 @@ struct ShorterMills {
     shorter: i64,
 }
 
-const MILLS_12_START: i64 = 1650;
-const MILLS_12_BASE: i64 = 1_000_000_000;
-
 impl ShorterMills {
+    const START: i64 = 1650;
+    const DIVBASE: i64 = 1_000_000_000;
+
     pub fn with_mills(mills: i64) -> ShorterMills {
-        let angel = mills / MILLS_12_BASE - MILLS_12_START;
+        let angel = mills / Self::DIVBASE - Self::START;
         if angel > 999 {
             panic!("mills out of range");
         }
 
-        let shorter = angel * MILLS_12_BASE + mills % MILLS_12_BASE;
+        let shorter = angel * Self::DIVBASE + mills % Self::DIVBASE;
         ShorterMills { mills, shorter }
     }
 
     pub fn with_shorter(shorter: i64) -> ShorterMills {
-        let angel = shorter / MILLS_12_BASE;
+        let angel = shorter / Self::DIVBASE;
         if angel > 999 {
             panic!("Shorter mills too high");
         }
 
-        let mills = (angel + MILLS_12_START) * MILLS_12_BASE + shorter % MILLS_12_BASE;
+        let mills = (angel + Self::START) * Self::DIVBASE + shorter % Self::DIVBASE;
         ShorterMills { mills, shorter }
     }
 
@@ -152,7 +148,9 @@ impl Factory {
             return Err("out of sequence range".into());
         }
 
-        let val = MILLIS_BASE * millis + seq * SEQUENCE_BASE + self.sharding;
+        let shorter = ShorterMills::with_mills(millis).shorter();
+        let val = MILLIS_BASE * shorter + seq * SEQUENCE_BASE + self.sharding;
+
         Ok(Id { val })
     }
 
@@ -179,8 +177,9 @@ impl Factory {
         sequence.1 = seq;
 
         let mut ids: Vec<Id> = Vec::new();
+        let shorter = ShorterMills::with_mills(millis).shorter();
         for i in start_seq..seq {
-            let val = MILLIS_BASE * millis + i * SEQUENCE_BASE + self.sharding;
+            let val = MILLIS_BASE * shorter + i * SEQUENCE_BASE + self.sharding;
             ids.push(Id { val });
         }
 
@@ -220,16 +219,32 @@ impl Into<String> for Id {
 }
 
 impl Id {
+    pub fn new(val: i64) -> Option<Self> {
+        if val < MIN_VALUE {
+            return None;
+        }
+
+        Some(Self { val })
+    }
+
+    pub fn from_short(short: String) -> Option<Self> {
+        let val = base62_to_decimal(short.as_str());
+        if val < MIN_VALUE {
+            return None;
+        }
+        Some(Id { val })
+    }
+
     pub fn millis(self) -> i64 {
-        self.val / MILLIS_BASE
+        ShorterMills::with_shorter(self.val / MILLIS_BASE).mills()
     }
 
     pub fn second(self) -> i64 {
-        self.val / SECOND_DIV
+        self.millis() / 1_000
     }
 
     pub fn sharding(self) -> i64 {
-        self.val % SEQUENCE_BASE
+        self.val % 1_00
     }
 
     pub fn sequence(self) -> i64 {
@@ -237,11 +252,14 @@ impl Id {
     }
 
     pub fn description(self) -> String {
-        format!("{} shard:{:02} seq:{:03} millis:{}", self.val.to_string(), self.sharding(), self.sequence(), self.millis())
-    }
-
-    pub fn valid(&self) -> bool {
-        self.val > MIN_VALUE
+        format!(
+            "{} shard:{:02} seq:{:03} millis:{} second:{}",
+            self.val.to_string(),
+            self.sharding(),
+            self.sequence(),
+            self.millis(),
+            self.second()
+        )
     }
 
     pub fn value(self) -> i64 {
@@ -249,19 +267,11 @@ impl Id {
     }
 
     pub fn short(self) -> String {
-        decimal_to_base62(self.val as u64)
-    }
-
-    pub fn from_short(short: String) -> Option<Self> {
-        let val = base62_to_decimal(short.as_str());
-        if val > i64::MAX as u64 || val < MIN_VALUE as u64 {
-            return None;
-        }
-        Some(Id { val: val as i64 })
+        decimal_to_base62(self.val)
     }
 }
 
-const BASE62: u64 = 62;
+const BASE62: i64 = 62;
 
 const BASE62_CHARS: [u8; 62] = [
     b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e', b'f', b'g', b'h', b'i', b'j', b'k', b'l',
@@ -279,7 +289,7 @@ const BASE62_MAP: [u8; 128] = {
     map
 };
 
-fn decimal_to_base62(val: u64) -> String {
+fn decimal_to_base62(val: i64) -> String {
     if val == 0 {
         return "0".to_string();
     }
@@ -294,11 +304,11 @@ fn decimal_to_base62(val: u64) -> String {
     String::from_utf8(result).unwrap()
 }
 
-fn base62_to_decimal(base62: &str) -> u64 {
+fn base62_to_decimal(base62: &str) -> i64 {
     let mut decimal = 0;
     let mut i = 0;
     for c in base62.chars().rev() {
-        decimal += (BASE62_MAP[c as usize] as u64) * BASE62.pow(i);
+        decimal += (BASE62_MAP[c as usize] as i64) * BASE62.pow(i);
         i += 1;
     }
 
@@ -313,11 +323,11 @@ mod tests {
     #[test]
     fn test_id() {
         let mut v = Vec::new();
-        for i in 1..999 {
+        for i in 1..9999 {
             v.push(id!().unwrap());
         }
         for id in v.iter() {
-            println!("{}", id);
+            println!("{}", id.description());
         }
     }
 
@@ -325,12 +335,12 @@ mod tests {
     fn test_id_n() {
         let mut v = Vec::new();
         for i in 1..5 {
-            v.push(shared().make_n(99).unwrap())
+            v.push(shared().make_n(1299).unwrap())
         }
 
         for list in v.iter() {
             for id in list {
-                println!("{}", id);
+                println!("{}", id.description());
             }
         }
     }
@@ -338,7 +348,7 @@ mod tests {
     #[test]
     fn test_try() {
         for i in 4..9 {
-            println!("{}", i);
+            println!("{}", id!().unwrap());
         }
     }
 
