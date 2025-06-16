@@ -73,11 +73,6 @@ pub fn shared() -> &'static Factory {
     &_shared_factory
 }
 
-/// 12 length mills
-struct Mills12 {
-    pub mills: i64,
-}
-
 struct ShorterMills {
     mills: i64,
     shorter: i64,
