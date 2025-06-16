@@ -7,6 +7,7 @@ use crate::conf;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Display;
 
 
 lazy_static! {
@@ -279,6 +280,12 @@ impl Erx {
     pub fn extra_map(&self) -> HashMap<String, String> {
         let m: HashMap<String, String> = HashMap::from_iter(self.extra.clone());
         m
+    }
+}
+
+impl Display for Erx {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", serde_json::to_string(&self).unwrap_or_default())
     }
 }
 
