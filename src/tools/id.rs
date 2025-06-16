@@ -17,12 +17,13 @@ pub struct Id {
 
 /// id factory
 pub struct Factory {
+    name: String,
     sharding: i64,
     sequence: RwLock<(i64, i64)>, // milli, sequence at milli
 }
 
 lazy_static! {
-    static ref _shared_factory: Factory = Factory::new(0);
+    static ref _shared_factory: Factory = Factory::new("SHARED", 0);
 }
 
 /// generate id
@@ -67,18 +68,61 @@ const SECOND_DIV: i64 = SEQUENCE_BASE * 100;
 /// maybe min id value
 const MIN_VALUE: i64 = 1728747205481002100;
 
-// const BILL_MILLIS_START_YEAR: i64 = 2025;
-
 /// gets shared id factory
 pub fn shared() -> &'static Factory {
     &_shared_factory
 }
 
+/// 12 length mills
+struct Mills12 {
+    pub mills: i64,
+}
 
+struct ShorterMills {
+    mills: i64,
+    shorter: i64,
+}
+
+const MILLS_12_START: i64 = 1650;
+const MILLS_12_BASE: i64 = 1_000_000_000;
+
+impl ShorterMills {
+    pub fn with_mills(mills: i64) -> ShorterMills {
+        let angel = mills / MILLS_12_BASE - MILLS_12_START;
+        if angel > 999 {
+            panic!("mills out of range");
+        }
+
+        let shorter = angel * MILLS_12_BASE + mills % MILLS_12_BASE;
+        ShorterMills { mills, shorter }
+    }
+
+    pub fn with_shorter(shorter: i64) -> ShorterMills {
+        let angel = shorter / MILLS_12_BASE;
+        if angel > 999 {
+            panic!("Shorter mills too high");
+        }
+
+        let mills = (angel + MILLS_12_START) * MILLS_12_BASE + shorter % MILLS_12_BASE;
+        ShorterMills { mills, shorter }
+    }
+
+    pub fn mills(&self) -> i64 {
+        self.mills
+    }
+
+    pub fn shorter(&self) -> i64 {
+        self.shorter
+    }
+}
 
 impl Factory {
-    pub fn new(sharding: i64) -> Factory {
-        Factory { sharding: sharding % MAX_SHARDING, sequence: RwLock::new((0, 0)) }
+    pub fn new(name: &str, sharding: i64) -> Factory {
+        Factory { name: name.to_owned(), sharding: sharding % MAX_SHARDING, sequence: RwLock::new((0, 0)) }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn sharding(&self) -> i64 {
@@ -93,8 +137,12 @@ impl Factory {
         self.sequence.read().unwrap().0
     }
 
+    fn current_millis() -> i64 {
+        chrono::Utc::now().timestamp_millis()
+    }
+
     pub fn make(&self) -> erx::ResultE<Id> {
-        let millis = chrono::Local::now().timestamp_millis();
+        let millis = Self::current_millis();
         let mut seq: i64 = 0;
         let mut sequence = self.sequence.try_write().map_err(erx::smp)?;
 
@@ -118,7 +166,7 @@ impl Factory {
             return Ok(vec![]);
         }
 
-        let millis = chrono::Local::now().timestamp_millis();
+        let millis = Self::current_millis();
         let mut seq: i64 = 0;
         let mut sequence = self.sequence.try_write().map_err(erx::smp)?;
 
@@ -262,48 +310,6 @@ fn base62_to_decimal(base62: &str) -> u64 {
     decimal
 }
 
-
-
- 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct BillMillis {
-    millis: i64,
-    billmillis: i64,
-}
-
-impl BillMillis  {
-
-    pub fn with_millis(millis: i64) -> BillMillis {
-        BillMillis { millis, billmillis:0 }
-    }
-
-    pub fn with_second(second: i64) -> BillMillis {
-        BillMillis { millis: second * 1000,  billmillis:0 }
-    }
-
-    pub fn with_billmillis(billmillis: i64) -> BillMillis {
-        BillMillis { millis: 0, billmillis }
-    }
-
-    pub fn millis(&self) -> i64 {
-        self.millis
-    }
-
-    pub fn billmillis(&self) -> i64 {
-        self.billmillis
-    }
-
-}
-
-pub fn year_from_millis(millis: i64) -> i64 {
-    match chrono::Utc.timestamp_millis_opt(millis) {
-        chrono::MappedLocalTime::Single(dt) => dt.year() as i64,
-        _ => 0
-    }
-}
-
-
-
 #[cfg(test)]
 #[allow(unused)]
 mod tests {
@@ -324,7 +330,7 @@ mod tests {
     fn test_id_n() {
         let mut v = Vec::new();
         for i in 1..5 {
-            v.push(shared().make_n(3).unwrap())
+            v.push(shared().make_n(99).unwrap())
         }
 
         for list in v.iter() {
@@ -339,5 +345,17 @@ mod tests {
         for i in 4..9 {
             println!("{}", i);
         }
+    }
+
+    #[test]
+    fn test_12() {
+        let i = |mills| {
+            let s = ShorterMills::with_mills(mills);
+            assert_eq!(s.shorter().to_string().len(), 12);
+            assert_eq!(mills, ShorterMills::with_shorter(s.shorter()).mills());
+        };
+
+        i(Factory::current_millis());
+        i(Factory::current_millis() + 120312412);
     }
 }
