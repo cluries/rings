@@ -5,6 +5,10 @@ use tokio_cron_scheduler::Job;
 
 
 
+/// let shared = rings::service::ServiceManager::shared().await;
+/// let i = rings::with_service_read!(shared, service::public::cnregion::CNRRegion, dos , {
+///     dos.rnd(100)+2
+/// });
 #[macro_export]
 macro_rules! with_service_read {
     ($shared:expr, $service_type:path, $var:ident, $code:block) => {{
@@ -32,6 +36,10 @@ macro_rules! with_service_read {
 }
 
 
+/// let shared = rings::service::ServiceManager::shared().await;
+/// let i = rings::with_service_write!(shared, service::public::cnregion::CNRRegion, dos , {
+///     dos.rnd(100)+2
+/// });
 #[macro_export]
 macro_rules! with_service_write {
     ($shared:expr, $service_type:path, $var:ident, $code:block) => {{
