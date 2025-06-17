@@ -1,40 +1,59 @@
 pub trait Zero {
-    fn zero() -> sea_orm::Value;
+    fn seaorm() -> sea_orm::Value;
+    fn human() -> String;
 }
 
 impl<Tz: chrono::TimeZone> Zero for chrono::DateTime<Tz> {
-    fn zero() -> sea_orm::Value {
-        chrono::DateTime::from_timestamp_nanos(0).naive_local().into()
+    fn seaorm() -> sea_orm::Value {
+        chrono::DateTime::from_timestamp_nanos(0).naive_utc().into()
+    }
+    fn human() -> String {
+        "0".to_string()
     }
 }
 
 impl Zero for String {
-    fn zero() -> sea_orm::Value {
+    fn seaorm() -> sea_orm::Value {
         "".into()
+    }
+    fn human() -> String {
+        "".to_string()
     }
 }
 
 impl Zero for i64 {
-    fn zero() -> sea_orm::Value {
+    fn seaorm() -> sea_orm::Value {
         0i64.into()
+    }
+    fn human() -> String {
+        "0".to_string()
     }
 }
 
 impl Zero for u64 {
-    fn zero() -> sea_orm::Value {
+    fn seaorm() -> sea_orm::Value {
         0u64.into()
+    }
+    fn human() -> String {
+        "0".to_string()
     }
 }
 
 impl Zero for f64 {
-    fn zero() -> sea_orm::Value {
+    fn seaorm() -> sea_orm::Value {
         0f64.into()
+    }
+    fn human() -> String {
+        "0".to_string()
     }
 }
 
 impl Zero for bool {
-    fn zero() -> sea_orm::Value {
+    fn seaorm() -> sea_orm::Value {
         false.into()
+    }
+    fn human() -> String {
+        "false".to_string()
     }
 }
 
@@ -44,6 +63,6 @@ mod tests {
 
     #[test]
     fn test_zero() {
-        println!("{}", chrono::DateTime::<chrono::FixedOffset>::zero());
+        println!("{}", chrono::DateTime::<chrono::FixedOffset>::seaorm());
     }
 }

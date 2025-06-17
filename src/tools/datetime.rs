@@ -23,19 +23,10 @@ pub enum Format {
     DatetimeWithTimeZone,
 }
 
-pub static MONTHS: [&'static str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-pub static MONTHS_LONG: [&'static str; 12] =
-    ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-pub static WEEKDAYS: [&'static str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-pub static WEEKDAYS_LONG: [&'static str; 7] = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-pub static FORMAT_DATE: &'static str = "%Y-%m-%d";
-pub static FORMAT_TIME: &'static str = "%H:%M:%S";
-pub static FORMAT_DATETIME: &'static str = "%Y-%m-%d %H:%M:%S";
-pub static FORMAT_DATETIME_WITH_TIMEZONE: &'static str = "%Y-%m-%d %H:%M:%S %Z";
+pub const FORMAT_DATE: &'static str = "%Y-%m-%d";
+pub const FORMAT_TIME: &'static str = "%H:%M:%S";
+pub const FORMAT_DATETIME: &'static str = "%Y-%m-%d %H:%M:%S";
+pub const FORMAT_DATETIME_WITH_TIMEZONE: &'static str = "%Y-%m-%d %H:%M:%S %Z";
 
 impl Format {
     pub fn layout(&self) -> &'static str {
@@ -121,8 +112,6 @@ impl Yearmonth {
     pub fn new(year: i32, month: i32) -> Self {
         Self { year, month }
     }
-
-
 
     pub fn month_days(&self) -> i32 {
         let year = self.year;

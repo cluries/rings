@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_sub_extract() {
-        let s = "china is very big and strong";
+        let s = "china is huge and strong";
         let start = "is";
         let end = "and";
         let result = Sub::extract(s, start, end);

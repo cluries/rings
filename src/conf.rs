@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 ///  struct GetOption;
 ///  struct Has;
 ///
-///  fn settings() -> &'static RwLock<Config>
-///  fn rebit() -> &'static RwLock<Rebit>
+///  fn settings() -> & 'static RwLock<Config>
+///  fn rebit() -> &' static RwLock<Rebit>
 ///
 ///  struct Rebit
 use std::cmp::PartialEq;
