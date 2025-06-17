@@ -63,7 +63,6 @@ const SEQUENCE_BASE: i64 = 100;
 
 /// maybe min id value
 const MIN_VALUE: i64 = 1_000_000_000_000_000_000;
-const MAX_VALUE: i64 = 1_000_000_000_000_000_000;
 
 /// gets shared id factory
 pub fn shared() -> &'static Factory {
