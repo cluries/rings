@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 pub type OutAny = Out<serde_json::Value>;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Out<T: Serialize> {
     pub code: String,
 

@@ -278,10 +278,10 @@ impl ServiceManager {
         Fut: std::future::Future,
     {
         let name = T::default().name().to_owned();
-        let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' was not registered!", &name)))?;
+        let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' Not Registered!", &name)))?;
         let read_guard = managed.try_read().map_err(crate::erx::smp)?;
 
-        let service = (&*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::new(format!("Service '{}' cast error", &name).as_str()))?;
+        let service = (&*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::new(format!("Unable Cast Service '{}'", &name).as_str()))?;
         let output = invoke(service).await;
         Ok(output)
     }
@@ -306,13 +306,13 @@ impl ServiceManager {
         Fut: std::future::Future,
     {
         let name = T::default().name().to_owned();
-        let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' was not registered!", &name)))?;
+        let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' Not Registered!", &name)))?;
         let mut write_guard = managed.try_write().map_err(crate::erx::smp)?;
 
         let service = (&mut *write_guard)
             .as_any_mut()
             .downcast_mut::<T>()
-            .ok_or(Erx::new(format!("Service '{}' cast error", &name).as_str()))?;
+            .ok_or(Erx::new(format!("Unable Cast Service '{}'", &name).as_str()))?;
         let output = invoke(service).await;
 
         Ok(output)
