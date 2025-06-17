@@ -3,8 +3,6 @@ use std::sync::{Arc, RwLock};
 use tokio::sync::OnceCell;
 use tokio_cron_scheduler::Job;
 
-
-
 /// let shared = rings::service::ServiceManager::shared().await;
 /// let i = rings::with_service_read!(shared, service::public::cnregion::CNRRegion, dos , {
 ///     dos.rnd(100)+2
@@ -16,25 +14,22 @@ macro_rules! with_service_read {
         let managed = $shared.managed_by_name(&__service_name);
         match managed {
             Some(managed) => {
-                 let write_guard = managed.try_read();
-                 match write_guard {
+                let write_guard = managed.try_read();
+                match write_guard {
                     Ok(guard) => {
                         let service = (&*guard).as_any().downcast_ref::<$service_type>();
                         match service {
                             Some($var) => Ok($code),
-                            None => Err(rings::erx::Erx::new(&format!("service downcast_ref error: {}", __service_name)))
+                            None => Err(rings::erx::Erx::new(&format!("service downcast_ref error: {}", __service_name))),
                         }
                     },
-                    Err(err) =>  Err(rings::erx::smp(err))
+                    Err(err) => Err(rings::erx::smp(err)),
                 }
             },
-            None => {
-                Err(rings::erx::Erx::new(&format!("service {} is not managed", __service_name)))
-            }
+            None => Err(rings::erx::Erx::new(&format!("service {} is not managed", __service_name))),
         }
     }};
 }
-
 
 /// let shared = rings::service::ServiceManager::shared().await;
 /// let i = rings::with_service_write!(shared, service::public::cnregion::CNRRegion, dos , {
@@ -47,27 +42,22 @@ macro_rules! with_service_write {
         let managed = $shared.managed_by_name(&__service_name);
         match managed {
             Some(managed) => {
-                 let write_guard = managed.try_write();
-                 match write_guard {
+                let write_guard = managed.try_write();
+                match write_guard {
                     Ok(mut guard) => {
                         let service = (&mut *guard).as_any_mut().downcast_mut::<$service_type>();
                         match service {
                             Some($var) => Ok($code),
-                            None => Err(rings::erx::Erx::new(&format!("service downcast_mut error: {}", __service_name)))
+                            None => Err(rings::erx::Erx::new(&format!("service downcast_mut error: {}", __service_name))),
                         }
                     },
-                    Err(err) =>  Err(rings::erx::smp(err))
+                    Err(err) => Err(rings::erx::smp(err)),
                 }
             },
-            None => {
-                Err(rings::erx::Erx::new(&format!("service {} is not managed", __service_name)))
-            }
+            None => Err(rings::erx::Erx::new(&format!("service {} is not managed", __service_name))),
         }
     }};
 }
-
-
-
 
 static SHARED_MANAGER: OnceCell<ServiceManager> = OnceCell::const_new();
 
@@ -100,7 +90,15 @@ pub async fn registe_to_shared<T: ServiceTrait + Default>() {
 /// * `ready` - check service is ready
 /// * `schedules` - get service schedules
 pub trait ServiceTrait: crate::any::AnyTrait + Send + Sync {
-    fn name(&self) -> &str;
+    fn service_name() -> &'static str
+    where
+        Self: Sized,
+    {
+        std::any::type_name::<Self>()
+    }
+
+    fn name(&self) -> &'static str;
+
     fn initialize(&mut self);
     fn release(&mut self);
     fn ready(&self) -> bool;
@@ -220,7 +218,7 @@ impl ServiceManager {
                 let warp = Arc::new(RwLock::new(Box::new(ctx) as Box<dyn ServiceTrait>));
                 write_guard.push(Arc::clone(&warp));
                 Ok(warp)
-            }
+            },
             Err(er) => Err(Erx::new(er.to_string().as_str())),
         }
     }
@@ -243,7 +241,7 @@ impl ServiceManager {
             Err(ex) => {
                 tracing::error!("{}", ex);
                 true
-            }
+            },
             Ok(srv) => !srv.name().eq(name.as_str()),
         });
 
@@ -277,11 +275,12 @@ impl ServiceManager {
         F: Fn(&T) -> Fut,
         Fut: std::future::Future,
     {
-        let name = T::default().name().to_owned();
+        let name = T::service_name().to_string();
         let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' Not Registered!", &name)))?;
         let read_guard = managed.try_read().map_err(crate::erx::smp)?;
 
-        let service = (&*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::new(format!("Unable Cast Service '{}'", &name).as_str()))?;
+        let service =
+            (&*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::new(format!("Unable to Cast Service '{}'", &name).as_str()))?;
         let output = invoke(service).await;
         Ok(output)
     }
@@ -305,19 +304,18 @@ impl ServiceManager {
         F: Fn(&mut T) -> Fut,
         Fut: std::future::Future,
     {
-        let name = T::default().name().to_owned();
+        let name = T::service_name().to_string();
         let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' Not Registered!", &name)))?;
         let mut write_guard = managed.try_write().map_err(crate::erx::smp)?;
 
         let service = (&mut *write_guard)
             .as_any_mut()
             .downcast_mut::<T>()
-            .ok_or(Erx::new(format!("Unable Cast Service '{}'", &name).as_str()))?;
+            .ok_or(Erx::new(format!("Unable to Cast Service '{}'", &name).as_str()))?;
         let output = invoke(service).await;
 
         Ok(output)
     }
-
 
     /// get shared service manager
     /// # Returns
@@ -339,7 +337,6 @@ mod tests {
     use crate::any::AnyTrait;
     use crate::tools::rand::rand_i64;
     use std::any::Any;
-
 
     #[tokio::test]
     async fn test_service_manager() {
@@ -384,8 +381,8 @@ mod tests {
     }
 
     impl ServiceTrait for TestService {
-        fn name(&self) -> &str {
-            "testservice"
+        fn name(&self) -> &'static str {
+            TestService::service_name()
         }
 
         fn initialize(&mut self) {
