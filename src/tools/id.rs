@@ -78,8 +78,6 @@ impl ShorterMills {
     const START: i64 = 1650;
     const DIVBASE: i64 = 1_000_000_000;
 
-
-
     pub fn with_mills(mills: i64) -> ShorterMills {
         let angel = mills / Self::DIVBASE - Self::START;
         if angel > 999 {
@@ -147,7 +145,7 @@ impl Factory {
         }
 
         if seq > MAX_SEQUENCE {
-            return Err("out of sequence range".into());
+            return Err("beyond sequence limits".into());
         }
 
         let shorter = ShorterMills::with_mills(millis).shorter();
@@ -171,7 +169,7 @@ impl Factory {
 
         let n = i64::from(n);
         if sequence.1 + n > MAX_SEQUENCE {
-            return Err("out of range range".into());
+            return Err("beyond sequence limits".into());
         }
 
         let start_seq = sequence.1;
