@@ -1,11 +1,11 @@
+use crate::erx::{smp, Erx, ResultE};
+use crate::web::url::join as url_join;
 use reqwest;
 use reqwest::Response;
 use std::{str::FromStr, time::Duration};
 
-use crate::web::url::join as url_join;
-
 // 默认的User-Agent字符串
-static DEFAULT_USER_AGENT: &str = "Rings (Linux; en-US; Iusworks.inc)";
+const DEFAULT_USER_AGENT: &str = "Rings (Linux; en-US; Iusworks.inc)";
 
 pub struct ClientBuilder {
     base: String,
@@ -180,128 +180,128 @@ impl ClientBuilder {
 }
 
 impl Client {
-    fn human_error<T: ToString>(error: T) -> String {
-        error.to_string()
-    }
-
-    // get
-    pub async fn get(&self, path: &str) -> Result<String, String> {
-        // let url = url_join(&self.base, path);
-        // let response = self.cli.get(url).send().await.map_err(|e| e.to_string())?;
-
-        Self::_response_untyped(self.cli.get(url_join(&self.base, path)).send().await.map_err(Self::human_error)?).await
-    }
-
-    pub async fn post(&self, path: &str, body: String) -> Result<String, String> {
+    pub async fn get(&self, path: &str) -> ResultE<String> {
         let url = url_join(&self.base, path);
-        let response = self.cli.post(url).body(body).send().await.map_err(Self::human_error)?;
+        let response = self.cli.get(url).send().await.map_err(smp)?;
         Self::_response_untyped(response).await
     }
 
-    pub async fn put(&self, path: &str, body: String) -> Result<String, String> {
+    pub async fn post(&self, path: &str, body: String) -> ResultE<String> {
         let url = url_join(&self.base, path);
-        let response = self.cli.put(url).body(body).send().await.map_err(Self::human_error)?;
+        let response = self.cli.post(url).body(body).send().await.map_err(smp)?;
         Self::_response_untyped(response).await
     }
 
-    pub async fn delete(&self, path: &str) -> Result<String, String> {
+    pub async fn put(&self, path: &str, body: String) -> ResultE<String> {
         let url = url_join(&self.base, path);
-        let response = self.cli.delete(url).send().await.map_err(Self::human_error)?;
+        let response = self.cli.put(url).body(body).send().await.map_err(smp)?;
         Self::_response_untyped(response).await
     }
 
-    pub async fn head(&self, path: &str) -> Result<String, String> {
+    pub async fn delete(&self, path: &str) -> ResultE<String> {
         let url = url_join(&self.base, path);
-        let response = self.cli.head(url).send().await.map_err(Self::human_error)?;
+        let response = self.cli.delete(url).send().await.map_err(smp)?;
         Self::_response_untyped(response).await
     }
 
-    pub async fn get_typed<T>(&self, path: &str) -> Result<T, String>
+    pub async fn head(&self, path: &str) -> ResultE<String> {
+        let url = url_join(&self.base, path);
+        let response = self.cli.head(url).send().await.map_err(smp)?;
+        Self::_response_untyped(response).await
+    }
+
+    pub async fn get_typed<T>(&self, path: &str) -> ResultE<T>
     where
         T: serde::de::DeserializeOwned,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.get(url).send().await.map_err(Self::human_error)?;
+        let response = self.cli.get(url).send().await.map_err(smp)?;
         Self::_response_typed(response).await
     }
 
-    pub async fn post_typed<ResponseT, RequestT>(&self, path: &str, params: &RequestT) -> Result<ResponseT, String>
+    pub async fn post_typed<ResponseT, RequestT>(&self, path: &str, params: &RequestT) -> ResultE<ResponseT>
     where
         ResponseT: serde::de::DeserializeOwned,
         RequestT: serde::Serialize + ?Sized,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.post(url).json(params).send().await.map_err(Self::human_error)?;
+        let response = self.cli.post(url).json(params).send().await.map_err(smp)?;
         Self::_response_typed(response).await
     }
 
-    pub async fn put_typed<ResponseT, RequestT>(&self, path: &str, params: &RequestT) -> Result<ResponseT, String>
+    pub async fn put_typed<ResponseT, RequestT>(&self, path: &str, params: &RequestT) -> ResultE<ResponseT>
     where
         ResponseT: serde::de::DeserializeOwned,
         RequestT: serde::Serialize + ?Sized,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.put(url).json(params).send().await.map_err(Self::human_error)?;
+        let response = self.cli.put(url).json(params).send().await.map_err(smp)?;
         Self::_response_typed(response).await
     }
 
-    pub async fn delete_typed<T>(&self, path: &str) -> Result<T, String>
+    pub async fn delete_typed<ResponseT>(&self, path: &str) -> ResultE<ResponseT>
     where
-        T: serde::de::DeserializeOwned,
+        ResponseT: serde::de::DeserializeOwned,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.delete(url).send().await.map_err(Self::human_error)?;
+        let response = self.cli.delete(url).send().await.map_err(smp)?;
         Self::_response_typed(response).await
     }
 
-    pub async fn head_typed<T>(&self, path: &str) -> Result<T, String>
+    pub async fn head_typed<ResponseT>(&self, path: &str) -> ResultE<ResponseT>
     where
-        T: serde::de::DeserializeOwned,
+        ResponseT: serde::de::DeserializeOwned,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.head(url.as_str()).send().await.map_err(Self::human_error)?;
+        let response = self.cli.head(url.as_str()).send().await.map_err(smp)?;
         Self::_response_typed(response).await
     }
 
-    pub async fn get_valued(&self, path: &str) -> Result<serde_json::Value, String> {
+    pub async fn get_valued(&self, path: &str) -> ResultE<serde_json::Value> {
         self.get_typed(path).await
     }
 
-    pub async fn post_valued<T>(&self, path: &str, params: &T) -> Result<serde_json::Value, String>
+    pub async fn post_valued<T>(&self, path: &str, params: &T) -> ResultE<serde_json::Value>
     where
         T: serde::Serialize + ?Sized,
     {
         self.post_typed(path, params).await
     }
 
-    pub async fn put_valued<T>(&self, path: &str, params: &T) -> Result<serde_json::Value, String>
+    pub async fn put_valued<T>(&self, path: &str, params: &T) -> ResultE<serde_json::Value>
     where
         T: serde::Serialize + ?Sized,
     {
         self.put_typed(path, params).await
     }
 
-    pub async fn delete_valued(&self, path: &str) -> Result<serde_json::Value, String> {
+    pub async fn delete_valued(&self, path: &str) -> ResultE<serde_json::Value> {
         self.delete_typed(path).await
     }
-    pub async fn head_valued(&self, path: &str) -> Result<serde_json::Value, String> {
+    pub async fn head_valued(&self, path: &str) -> ResultE<serde_json::Value> {
         self.head_typed(path).await
     }
 
-    async fn _response_untyped(response: Response) -> Result<String, String> {
+    async fn _response_untyped(response: Response) -> ResultE<String> {
         let status = response.status();
-        let body = response.text().await.map_err(Self::human_error)?;
-        if status.is_success() { Ok(body) } else { Err(body) }
+        let body = response.text().await.map_err(smp)?;
+        match status.is_success() {
+            true => Ok(body),
+            false => Err(Erx::new(&body)),
+        }
     }
 
-    async fn _response_typed<T>(response: Response) -> Result<T, String>
+    async fn _response_typed<T>(response: Response) -> ResultE<T>
     where
         T: serde::de::DeserializeOwned,
     {
         if response.status().is_success() {
-            Ok(response.json::<T>().await.map_err(Self::human_error)?)
+            Ok(response.json::<T>().await.map_err(smp)?)
         } else {
-            Err(response.text().await.map_err(Self::human_error)?)
+            let body = response.text().await.map_err(smp)?;
+            Err(Erx::new(&body))
         }
     }
 }
+
+
