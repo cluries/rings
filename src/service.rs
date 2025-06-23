@@ -126,18 +126,18 @@ pub trait ServiceTrait: crate::any::AnyTrait + Send + Sync {
 //     Box<dyn FnMut(Box<S>, &T) -> Result<Arc<RwLock<Box<dyn ServiceTrait>>>, E>>,
 // ) -> Arc<Vec<T>>;
 
+/// Managed Service
+/// Arc<RwLock<Box<dyn ServiceTrait>>>
+pub type Managed = Arc<RwLock<Box<dyn ServiceTrait + Send>>>;
+
 /// Service Manager
 /// # Fields
 /// * `name` - service manager name
 /// * `managed` - managed services
 pub struct ServiceManager {
     name: String,
-    managed: RwLock<Vec<Arc<RwLock<Box<dyn ServiceTrait>>>>>,
+    managed: RwLock<Vec<Managed>>,
 }
-
-/// Managed Service
-/// Arc<RwLock<Box<dyn ServiceTrait>>>
-pub type Managed = Arc<RwLock<Box<dyn ServiceTrait>>>;
 
 /// Service Manager
 /// # Fields
@@ -174,7 +174,7 @@ impl ServiceManager {
     /// * `name` - service name
     /// # Returns
     /// * `Option<Arc<RwLock<Box<dyn ServiceTrait>>>>` - managed service
-    pub fn managed_by_name(&self, name: &str) -> Option<Arc<RwLock<Box<dyn ServiceTrait>>>> {
+    pub fn managed_by_name(&self, name: &str) -> Option<Managed> {
         self.managed
             .read()
             .ok()?
@@ -191,7 +191,7 @@ impl ServiceManager {
     /// * `Vec<Arc<RwLock<Box<dyn ServiceTrait>>>>` - managed services
     /// # Panics
     /// * `std::sync::PoisonError` - if managed services is poisoned
-    pub fn managed_services(&self) -> Vec<Arc<RwLock<Box<dyn ServiceTrait>>>> {
+    pub fn managed_services(&self) -> Vec<Managed> {
         self.managed.read().unwrap().clone()
     }
 
@@ -201,7 +201,7 @@ impl ServiceManager {
     /// * `service` - service
     /// # Returns
     /// * `Result<Arc<RwLock<Box<dyn ServiceTrait>>>, Erx>` - managed service
-    pub fn register<T>(&self) -> Result<Arc<RwLock<Box<dyn ServiceTrait>>>, Erx>
+    pub fn register<T>(&self) -> Result<Managed, Erx>
     where
         T: ServiceTrait + Default,
     {
@@ -215,7 +215,7 @@ impl ServiceManager {
         match self.managed.try_write() {
             Ok(mut write_guard) => {
                 ctx.initialize();
-                let warp = Arc::new(RwLock::new(Box::new(ctx) as Box<dyn ServiceTrait>));
+                let warp = Arc::new(RwLock::new(Box::new(ctx) as Box<dyn ServiceTrait + Send>));
                 write_guard.push(Arc::clone(&warp));
                 Ok(warp)
             },
@@ -253,7 +253,7 @@ impl ServiceManager {
     /// * `name` - service name
     /// # Returns
     /// * `Option<Arc<RwLock<Box<dyn ServiceTrait>>>>` - managed service
-    pub fn get<T: ServiceTrait + Default>(&self) -> Option<Arc<RwLock<Box<dyn ServiceTrait>>>> {
+    pub fn get<T: ServiceTrait + Default>(&self) -> Option<Managed> {
         self.managed_by_name(T::default().name())
     }
 

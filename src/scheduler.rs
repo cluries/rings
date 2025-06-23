@@ -79,7 +79,7 @@ impl crate::rings::RingsMod for SchedulerManager {
         let mut futures = vec![]; // Vec<Box<dyn Future<Output = ()> + Send>>;
         let srv_manager = ServiceManager::shared().await;
 
-        let managed: Vec<Arc<RwLock<Box<dyn ServiceTrait>>>> = srv_manager.managed_services();
+        let managed: Vec<crate::service::Managed> = srv_manager.managed_services();
         let scheduler = self.scheduler.clone(); // Arc<ToKioRwLock<JobScheduler>>;
 
         for service in managed {
