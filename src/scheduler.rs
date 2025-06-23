@@ -1,6 +1,6 @@
 use crate::erx;
 use crate::rings::RingState;
-use crate::service::{ServiceManager, ServiceTrait};
+use crate::service::{ServiceManager};
 use async_trait::async_trait;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
