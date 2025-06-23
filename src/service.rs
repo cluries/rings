@@ -269,7 +269,7 @@ impl ServiceManager {
     ///      async move { r }
     ///  }).await;
     ///
-    pub async fn using<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
+    pub fn using<T, F, Fut>(&self, invoke: F) -> Result<Fut, Erx>
     where
         T: ServiceTrait + Default,
         F: Fn(&T) -> Fut,
@@ -278,10 +278,9 @@ impl ServiceManager {
         let name = T::service_name().to_string();
         let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' Not Registered!", &name)))?;
         let read_guard = managed.try_read().map_err(crate::erx::smp)?;
-
         let service =
             (&*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::new(format!("Unable to Cast Service '{}'", &name).as_str()))?;
-        let output = invoke(service).await;
+        let output = invoke(service);
         Ok(output)
     }
 
@@ -298,7 +297,7 @@ impl ServiceManager {
     ///      async move { r }
     ///  }).await;
     ///
-    pub async fn using_mut<T, F, Fut>(&self, invoke: F) -> Result<Fut::Output, Erx>
+    pub fn using_mut<T, F, Fut>(&self, invoke: F) -> Result<Fut, Erx>
     where
         T: ServiceTrait + Default,
         F: Fn(&mut T) -> Fut,
@@ -312,8 +311,7 @@ impl ServiceManager {
             .as_any_mut()
             .downcast_mut::<T>()
             .ok_or(Erx::new(format!("Unable to Cast Service '{}'", &name).as_str()))?;
-        let output = invoke(service).await;
-
+        let output = invoke(service);
         Ok(output)
     }
 
@@ -358,6 +356,7 @@ mod tests {
                 let r = srv.rnd();
                 async move { r }
             })
+            .unwrap()
             .await;
         println!("==={:#?}", r);
     }
