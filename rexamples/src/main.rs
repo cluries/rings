@@ -4,36 +4,27 @@ use rings::service::ServiceTrait;
 #[allow(dead_code, unused)]
 mod mringm;
 
-
 #[ringm::service]
 #[ringm::default_any]
 struct ArgsService {}
 
-
-
 #[ringm::service]
 #[ringm::default_any]
 struct LanuchService {}
-
 
 #[tokio::main]
 async fn main() {
     mringm::its_service().await;
 }
 
-
 impl ServiceTrait for ArgsService {
-    fn name(&self) -> &str {
-        "Args"
+    fn name(&self) -> &'static str {
+        ArgsService::service_name()
     }
 
-    fn initialize(&mut self) {
+    fn initialize(&mut self) {}
 
-    }
-
-    fn release(&mut self) {
-
-    }
+    fn release(&mut self) {}
 
     fn ready(&self) -> bool {
         true
@@ -45,17 +36,13 @@ impl ServiceTrait for ArgsService {
 }
 
 impl ServiceTrait for LanuchService {
-    fn name(&self) -> &str {
-        "Lanuch"
+    fn name(&self) -> &'static str {
+        LanuchService::service_name()
     }
 
-    fn initialize(&mut self) {
+    fn initialize(&mut self) {}
 
-    }
-
-    fn release(&mut self) {
-
-    }
+    fn release(&mut self) {}
 
     fn ready(&self) -> bool {
         true

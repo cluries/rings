@@ -12,8 +12,8 @@ pub struct Auth {
 }
 
 impl ServiceTrait for Auth {
-    fn name(&self) -> &str {
-        "auth"
+    fn name(&self) -> &'static str {
+        Auth::service_name()
     }
 
     fn initialize(&mut self) {}

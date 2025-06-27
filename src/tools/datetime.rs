@@ -262,7 +262,13 @@ impl Is {
 }
 
 #[cfg(test)]
-#[test]
-fn test_local_datetime() {
-    // println!("{}", Now::local_datetime_with_zone_string());
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_local_datetime() {
+        println!("{} {} {}", Now::fixed(1).to_utc(), Now::fixed(2).to_utc(), Now::local().to_utc());
+        println!("{} {} {}", Now::fixed(1).timestamp(), Now::fixed(2).timestamp(), Now::local().timestamp());
+
+    }
 }

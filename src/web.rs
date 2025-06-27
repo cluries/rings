@@ -15,8 +15,7 @@ pub mod session;
 pub mod tools;
 pub mod types;
 pub mod url;
-// pub mod validator;
-pub mod inputvalidator;
+pub mod input;
 
 use crate::rings::{RingState, RingsMod, SafeRS};
 use crate::web::luaction::LuaAction;

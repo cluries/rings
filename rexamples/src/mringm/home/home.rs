@@ -8,19 +8,14 @@ pub struct Home {
     pub email: String,
 }
 
-
 impl ServiceTrait for Home {
-    fn name(&self) -> &str {
-        "Home"
+    fn name(&self) -> &'static str {
+        Home::service_name()
     }
 
-    fn initialize(&mut self) {
+    fn initialize(&mut self) {}
 
-    }
-
-    fn release(&mut self) {
-
-    }
+    fn release(&mut self) {}
 
     fn ready(&self) -> bool {
         true

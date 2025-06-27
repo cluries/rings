@@ -24,7 +24,7 @@ hmac = { version = "0" }
 jsonwebtoken = { version = "9" }
 lazy_static = { version = "1" }
 log = { version = "0.4" }
-md5 = {version = "0"}
+md5 = { version = "0" }
 mlua = { version = "0.10", features = ["lua54", "vendored"] }
 ofb = { version = "0.6" }
 pem = { version = "3.0" }
@@ -49,6 +49,7 @@ tracing-serde = { version = "0.2" }
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 url = { version = "2", features = ["default", "serde"] }
 uuid = { version = "1.17.0", features = ["v4"] }
+validator = { version = "0.20", features = ["derive"] }
 
 [dependencies]
 aes = { workspace = true }
@@ -93,3 +94,4 @@ tracing-serde = { workspace = true }
 tracing-subscriber = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
+validator = { workspace = true }
