@@ -22,6 +22,8 @@ pub struct Provider {
     pub key: String,
 }
 
+
+///
 pub struct LLM {
     provider: Provider,
 }
@@ -174,7 +176,7 @@ impl LLM {
         Client::with_config(config)
     }
 
-    pub async fn chat_single(&self, prompt: Vec<ChatCompletionRequestMessage>) -> Result<ChatResponse, erx::Erx> {
+    pub async fn chat(&self, prompt: Vec<ChatCompletionRequestMessage>) -> Result<ChatResponse, erx::Erx> {
         let request = CreateChatCompletionRequestArgs::default()
             .stream(false)
             .model(self.provider.model.clone())
@@ -188,10 +190,6 @@ impl LLM {
         let duration = SystemTime::now().duration_since(start).unwrap_or_default();
         Ok(ChatResponse::new(duration, response))
     }
-
-    // pub async fn chat_own_type<T: Serialize>(&self, own: T) -> Result<ChatResponse, erx::Erx> {
-    //     Err("OpenAI does not support this chat".into())
-    // }
 }
 
 #[cfg(test)]
@@ -219,7 +217,7 @@ mod tests {
         let mut b = PromptsBuilder::default();
         b.user("孟加拉国和印度有世仇？主要争端是什么？用中文和英文分别回答。");
 
-        let r = LLM::with_provider(vol_deepseek_v3()).chat_single(b.into()).await.unwrap();
+        let r = LLM::with_provider(vol_deepseek_v3()).chat(b.into()).await.unwrap();
         println!("{}", r.response_string());
     }
 
@@ -238,7 +236,7 @@ mod tests {
         let url = "https://horizonpublicstorage.bangbangwang.cn/horizon/img/202311/11/mKhA3fBfpsbsaCNWSZF4PdONi8bdNrNehYGa77d2.jpg";
         b.image(prompt, url);
 
-        let r = LLM::with_provider(vol_doubao_vision_15_pro()).chat_single(b.into()).await.unwrap();
+        let r = LLM::with_provider(vol_doubao_vision_15_pro()).chat(b.into()).await.unwrap();
         println!("{}", r.response_string());
     }
 }
