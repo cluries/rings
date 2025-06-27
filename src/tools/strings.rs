@@ -13,22 +13,31 @@ pub struct Word;
 
 impl IgnoreCase {
     pub fn matches(&self, s: &str) -> bool {
+        fn cmi<T: Iterator<Item = char>>(sources: &mut T, prefixs: &mut T) -> bool {
+            loop {
+                match (sources.next(), prefixs.next()) {
+                    (Some(s), Some(p)) => {
+                        if !s.eq_ignore_ascii_case(&p) {
+                            return false;
+                        }
+                    },
+                    (_, None) => return true,        // 所有 prefix 字符已匹配
+                    (None, Some(_)) => return false, // source 比 prefix 短
+                }
+            }
+        }
+
         match self {
             IgnoreCase::Contain(val) => s.to_lowercase().contains(&val.to_lowercase()),
             IgnoreCase::Prefix(prefix) => {
-                let src_len = s.len();
-                let prx_len = prefix.len();
-                if src_len < prx_len { false } else { s[..prx_len].eq_ignore_ascii_case(prefix) }
+                let mut sources = s.chars();
+                let mut prefixs = prefix.chars();
+                cmi(&mut sources, &mut prefixs)
             },
             IgnoreCase::Suffix(suffix) => {
-                let src_len = s.len();
-                let sfx_len = suffix.len();
-                if src_len < sfx_len {
-                    false
-                } else {
-                    let index = src_len - sfx_len;
-                    s[index..].eq_ignore_ascii_case(suffix)
-                }
+                let mut sources = s.chars().rev();
+                let mut suffixs = suffix.chars().rev();
+                cmi(&mut sources, &mut suffixs)
             },
         }
     }
