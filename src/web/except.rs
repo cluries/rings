@@ -15,7 +15,8 @@ pub enum Except {
     NotFound,
     InternalServerError,
     Unknown(String),
-    InvalidParams(String),
+    InvalidParam(String),
+    InvalidParams(Vec<String>),
     Fuzzy(String, String),
     FuzzyService(String, String),
     FuzzyModel(String, String),
@@ -41,6 +42,8 @@ impl Except {
             code: Layouted::common(PreL4::COMM.into(), &format!("{:04}", c.code())).into(),
             message: Some(c.message().into()),
             data: None,
+            debug: None,
+            profile: None,
         };
 
         match self {
@@ -54,23 +57,61 @@ impl Except {
                 } else {
                     m
                 };
-                Out::<T> { code: Layouted::common(PreL4::COMM.into(), "9999").into(), message: tos!(m), data: None }
+                Out::<T> {
+                    code: Layouted::common(PreL4::COMM.into(), "9999").into(),
+                    message: tos!(m),
+                    data: None,
+                    debug: None,
+                    profile: None,
+                }
+            },
+            Except::InvalidParam(m) => {
+                let m = if m.is_empty() { "invalid params" } else { m };
+                Out::<T> {
+                    code: Layouted::common(PreL4::COMM.into(), "1000").into(),
+                    message: tos!(m),
+                    data: None,
+                    debug: None,
+                    profile: None,
+                }
             },
             Except::InvalidParams(m) => {
-                let m = if m.is_empty() { "invalid params" } else { m };
-                Out::<T> { code: Layouted::common(PreL4::COMM.into(), "1000").into(), message: tos!(m), data: None }
+                let m = if m.is_empty() { "invalid params".to_string() } else { m.join(", ") };
+                Out::<T> {
+                    code: Layouted::common(PreL4::COMM.into(), "1000").into(),
+                    message: Some(m),
+                    data: None,
+                    debug: None,
+                    profile: None,
+                }
             },
-            Except::Fuzzy(detail, m) => {
-                Out::<T> { code: Layouted::common(PreL4::FUZZ.into(), detail).into(), message: tos!(m), data: None }
+            Except::Fuzzy(detail, m) => Out::<T> {
+                code: Layouted::common(PreL4::FUZZ.into(), detail).into(),
+                message: tos!(m),
+                data: None,
+                debug: None,
+                profile: None,
             },
-            Except::FuzzyService(detail, m) => {
-                Out::<T> { code: Layouted::service(PreL4::FUZZ.into(), detail).into(), message: tos!(m), data: None }
+            Except::FuzzyService(detail, m) => Out::<T> {
+                code: Layouted::service(PreL4::FUZZ.into(), detail).into(),
+                message: tos!(m),
+                data: None,
+                debug: None,
+                profile: None,
             },
-            Except::FuzzyModel(detail, m) => {
-                Out::<T> { code: Layouted::model(PreL4::FUZZ.into(), detail).into(), message: tos!(m), data: None }
+            Except::FuzzyModel(detail, m) => Out::<T> {
+                code: Layouted::model(PreL4::FUZZ.into(), detail).into(),
+                message: tos!(m),
+                data: None,
+                debug: None,
+                profile: None,
             },
-            Except::FuzzyAction(detail, m) => {
-                Out::<T> { code: Layouted::action(PreL4::FUZZ.into(), detail).into(), message: tos!(m), data: None }
+            Except::FuzzyAction(detail, m) => Out::<T> {
+                code: Layouted::action(PreL4::FUZZ.into(), detail).into(),
+                message: tos!(m),
+                data: None,
+                debug: None,
+                profile: None,
             },
         }
     }

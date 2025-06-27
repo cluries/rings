@@ -1,7 +1,5 @@
 use crate::web::except::Except;
 
-
-
 /// see https://github.com/Keats/validator
 ///
 pub struct Inputs;
@@ -12,12 +10,8 @@ impl Inputs {
             Ok(_) => None,
             Err(errs) => {
                 let except: Vec<String> = errs.into_errors().iter().map(|err| err.0.to_string()).collect();
-                Some(Except::InvalidParams(except.join(", ").to_owned()))
+                Some(Except::InvalidParams(except))
             },
         }
     }
-    
-    
 }
-
-

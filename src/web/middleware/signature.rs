@@ -46,6 +46,8 @@ macro_rules! rout {
             code: make_code($x).into(),
             message:None,
             data: None,
+            debug: None,
+            profile: None,
         }.into_response()
     };
 
@@ -54,6 +56,8 @@ macro_rules! rout {
             code:make_code($x).into(),
             message: Some($y),
             data: None,
+            debug: None,
+            profile: None,
        }.into_response()
     };
 
@@ -62,6 +66,8 @@ macro_rules! rout {
             code:make_code($x).into(),
             message: Some($y),
             data: Some($z),
+            debug: None,
+            profile: None,
        }.into_response()
     };
 
