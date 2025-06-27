@@ -1,6 +1,6 @@
 use crate::erx::Layouted;
 use crate::tos;
-use crate::web::api::Out;
+use crate::web::api::{Debug, Out};
 use crate::web::define;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -122,8 +122,8 @@ impl Except {
 }
 
 impl ExceptGrow {
-    pub fn add(&mut self, key: String, value: String) -> &mut Self {
-        self.grows.insert(key, value);
+    pub fn add(&mut self, key: &str, value: &str) -> &mut Self {
+        self.grows.insert(key.to_string(), value.to_string());
         self
     }
 
@@ -160,10 +160,18 @@ impl ExceptGrow {
         self.except
     }
 
-    pub fn out<T>(self) -> Out<T>
+    pub fn out<T>(&self) -> Out<T>
     where
         T: Serialize,
     {
-        self.diminish().out()
+        let mut out = self.except.out();
+        if !self.grows.is_empty() {
+            let mut debug = out.debug.unwrap_or(Debug::new());
+            for (key, value) in &self.grows {
+                debug.add_other(key, value);
+            }
+            out.debug = Some(debug);
+        }
+        out
     }
 }

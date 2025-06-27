@@ -3,6 +3,7 @@ use crate::web::except::Except;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::Response;
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -26,10 +27,25 @@ pub struct Out<T: Serialize> {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Debug {}
+pub struct Debug {
+    others: HashMap<String, String>,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Profile {}
+
+const ORIGIN_ERX_CODE: &'static str = "ORIGIN_ERX_CODE";
+
+impl Debug {
+    pub fn new() -> Debug {
+        Debug { others: HashMap::new() }
+    }
+
+    pub fn add_other(&mut self, key: &str, value: &str) -> &mut Debug {
+        self.others.insert(key.to_string(), value.to_string());
+        self
+    }
+}
 
 impl<T: Serialize> Out<T> {
     pub fn new(code: LayoutedC, message: Option<String>, data: Option<T>) -> Self {
@@ -71,7 +87,10 @@ impl<T: Serialize> From<Except> for Out<T> {
 
 impl<T: Serialize> From<Erx> for Out<T> {
     fn from(value: Erx) -> Self {
-        Except::Fuzzy(value.code().layout_string(), value.message().to_string()).into()
+        Except::Fuzzy(value.code().get_detail().to_string(), value.message().to_string())
+            .grow()
+            .add(ORIGIN_ERX_CODE, &value.code().layout_string())
+            .out()
     }
 }
 

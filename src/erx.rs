@@ -394,6 +394,21 @@ impl LayoutedC {
     pub fn layout_string(&self) -> String {
         format!("{}-{}-{}-{}", self.application, self.domain, self.category, self.detail)
     }
+
+    pub fn get_app(&self) -> &str {
+        &self.application
+    }
+    pub fn get_domain(&self) -> &str {
+        &self.domain
+    }
+
+    pub fn get_category(&self) -> &str {
+        &self.category
+    }
+
+    pub fn get_detail(&self) -> &str {
+        &self.detail
+    }
 }
 
 impl Into<String> for LayoutedC {
