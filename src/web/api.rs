@@ -17,23 +17,49 @@ pub struct Out<T: Serialize> {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<T>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debug: Option<Debug>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<Profile>,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Debug {}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Profile {}
 
 impl<T: Serialize> Out<T> {
     pub fn new(code: LayoutedC, message: Option<String>, data: Option<T>) -> Self {
-        Out { code: code.into(), message, data }
+        Out { code: code.into(), message, data, debug: None, profile: None }
     }
 
     pub fn only_code(code: LayoutedC) -> Self {
-        Out { code: code.into(), message: None, data: None }
+        Out { code: code.into(), message: None, data: None, debug: None, profile: None }
     }
 
     pub fn code_message(code: LayoutedC, message: &str) -> Self {
-        Out { code: code.into(), message: if message.is_empty() { None } else { Some(message.to_string()) }, data: None }
+        Out {
+            code: code.into(),
+            message: if message.is_empty() { None } else { Some(message.to_string()) },
+            data: None,
+            debug: None,
+            profile: None,
+        }
     }
 
     pub fn ok(data: T) -> Self {
-        Out { code: LayoutedC::okay().into(), message: None, data: Some(data) }
+        Out { code: LayoutedC::okay().into(), message: None, data: Some(data), debug: None, profile: None }
+    }
+
+    pub fn set_debug(&mut self, debug: Debug) {
+        self.debug = Some(debug);
+    }
+
+    pub fn set_profile(&mut self, profile: Profile) {
+        self.profile = Some(profile);
     }
 }
 
