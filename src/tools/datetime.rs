@@ -269,6 +269,5 @@ mod tests {
     fn test_local_datetime() {
         println!("{} {} {}", Now::fixed(1).to_utc(), Now::fixed(2).to_utc(), Now::local().to_utc());
         println!("{} {} {}", Now::fixed(1).timestamp(), Now::fixed(2).timestamp(), Now::local().timestamp());
-
     }
 }
