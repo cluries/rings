@@ -19,3 +19,4 @@ pub mod tests;
 pub mod validator;
 pub mod video;
 pub mod zip;
+mod promptor;
