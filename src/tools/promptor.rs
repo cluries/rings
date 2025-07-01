@@ -37,7 +37,7 @@ pub enum ValueKind {
 
 pub struct OutFormatJson {
     kind: ValueKind,
-    required: bool,
+    nest: Option<Box<OutFormatJson>>,
     field: String,
     comment: String,
 }
@@ -177,26 +177,31 @@ impl Into<CommonComponent> for Input {
 }
 
 impl OutFormatJson {
+    pub fn prefix() -> &'static str {
+        "Return JSON in this exact structure"
+    }
+
     pub fn description(&self) -> String {
         let kind = self.kind.clone();
         match kind {
             ValueKind::String => {
-                format!("\"{}\":\"string, {}\"", self.field, self.comment)
+                format!("\"{}\": \"string, {}\"", self.field, self.comment)
             },
             ValueKind::Integer => {
-                format!("\"{}\":\"integer, {}\"", self.field, self.comment)
+                format!("\"{}\": \"integer, {}\"", self.field, self.comment)
             },
             ValueKind::Float => {
-                format!("\"{}\":\"float, {}\"", self.field, self.comment)
+                format!("\"{}\": \"float, {}\"", self.field, self.comment)
             },
             ValueKind::Object => {
-                format!("\"{}\":\"object, {}\"", self.field, self.comment)
+                let n = self.nest.as_ref().unwrap();
+                format!("\"{}\": \"object, {}\"", self.field, n.description())
             },
             ValueKind::Array => {
-                format!("\"{}\":\"array, {}\"", self.field, self.comment)
+                format!("\"{}\": \"array, {}\"", self.field, self.comment)
             },
             ValueKind::Boolean => {
-                format!("\"{}\":\"boolean, {}\"", self.field, self.comment)
+                format!("\"{}\": \"boolean, {}\"", self.field, self.comment)
             },
         }
     }
@@ -215,5 +220,12 @@ mod tests {
             .add_skill("convert json to xml")
             .add_skill("convert xml to json");
         println!("{}", s.build());
+    }
+
+    #[test]
+    fn test_json_output_format() {
+        let k: OutFormatJson =
+            OutFormatJson { kind: ValueKind::String, nest: None, field: "strname".to_string(), comment: "string name".to_string() };
+        println!("{}", k.description());
     }
 }
