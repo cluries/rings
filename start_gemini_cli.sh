@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
-export GEMINI_API_KEY="AIzaSyCoPTF3pFHvu1W8ttysB0-_fdp78fAgd68"
+
+# comparefinally
+
+export GEMINI_API_KEY="AIzaSyDVP0QOOZLLlVW7V878Dh-tQnSYSiz3NXo"
 
 
-/opt/homebrew/Cellar/node/24.3.0/bin/gemini
+/opt/homebrew/Cellar/node/24.3.0/bin/gemini --telemetry false
