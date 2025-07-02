@@ -37,9 +37,10 @@ pub enum ValueKind {
 
 pub struct OutFormatJson {
     kind: ValueKind,
-    nest: Option<Box<OutFormatJson>>,
     field: String,
     comment: String,
+    nest_object: Option<Vec<Box<OutFormatJson>>>,
+    nest_array: Option<Box<OutFormatJson>>,
 }
 
 pub struct Skills(Vec<String>);
@@ -181,6 +182,66 @@ impl OutFormatJson {
         "Return JSON in this exact structure"
     }
 
+    pub fn new_str(field: &str, comment: &str) -> OutFormatJson {
+        OutFormatJson {
+            kind: ValueKind::String,
+            field: field.to_string(),
+            comment: comment.to_string(),
+            nest_array: None,
+            nest_object: None,
+        }
+    }
+
+    pub fn new_int(field: &str, comment: &str) -> OutFormatJson {
+        OutFormatJson {
+            kind: ValueKind::Integer,
+            field: field.to_string(),
+            comment: comment.to_string(),
+            nest_array: None,
+            nest_object: None,
+        }
+    }
+
+    pub fn new_float(field: &str, comment: &str) -> OutFormatJson {
+        OutFormatJson {
+            kind: ValueKind::Float,
+            field: field.to_string(),
+            comment: comment.to_string(),
+            nest_array: None,
+            nest_object: None,
+        }
+    }
+
+    pub fn new_bool(field: &str, comment: &str) -> OutFormatJson {
+        OutFormatJson {
+            kind: ValueKind::Boolean,
+            field: field.to_string(),
+            comment: comment.to_string(),
+            nest_array: None,
+            nest_object: None,
+        }
+    }
+
+    pub fn new_array(field: &str, comment: &str, nest_array: OutFormatJson) -> OutFormatJson {
+        OutFormatJson {
+            kind: ValueKind::Array,
+            field: field.to_string(),
+            comment: comment.to_string(),
+            nest_array: Some(Box::new(nest_array)),
+            nest_object: None,
+        }
+    }
+
+    pub fn new_object(field: &str, comment: &str, nest_object: Vec<Box<OutFormatJson>>) -> OutFormatJson {
+        OutFormatJson {
+            kind: ValueKind::Array,
+            field: field.to_string(),
+            comment: comment.to_string(),
+            nest_array: None,
+            nest_object: Some(nest_object),
+        }
+    }
+
     pub fn description(&self) -> String {
         let kind = self.kind.clone();
         match kind {
@@ -194,11 +255,13 @@ impl OutFormatJson {
                 format!("\"{}\": \"float, {}\"", self.field, self.comment)
             },
             ValueKind::Object => {
-                let n = self.nest.as_ref().unwrap();
-                format!("\"{}\": \"object, {}\"", self.field, n.description())
+                let n = self.nest_object.as_ref().unwrap();
+                let n = n.iter().map(|x| x.description()).collect::<Vec<String>>().join(",\n ");
+                format!("\"{}\": {{ {} }}", self.field, n)
             },
             ValueKind::Array => {
-                format!("\"{}\": \"array, {}\"", self.field, self.comment)
+                let n = self.nest_array.as_ref().unwrap().description();
+                format!("\"{}\": [ {} ] ", self.field, n)
             },
             ValueKind::Boolean => {
                 format!("\"{}\": \"boolean, {}\"", self.field, self.comment)
@@ -224,8 +287,11 @@ mod tests {
 
     #[test]
     fn test_json_output_format() {
-        let k: OutFormatJson =
-            OutFormatJson { kind: ValueKind::String, nest: None, field: "strname".to_string(), comment: "string name".to_string() };
+        let k = OutFormatJson::new_object(
+            "foo",
+            "bar",
+            vec![Box::new(OutFormatJson::new_int("foo", "bar")), Box::new(OutFormatJson::new_float("foo", "bar"))],
+        );
         println!("{}", k.description());
     }
 }
