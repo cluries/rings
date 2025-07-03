@@ -66,7 +66,7 @@ impl Desc {
 
         recurse(&mut value, "", &cribe);
 
-        serde_json::to_string_pretty(&value).map_err(smp)
+        serde_json::to_string(&value).map_err(smp)
     }
 }
 
