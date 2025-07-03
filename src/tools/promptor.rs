@@ -45,6 +45,10 @@ pub fn constraint_json(structure: &str) -> String {
     format!("{}: {}", CONSTRAINT_ONLY_RESULTS_USE_JSON_PREFIX[0], s.join(""))
 }
 
+pub struct JsonDescription {
+    descriptions: std::collections::HashMap<String, String>,
+}
+
 impl Prompt {
     pub fn system(&self) -> &str {
         self.system.as_deref().unwrap_or("")
@@ -176,6 +180,34 @@ impl PromptBuilder {
 
         prompt.join("\n\n")
     }
+}
+
+impl JsonDescription {
+    pub fn new(descriptions: std::collections::HashMap<String, String>) -> JsonDescription {
+        JsonDescription { descriptions }
+    }
+
+    // pub fn make<T: Serialize>(&self, object: &T) -> String {
+    //     // 传入一个结构体，生成对应的JSON对象描述
+    //     // 比如
+    //
+    //     struct Person {
+    //         name: String,
+    //         age: i32,
+    //     }
+    //     struct Eg {
+    //         egname: String,
+    //         id: String,
+    //         score: i32,
+    //         likes: Vec<Vec<Person>>,
+    //     }
+    //
+    //     let mut desc: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    //     desc.insert("egname".to_string(), "例子名称".to_string());
+    //     desc.insert("id".to_string(), "例子ID".to_string());
+    //     desc.insert("score".to_string(), "例子评级分数".to_string());
+    //     desc.insert("likes".to_string(), "例子喜欢的人列表".to_string());
+    //  }
 }
 
 #[cfg(test)]

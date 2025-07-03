@@ -19,5 +19,4 @@ pub mod tests;
 pub mod validator;
 pub mod video;
 pub mod zip;
-pub mod json_structure;
 pub mod promptor;
