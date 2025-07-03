@@ -115,6 +115,12 @@ mod tests {
         book.tags.push(Default::default());
         person.likes.push(book);
 
-        println!("{}", Desc::describe(&person, Default::default()).unwrap());
+        let mut describe: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+
+        describe.insert(String::from("name"), String::from("姓名"));
+        describe.insert(String::from("likes.name"), String::from("书名"));
+        describe.insert(String::from("likes.tags.name"), String::from("标签"));
+
+        println!("{}", Desc::describe(&person, describe).unwrap());
     }
 }
