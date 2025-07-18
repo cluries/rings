@@ -53,3 +53,4 @@ pub fn parse_query(query: &str) -> HashMap<String, String> {
 
     url::form_urlencoded::parse(query.as_bytes()).into_owned().collect()
 }
+
