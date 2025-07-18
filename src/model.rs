@@ -1,5 +1,3 @@
-pub mod coffee;
-pub mod conf;
 pub mod dbms;
 pub mod facade;
 pub mod jsons;
