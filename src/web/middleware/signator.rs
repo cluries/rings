@@ -4,9 +4,8 @@ use crate::tools::hash;
 use crate::web::api::Out;
 use crate::web::request::clone_request;
 use crate::web::url::parse_query;
-use redis::AsyncCommands;
-
 // 移除未使用的导入
+
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -14,6 +13,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::fmt;
+use tokio::time::{timeout, Duration};
 
 /// 签名验证相关的错误类型
 #[derive(Debug, Clone)]
@@ -99,13 +99,30 @@ fn make_code(detail: &str) -> LayoutedC {
 /// KeyLoader
 pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output=Result<String, Erx>> + Send>> + Send + Sync>;
 
+/// Redis 连接池管理器
+#[derive(Clone)]
+pub struct RedisConnectionManager {
+    client: redis::Client,
+}
+
+impl RedisConnectionManager {
+    pub fn new(redis_url: &str) -> Result<Self, redis::RedisError> {
+        let client = redis::Client::open(redis_url)?;
+        Ok(RedisConnectionManager { client })
+    }
+
+    pub async fn get_connection(&self) -> Result<redis::aio::MultiplexedConnection, redis::RedisError> {
+        self.client.get_multiplexed_tokio_connection().await
+    }
+}
+
 /// 签名验证中间件
 pub struct SignatorMiddleware {
     rear: String, // 后门，开发时候方便用
     excludes: Vec<fn(parts: &axum::http::request::Parts) -> bool>,
     nonce_lifetime: i64,
     key_loader: KeyLoader,
-    redis_client: redis::Client,
+    redis_manager: RedisConnectionManager,
 }
 
 impl Clone for SignatorMiddleware {
@@ -115,27 +132,27 @@ impl Clone for SignatorMiddleware {
             excludes: self.excludes.clone(),
             nonce_lifetime: self.nonce_lifetime,
             key_loader: Arc::clone(&self.key_loader),
-            redis_client: self.redis_client.clone(),
+            redis_manager: self.redis_manager.clone(),
         }
     }
 }
 
 impl SignatorMiddleware {
-    pub fn new(redis_url: &str, key_loader: KeyLoader) -> Self {
+    pub fn new(redis_url: &str, key_loader: KeyLoader) -> Result<Self, SignatorError> {
         Self::with_rear(redis_url, key_loader, String::default())
     }
 
-    pub fn with_rear(redis_url: &str, key_loader: KeyLoader, rear: String) -> Self {
-        SignatorMiddleware {
+    pub fn with_rear(redis_url: &str, key_loader: KeyLoader, rear: String) -> Result<Self, SignatorError> {
+        let redis_manager = RedisConnectionManager::new(redis_url)
+            .map_err(|e| SignatorError::RedisConnection(format!("Failed to create Redis manager: {}", e)))?;
+
+        Ok(SignatorMiddleware {
             rear,
             excludes: vec![],
             nonce_lifetime: DEFAULT_RAND_LIFE,
             key_loader,
-            redis_client: redis::Client::open(redis_url).unwrap_or_else(|err| {
-                tracing::error!("{} {}", redis_url, err);
-                panic!("failed to connect to redis: {}", err);
-            }),
-        }
+            redis_manager,
+        })
     }
 
     pub fn add_exclude(&mut self, exclude: fn(parts: &axum::http::request::Parts) -> bool) -> &mut Self {
@@ -144,9 +161,7 @@ impl SignatorMiddleware {
     }
 
     pub fn with_excludes(mut self, excludes: Vec<fn(parts: &axum::http::request::Parts) -> bool>) -> Self {
-        for exclude in excludes {
-            self.excludes.push(exclude);
-        }
+        self.excludes.extend(excludes);
         self
     }
 
@@ -173,25 +188,33 @@ impl SignatorMiddleware {
         let user_id = payload.user_id();
         let nonce = payload.nonce();
 
-        // 并行执行密钥加载和随机数检查
+        // 并行执行密钥加载和随机数检查，带超时控制
         let key_future = {
             let loader = Arc::clone(&self.key_loader);
             let user_id = user_id.to_string();
-            async move { loader(user_id).await }
+            timeout(
+                Duration::from_millis(KEY_LOAD_TIMEOUT_MS),
+                async move { loader(user_id).await }
+            )
         };
 
-        let nonce_future = self.rand_guard(user_id, nonce);
+        let nonce_future = timeout(
+            Duration::from_millis(REDIS_TIMEOUT_MS),
+            self.rand_guard(user_id, nonce)
+        );
 
         // 使用 tokio::try_join! 并行执行
-        let (key_result, nonce_result) = tokio::try_join!(
+        let (key_timeout_result, nonce_timeout_result) = tokio::join!(
             key_future,
             nonce_future
         );
 
-        let key = key_result
+        let key = key_timeout_result
+            .map_err(|_| SignatorError::KeyLoad("Key loading timeout".to_string()).into_response())?
             .map_err(|e| SignatorError::KeyLoad(e.message_string()).into_response())?;
 
-        nonce_result
+        nonce_timeout_result
+            .map_err(|_| SignatorError::RedisConnection("Redis operation timeout".to_string()).into_response())?
             .map_err(|e| e.into_response())?;
 
         // 验证签名（同步操作）
@@ -218,27 +241,60 @@ impl SignatorMiddleware {
     }
 
     async fn rand_guard(&self, user_id: &str, nonce: &str) -> Result<(), SignatorError> {
-        let mut conn = self.redis_client.get_multiplexed_tokio_connection().await
-            .map_err(|e| SignatorError::RedisConnection(e.to_string()))?;
+        let mut conn = self.redis_manager.get_connection().await
+            .map_err(|e| SignatorError::RedisConnection(format!("Failed to get Redis connection: {}", e)))?;
 
-        let name = format!("XR:{}", user_id);
-        let score: Option<i64> = conn.zscore(name.as_str(), nonce).await
-            .map_err(|e| SignatorError::RedisConnection(e.to_string()))?;
-        
-        let score = score.unwrap_or(0);
-        let current: i64 = chrono::Local::now().timestamp();
+        let key = format!("XR:{}", user_id);
+        let current = chrono::Local::now().timestamp();
 
-        if (current - score).abs() < self.nonce_lifetime {
-            return Err(SignatorError::NonceReplay("duplicate rand value".to_string()));
+        // 使用 Redis 事务来确保原子性和性能
+        let script = redis::Script::new(r#"
+            local key = KEYS[1]
+            local nonce = ARGV[1]
+            local current = tonumber(ARGV[2])
+            local lifetime = tonumber(ARGV[3])
+            
+            -- 检查是否存在重复的 nonce
+            local score = redis.call('ZSCORE', key, nonce)
+            if score then
+                local diff = math.abs(current - tonumber(score))
+                if diff < lifetime then
+                    return {err = "duplicate nonce"}
+                end
+            end
+            
+            -- 添加新的 nonce 并清理过期数据
+            redis.call('ZADD', key, current, nonce)
+            redis.call('ZREMRANGEBYSCORE', key, '-inf', current - lifetime)
+            redis.call('EXPIRE', key, lifetime)
+            
+            return {ok = "success"}
+        "#);
+
+        let result: redis::Value = script
+            .key(&key)
+            .arg(nonce)
+            .arg(current)
+            .arg(self.nonce_lifetime)
+            .invoke_async(&mut conn)
+            .await
+            .map_err(|e| SignatorError::RedisConnection(format!("Redis script execution failed: {}", e)))?;
+
+        // 检查脚本执行结果
+        match result {
+            redis::Value::Array(ref values) => {
+                if let Some(redis::Value::BulkString(ref data)) = values.get(0) {
+                    if data == b"err" {
+                        if let Some(redis::Value::BulkString(ref msg)) = values.get(1) {
+                            if msg == b"duplicate nonce" {
+                                return Err(SignatorError::NonceReplay("duplicate nonce detected".to_string()));
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {} // 其他情况认为成功
         }
-
-        let mut pipe = redis::pipe();
-        pipe.zadd(name.as_str(), nonce, current);
-        pipe.zrembyscore(name.as_str(), "-inf", current - self.nonce_lifetime);
-        pipe.expire(name.as_str(), self.nonce_lifetime);
-        
-        let _r = pipe.query_async::<Vec<i64>>(&mut conn).await
-            .map_err(|e| SignatorError::RedisConnection(e.to_string()))?;
 
         Ok(())
     }
@@ -282,6 +338,10 @@ mod constants {
     pub const MIN_NONCE_LENGTH: usize = 8;
     pub const MAX_NONCE_LENGTH: usize = 40;
     pub const BODY_SIZE_LIMIT: usize = 1024 * 1024 * 32; // 32MB
+    
+    // 异步操作超时时间
+    pub const REDIS_TIMEOUT_MS: u64 = 5000; // 5秒
+    pub const KEY_LOAD_TIMEOUT_MS: u64 = 3000; // 3秒
 }
 
 use constants::*;
@@ -344,6 +404,7 @@ impl SignatureHeaders {
     }
 
     /// 获取用于签名的头部字符串
+    #[allow(dead_code)]
     fn to_signature_string(&self) -> String {
         format!("{},{},{}", self.user_id, self.timestamp, self.nonce)
     }
@@ -404,68 +465,102 @@ impl RequestPayload {
         Ok(Some(json))
     }
 
-    /// 生成用于签名的载荷字符串
+    /// 生成用于签名的载荷字符串（优化版本）
     fn to_signature_string(&self, headers: &SignatureHeaders) -> String {
-        let mut payload = format!("{},{},{{{}}}",
-            self.method,
-            self.path,
-            headers.to_signature_string()
-        );
+        // 预估容量以减少重新分配
+        let estimated_capacity = self.method.len() + self.path.len() + 
+            headers.user_id.len() + 20 + // timestamp 和其他字符
+            self.queries.iter().map(|(k, v)| k.len() + v.len() + 2).sum::<usize>() +
+            self.body.as_ref().map_or(0, |_| 100); // 估算 JSON 大小
+
+        let mut buffer = String::with_capacity(estimated_capacity);
+        
+        // 构建基础载荷
+        buffer.push_str(&self.method);
+        buffer.push(',');
+        buffer.push_str(&self.path);
+        buffer.push_str(",{");
+        buffer.push_str(&headers.user_id);
+        buffer.push(',');
+        buffer.push_str(&headers.timestamp.to_string());
+        buffer.push(',');
+        buffer.push_str(&headers.nonce);
+        buffer.push('}');
 
         // 添加查询参数
         if !self.queries.is_empty() {
-            let mut query_keys: Vec<String> = self.queries.keys().cloned().collect();
-            query_keys.sort();
+            let mut query_keys: Vec<&String> = self.queries.keys().collect();
+            query_keys.sort_unstable();
 
-            payload.push_str(",{");
+            buffer.push_str(",{");
             for (i, key) in query_keys.iter().enumerate() {
                 if i > 0 {
-                    payload.push(',');
+                    buffer.push(',');
                 }
-                payload.push_str(&format!("{}={}", key, self.queries.get(key).unwrap()));
+                buffer.push_str(key);
+                buffer.push('=');
+                buffer.push_str(self.queries.get(*key).unwrap());
             }
-            payload.push('}');
+            buffer.push('}');
         }
 
         // 添加请求体
         if let Some(body) = &self.body {
-            payload.push(',');
-            payload.push_str(&JsonFormatter::format(body));
+            buffer.push(',');
+            JsonFormatter::format_into(&mut buffer, body);
         }
 
-        payload
+        buffer
     }
 }
 
-/// JSON 格式化器
+/// 高性能 JSON 格式化器
 struct JsonFormatter;
 
 impl JsonFormatter {
+    #[allow(dead_code)]
     fn format(value: &serde_json::Value) -> String {
+        let mut buffer = String::new();
+        Self::format_into(&mut buffer, value);
+        buffer
+    }
+
+    fn format_into(buffer: &mut String, value: &serde_json::Value) {
         match value {
-            serde_json::Value::Null => "null".to_string(),
-            serde_json::Value::Bool(b) => b.to_string(),
-            serde_json::Value::Number(n) => n.to_string(),
-            serde_json::Value::String(s) => s.clone(),
-            serde_json::Value::Array(array) => Self::format_array(array),
-            serde_json::Value::Object(object) => Self::format_object(object),
+            serde_json::Value::Null => buffer.push_str("null"),
+            serde_json::Value::Bool(b) => buffer.push_str(&b.to_string()),
+            serde_json::Value::Number(n) => buffer.push_str(&n.to_string()),
+            serde_json::Value::String(s) => buffer.push_str(s),
+            serde_json::Value::Array(array) => Self::format_array_into(buffer, array),
+            serde_json::Value::Object(object) => Self::format_object_into(buffer, object),
         }
     }
 
-    fn format_array(array: &[serde_json::Value]) -> String {
-        let items: Vec<String> = array.iter().map(Self::format).collect();
-        format!("[{}]", items.join(","))
+    fn format_array_into(buffer: &mut String, array: &[serde_json::Value]) {
+        buffer.push('[');
+        for (i, item) in array.iter().enumerate() {
+            if i > 0 {
+                buffer.push(',');
+            }
+            Self::format_into(buffer, item);
+        }
+        buffer.push(']');
     }
 
-    fn format_object(object: &serde_json::Map<String, serde_json::Value>) -> String {
-        let mut keys: Vec<String> = object.keys().cloned().collect();
-        keys.sort();
+    fn format_object_into(buffer: &mut String, object: &serde_json::Map<String, serde_json::Value>) {
+        let mut keys: Vec<&String> = object.keys().collect();
+        keys.sort_unstable();
         
-        let items: Vec<String> = keys.iter()
-            .map(|key| format!("{}={}", key, Self::format(object.get(key).unwrap())))
-            .collect();
-        
-        format!("{{{}}}", items.join(","))
+        buffer.push('{');
+        for (i, key) in keys.iter().enumerate() {
+            if i > 0 {
+                buffer.push(',');
+            }
+            buffer.push_str(key);
+            buffer.push('=');
+            Self::format_into(buffer, object.get(*key).unwrap());
+        }
+        buffer.push('}');
     }
 }
 
@@ -599,7 +694,8 @@ mod tests {
     #[tokio::test]
     async fn test_signator_middleware_creation() {
         let key_loader = create_test_key_loader();
-        let middleware = SignatorMiddleware::new("redis://localhost:6379", key_loader);
+        let middleware = SignatorMiddleware::new("redis://localhost:6379", key_loader)
+            .expect("Failed to create middleware");
         
         assert_eq!(middleware.priority(), 85);
         assert_eq!(middleware.name(), "SignatorMiddleware");
@@ -610,11 +706,12 @@ mod tests {
     #[tokio::test]
     async fn test_signator_middleware_focus() {
         let key_loader = create_test_key_loader();
-        let middleware = SignatorMiddleware::new("redis://localhost:6379", key_loader);
+        let middleware = SignatorMiddleware::new("redis://localhost:6379", key_loader)
+            .expect("Failed to create middleware");
         
         // 创建测试请求
         let request = Request::builder()
-            .method(Method::GET)
+            .method(axum::http::Method::GET)
             .uri("/api/users")
             .body(Body::empty())
             .unwrap();
@@ -635,11 +732,12 @@ mod tests {
         };
         
         let middleware = SignatorMiddleware::new("redis://localhost:6379", key_loader)
+            .expect("Failed to create middleware")
             .with_excludes(vec![exclude_health]);
         
         // 测试排除的路径
         let request = Request::builder()
-            .method(Method::GET)
+            .method(axum::http::Method::GET)
             .uri("/api/health")
             .body(Body::empty())
             .unwrap();
@@ -651,7 +749,7 @@ mod tests {
         
         // 测试非排除的路径
         let request = Request::builder()
-            .method(Method::GET)
+            .method(axum::http::Method::GET)
             .uri("/api/users")
             .body(Body::empty())
             .unwrap();
@@ -670,7 +768,8 @@ mod tests {
             "redis://localhost:6379", 
             key_loader, 
             "development_backdoor".to_string()
-        ).with_nonce_lifetime(600);
+        ).expect("Failed to create middleware")
+        .with_nonce_lifetime(600);
         
         assert_eq!(middleware.rear, "development_backdoor");
         assert_eq!(middleware.nonce_lifetime, 600);
@@ -756,7 +855,7 @@ mod tests {
 
 /// 使用示例
 
-pub fn create_signator_middleware_chain(redis_url: &str, key_loader: KeyLoader) -> MiddlewareChain {
+pub fn create_signator_middleware_chain(redis_url: &str, key_loader: KeyLoader) -> Result<MiddlewareChain, SignatorError> {
     // 定义排除函数
     let exclude_health = |parts: &axum::http::request::Parts| -> bool {
         parts.uri.path() == "/api/health" || parts.uri.path() == "/api/ping"
@@ -767,7 +866,7 @@ pub fn create_signator_middleware_chain(redis_url: &str, key_loader: KeyLoader) 
     };
 
     // 创建签名中间件
-    let signator = SignatorMiddleware::new(redis_url, key_loader)
+    let signator = SignatorMiddleware::new(redis_url, key_loader)?
         .with_excludes(vec![exclude_health, exclude_public])
         .with_nonce_lifetime(300); // 5分钟
 
@@ -780,7 +879,7 @@ pub fn create_signator_middleware_chain(redis_url: &str, key_loader: KeyLoader) 
         .add(super::examples::RateLimitMiddleware::new(100, 60)) // 优先级: 80
         .build();
 
-    MiddlewareChain::new(manager)
+    Ok(MiddlewareChain::new(manager))
 }
 
 /// 创建带有后门的签名中间件链（用于开发环境）
@@ -788,8 +887,8 @@ pub fn create_signator_middleware_chain_with_rear(
     redis_url: &str, 
     key_loader: KeyLoader, 
     rear: String
-) -> MiddlewareChain {
-    let signator = SignatorMiddleware::with_rear(redis_url, key_loader, rear)
+) -> Result<MiddlewareChain, SignatorError> {
+    let signator = SignatorMiddleware::with_rear(redis_url, key_loader, rear)?
         .with_nonce_lifetime(300);
 
     let manager = MiddlewareBuilder::new()
@@ -797,5 +896,5 @@ pub fn create_signator_middleware_chain_with_rear(
         .add(signator)
         .build();
 
-    MiddlewareChain::new(manager)
+    Ok(MiddlewareChain::new(manager))
 }
