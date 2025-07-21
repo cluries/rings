@@ -162,16 +162,39 @@ impl SignatorMiddleware {
     async fn validate_signature(&self, request: Request) -> Result<Request, Response> {
         let (payload_request, mut request) = clone_request(request).await;
 
+        // 并行处理载荷解析和验证
         let payload = Payload::from_request(payload_request).await
             .map_err(|e| e.into_response())?;
         
+        // 同步验证，无需 await
         payload.guard()
             .map_err(|e| e.into_response())?;
 
-        let loader = Arc::clone(&self.key_loader);
-        let key = loader(payload.val_or_default_u()).await
+        let user_id = payload.user_id();
+        let nonce = payload.nonce();
+
+        // 并行执行密钥加载和随机数检查
+        let key_future = {
+            let loader = Arc::clone(&self.key_loader);
+            let user_id = user_id.to_string();
+            async move { loader(user_id).await }
+        };
+
+        let nonce_future = self.rand_guard(user_id, nonce);
+
+        // 使用 tokio::try_join! 并行执行
+        let (key_result, nonce_result) = tokio::try_join!(
+            key_future,
+            nonce_future
+        );
+
+        let key = key_result
             .map_err(|e| SignatorError::KeyLoad(e.message_string()).into_response())?;
 
+        nonce_result
+            .map_err(|e| e.into_response())?;
+
+        // 验证签名（同步操作）
         if let Err((error, debug)) = payload.valid(key) {
             if self.rear.is_empty() || Some(self.rear.as_str()) != payload.development_skip() {
                 return Err(SignatorError::SignatureInvalid { 
@@ -186,12 +209,9 @@ impl SignatorMiddleware {
             }
         }
 
-        self.rand_guard(payload.user_id(), payload.nonce())
-            .await
-            .map_err(|e| e.into_response())?;
-
+        // 设置上下文
         use crate::web::context::Context;
-        let context = Context::new(payload.user_id().to_string());
+        let context = Context::new(user_id.to_string());
         request.extensions_mut().insert(context);
 
         Ok(request)
