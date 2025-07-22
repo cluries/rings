@@ -3,6 +3,7 @@ pub mod signature;
 
 use axum::http::request::Parts;
 use axum::{extract::Request, response::Response};
+use futures_util::future::BoxFuture;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -11,7 +12,8 @@ use std::time::Instant;
 use crate::erx;
 use axum::http::Method;
 use std::task::{Context as TaskContext, Poll};
-use tower::{Layer, Service};
+use tower::layer::util::{Identity, Stack};
+use tower::{Layer, Service, ServiceBuilder};
 
 pub enum Pattern {
     Prefix(String),
@@ -89,7 +91,10 @@ pub struct ManagerLayer {
     manager: Arc<Manager>,
 }
 
-pub struct ManagerService<S> {
+pub struct ManagerService<S>
+where
+    S: Clone,
+{
     inner: S,
     manager: Arc<Manager>,
 }
@@ -198,9 +203,15 @@ impl Manager {
     }
 }
 
+impl Into<ServiceBuilder<Stack<ManagerLayer, Identity>>> for ManagerLayer {
+    fn into(self) -> ServiceBuilder<Stack<ManagerLayer, Identity>> {
+        ServiceBuilder::new().layer(self)
+    }
+}
+
 impl<S> Layer<S> for ManagerLayer
 where
-    S: Service<Request, Response = Response> + Send + 'static,
+    S: Service<Request, Response = Response> + Send + Clone + 'static,
     S::Future: Send + 'static,
     S::Error: Into<erx::Erx>,
 {
@@ -211,37 +222,50 @@ where
     }
 }
 
-impl<S> Service<Request> for ManagerService<S>
+impl<S> Service<axum::extract::Request> for ManagerService<S>
 where
-    S: Service<Request, Response = Response> + Send + 'static,
+    S: Service<axum::extract::Request, Response = axum::response::Response> + Send + Clone + 'static,
     S::Future: Send + 'static,
     S::Error: Into<erx::Erx>,
 {
-    type Response = Response;
-    type Error = erx::Erx;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx).map_err(Into::into)
+        self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
         let manager = Arc::clone(&self.manager);
         let (parts, body) = req.into_parts();
+        let middles = manager.applys(&parts);
 
-        let applicable_middlewares = manager.applys(&parts);
+        let mut inner = self.inner.clone();
+        let context = Context::new(Request::from_parts(parts, body));
 
         Box::pin(async move {
-            let mut context = Context::new(Request::from_parts(parts, body));
-
-            for m in applicable_middlewares {
-
+            let mut context = Arc::new(context);
+            for m in middles {
+                match m.on_request(context.clone()) {
+                    None => {},
+                    Some(middleware_future) => {
+                        context = middleware_future.await?;
+                    },
+                }
             }
 
-            for m in applicable_middlewares {
+            let req = context.request;
+            let response: Response = inner.call(req).await?;
 
+            for m in middles {
+                match m.on_response(context.clone()) {
+                    None => {},
+                    Some(middleware_future) => {
+                        context = middleware_future.await?;
+                    },
+                }
             }
-            
         })
     }
 }
