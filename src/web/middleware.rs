@@ -5,8 +5,8 @@ use axum::http::request::Parts;
 use axum::{extract::Request, response::Response};
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Instant;
-use std::sync::{Arc};
 
 use crate::erx;
 use axum::http::Method;
@@ -83,6 +83,23 @@ pub struct Manager {
     middlewares: Vec<Box<dyn Middleware>>,
 }
 
+impl Pattern {
+    pub fn check(&self, path: &str) -> bool {
+        match self {
+            Pattern::Prefix(prefix) => path.starts_with(prefix),
+            Pattern::Suffix(suffix) => path.ends_with(suffix),
+            Pattern::Contains(contains) => path.contains(contains),
+            Pattern::Regex(regex) => match regex::Regex::new(regex) {
+                Ok(re) => re.is_match(path),
+                Err(e) => {
+                    tracing::error!("Invalid regex pattern: {}", e);
+                    false
+                },
+            },
+        }
+    }
+}
+
 impl Manager {
     pub fn new() -> Self {
         Self { middlewares: Vec::new() }
@@ -95,15 +112,12 @@ impl Manager {
             }
         }
         self.middlewares.push(middleware);
-        self
-    }
-
-    pub fn sort(&mut self) {
         self.middlewares.sort_by(|a, b| {
             let a_priority = a.priority().unwrap_or(0);
             let b_priority = b.priority().unwrap_or(0);
             b_priority.cmp(&a_priority)
         });
+        self
     }
 
     pub fn applys(&self, parts: &Parts) -> Vec<&Box<dyn Middleware>> {
@@ -125,8 +139,16 @@ impl Manager {
             let request_method = parts.method.clone();
             for method in methods {
                 match method {
-                    ApplyKind::Include(m) => if request_method == &m { return true },
-                    ApplyKind::Exclude(m) => if request_method != &m { return true },
+                    ApplyKind::Include(m) => {
+                        if request_method == &m {
+                            return true;
+                        }
+                    },
+                    ApplyKind::Exclude(m) => {
+                        if request_method != &m {
+                            return true;
+                        }
+                    },
                 }
             }
         }
@@ -135,40 +157,26 @@ impl Manager {
             let path = parts.uri.path();
             for pattern in patterns {
                 match pattern {
-                    ApplyKind::Include(p) => if  check_pattern(&p, path) { return true },
-                    ApplyKind::Exclude(p) => if !check_pattern(&p, path) { return true },
+                    ApplyKind::Include(p) => {
+                        if p.check(path) {
+                            return true;
+                        }
+                    },
+                    ApplyKind::Exclude(p) => {
+                        if !p.check(path) {
+                            return true;
+                        }
+                    },
                 }
-            }
-        }
-        
-        #[inline]
-        fn check_pattern(pattern: &Pattern, path: &str) -> bool {
-            match pattern {
-                Pattern::Prefix(prefix) => path.starts_with(prefix),
-                Pattern::Suffix(suffix) => path.ends_with(suffix),
-                Pattern::Contains(contains) => path.contains(contains),
-                Pattern::Regex(regex) => {
-                    match regex::Regex::new(regex) {
-                        Ok(re) => re.is_match(path),
-                        Err(_) => false,
-                    }
-                },
             }
         }
 
         false
     }
 
-    
-    
-
-
     pub fn integrated(_manager: Arc<Manager>, router: axum::Router) -> axum::Router {
         // 创建一个新的中间件层
 
         router
     }
-
 }
- 
-  

@@ -13,7 +13,6 @@ use crate::web::request::clone_request;
 use crate::web::url::parse_query;
 use redis::AsyncCommands;
 
-
 use crate::erx;
 use axum::http::{HeaderMap, HeaderValue};
 use axum::response::IntoResponse;
@@ -143,13 +142,13 @@ impl Signator {
         Ok(request)
     }
 
-    async fn rand_guard(&self, payload:&Payload) -> erx::ResultEX {
+    async fn rand_guard(&self, payload: &Payload) -> erx::ResultEX {
         let mut conn: redis::aio::MultiplexedConnection = self.redis_client.get_multiplexed_tokio_connection().await.map_err(erx::smp)?;
 
         let name = format!("XR:{}", payload.xget_u());
         let xr = payload.xget_r();
 
-        let score: Option<i64> = conn.zscore(name.as_str(), &xr ).await.map_err(erx::smp)?;
+        let score: Option<i64> = conn.zscore(name.as_str(), &xr).await.map_err(erx::smp)?;
 
         let score = score.unwrap_or(0);
         let current: i64 = chrono::Local::now().timestamp();
@@ -166,7 +165,6 @@ impl Signator {
 
         Ok(())
     }
-
 }
 
 #[derive(Clone)]
@@ -342,11 +340,10 @@ impl Payload {
 
             payload.body = body.ok();
         }
-        
+
         payload.load_header(parts.headers);
 
         Ok(payload)
-        
     }
 
     fn load_header(&mut self, headers: HeaderMap<HeaderValue>) {
