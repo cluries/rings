@@ -2,9 +2,10 @@
 /// an api middleware for signature
 ///
 /// Usage:
-///  let backdoor = signator_conf.get("backdoor").cloned().unwrap_or_default();
-///  let layer = SigLayer::with_backdoor(&redis_url, key_loader, excludes, backdoor);
+///  let rear = signator_conf.get("rear").cloned().unwrap_or_default();
+///  let layer = SigLayer::with_rear(&redis_url, key_loader, excludes, rear);
 ///  layer.integrated(router)
+
 use crate::erx::{Erx, Layouted, LayoutedC};
 use crate::tools::hash;
 use crate::web::api::Out;
@@ -14,7 +15,6 @@ use redis::AsyncCommands;
 
 
 use crate::erx;
-use axum::http::{HeaderMap, HeaderValue};
 use axum::response::IntoResponse;
 use axum::Router;
 use futures_util::future::BoxFuture;
@@ -28,39 +28,47 @@ use tower::layer::util::{Identity, Stack};
 use tower::{Layer, Service, ServiceBuilder};
 use tracing::info;
 
-// 默认配置常量
-const DEFAULT_NONCE_LIFETIME: i64 = 300; // 5分钟
-const MAX_BODY_SIZE: usize = 1024 * 1024 * 32; // 32MB
-const MAX_TIME_DIFF: i64 = 60 * 5; // 5分钟时间差
-const MIN_NONCE_LENGTH: usize = 8;
-const MAX_NONCE_LENGTH: usize = 40;
-const SIGNATURE_LENGTH: usize = 40;
+static DEFAULT_RAND_LIFE: i64 = 300;
 
-// 错误码常量
-mod error_codes {
-    pub const SIGN: &str = "SIGN";
-    pub const PAYLOAD: &str = "PAYL";
-    pub const FORMAT: &str = "FRMT";
-    pub const LOAD: &str = "LOAD";
-    pub const INVALID: &str = "INVD";
-}
+static SIGN_STR: &str = "SIGN";
+static PAYL_STR: &str = "PAYL";
+static FRMT_STR: &str = "FRMT";
+static LOAD_STR: &str = "LOAD";
+static INVD_STR: &str = "INVD";
 
-#[inline]
 fn make_code(detail: &str) -> LayoutedC {
-    Layouted::middleware(error_codes::SIGN, detail)
+    Layouted::middleware(SIGN_STR, detail)
 }
 
 macro_rules! rout {
     ($x:expr) => {
-        Out::<()>{code:make_code($x).into(), message:None, data:None, debug:None, profile:None}.into_response()
+        Out::<()>{
+            code: make_code($x).into(),
+            message:None,
+            data: None,
+            debug: None,
+            profile: None,
+        }.into_response()
     };
 
     ($x:expr, $y:expr) => {
-       Out::<()> {code:make_code($x).into(), message:Some($y), data:None, debug:None,profile:None}.into_response()
+       Out::<()> {
+            code:make_code($x).into(),
+            message: Some($y),
+            data: None,
+            debug: None,
+            profile: None,
+       }.into_response()
     };
 
     ($x:expr, $y:expr, $z:expr) => {
-        Out{code:make_code($x).into(), message:Some($y), data:Some($z), debug:None, profile:None}.into_response()
+        Out{
+            code:make_code($x).into(),
+            message: Some($y),
+            data: Some($z),
+            debug: None,
+            profile: None,
+       }.into_response()
     };
 
     ($($x:expr),*) => {
@@ -69,12 +77,11 @@ macro_rules! rout {
 }
 
 /// KeyLoader
-pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
-pub type Excluder = fn(parts: &axum::http::request::Parts) -> bool;
+pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output=Result<String, Erx>> + Send>> + Send + Sync>;
 
 pub struct Signator {
-    backdoor: String, // 后门，开发时候方便用
-    excludes: Vec<Excluder>,
+    rear: String, // 后门，开发时候方便用
+    excludes: Vec<fn(parts: &axum::http::request::Parts) -> bool>,
     nonce_lifetime: i64,
     key_loader: KeyLoader,
     redis_client: redis::Client,
@@ -83,7 +90,7 @@ pub struct Signator {
 impl Clone for Signator {
     fn clone(&self) -> Self {
         Signator {
-            backdoor: self.backdoor.clone(),
+            rear: self.rear.clone(),
             excludes: self.excludes.clone(),
             nonce_lifetime: self.nonce_lifetime,
             key_loader: Arc::clone(&self.key_loader),
@@ -94,14 +101,14 @@ impl Clone for Signator {
 
 impl Signator {
     pub fn new(redis_url: &str, key_loader: KeyLoader) -> Self {
-        Self::with_backdoor(redis_url, Arc::clone(&key_loader), String::default())
+        Self::with_rear(redis_url, Arc::clone(&key_loader), String::default())
     }
 
-    pub fn with_backdoor(redis_url: &str, key_loader: KeyLoader, backdoor: String) -> Self {
+    pub fn with_rear(redis_url: &str, key_loader: KeyLoader, rear: String) -> Self {
         Signator {
-            backdoor,
+            rear,
             excludes: vec![],
-            nonce_lifetime: DEFAULT_NONCE_LIFETIME,
+            nonce_lifetime: DEFAULT_RAND_LIFE,
             key_loader,
             redis_client: redis::Client::open(redis_url).unwrap_or_else(|err| {
                 tracing::error!("{} {}", redis_url, err);
@@ -122,22 +129,24 @@ impl Signator {
     pub async fn exec(&self, request: axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response> {
         let (payload_request, mut request) = clone_request(request).await;
 
-        let payload = Payload::from_request(payload_request).await.map_err(|e| rout!(error_codes::PAYLOAD, e))?;
-        payload.guard().map_err(|e| rout!(error_codes::FORMAT, e.into()))?;
+        let payload = Payload::from_request(payload_request).await.map_err(|e| rout!(PAYL_STR, e))?;
+        payload.guard().map_err(|e| rout!(FRMT_STR, e.into()))?;
 
         let loader = Arc::clone(&self.key_loader);
-        let key = loader(payload.xuser()).await.map_err(|e| rout!(error_codes::LOAD, e.message_string()))?;
+        let key = loader(payload.val_or_default_u()).await.map_err(|e| rout!(LOAD_STR, e.message_string()))?;
 
         if let Err((error, debug)) = payload.valid(key) {
-            if self.backdoor.is_empty() || !self.backdoor.eq(&payload.xdevskip()) {
-                return Err(rout!(error_codes::INVALID, error, debug));
+            if self.rear.is_empty() || !self.rear.eq(&payload.val_or_default_d()) {
+                return Err(rout!(INVD_STR, error, debug));
             }
         }
 
-        self.rand_guard(payload.xuser(), payload.xnonce()).await.map_err(|e| rout!(error_codes::INVALID, e.message_string()))?;
+        self.rand_guard(payload.val_or_default_u(), payload.val_or_default_r())
+            .await
+            .map_err(|e| rout!(INVD_STR, e.message_string()))?;
 
         use crate::web::context::Context;
-        let context = Context::new(payload.xuser());
+        let context = Context::new(payload.val_or_default_u());
         request.extensions_mut().insert(context);
 
         Ok(request)
@@ -148,7 +157,8 @@ impl Signator {
 
         let name = format!("XR:{}", xu);
         let score: Option<i64> = conn.zscore(name.as_str(), xr.as_str()).await.map_err(erx::smp)?;
-
+        // let score_rs: redis::RedisResult<i64> = conn.zscore(name.as_str(), xr.as_str()).await;
+        // let score:i64 = 0;
         let score = score.unwrap_or(0);
         let current: i64 = chrono::Local::now().timestamp();
 
@@ -181,13 +191,15 @@ where
 }
 
 impl SigLayer {
-    pub fn new(redis_url: &str, key_loader: KeyLoader, excludes: Vec<Excluder>) -> Self {
-        Self::with_backdoor(redis_url, key_loader, excludes, "".to_string())
+    pub fn new(redis_url: &str, key_loader: KeyLoader, excludes: Vec<fn(parts: &axum::http::request::Parts) -> bool>) -> Self {
+        Self::with_rear(redis_url, key_loader, excludes, "".to_string())
     }
 
-    pub fn with_backdoor(redis_url: &str, key_loader: KeyLoader, excludes: Vec<Excluder>, backdoor: String) -> Self {
+    pub fn with_rear(
+        redis_url: &str, key_loader: KeyLoader, excludes: Vec<fn(parts: &axum::http::request::Parts) -> bool>, rear: String,
+    ) -> Self {
         info!("new signator: {}", redis_url);
-        let mut s = Signator::with_backdoor(redis_url, key_loader, backdoor);
+        let mut s = Signator::with_rear(redis_url, key_loader, rear);
         for exclude in excludes {
             s.add_exclude(exclude);
         }
@@ -220,7 +232,7 @@ where
 
 impl<S> Service<axum::extract::Request> for SigMiddle<S>
 where
-    S: Service<axum::extract::Request, Response = axum::response::Response> + Send + Clone + 'static,
+    S: Service<axum::extract::Request, Response=axum::response::Response> + Send + Clone + 'static,
     S::Future: Send + 'static,
 {
     type Response = S::Response;
@@ -248,21 +260,27 @@ where
                 Ok(request) => {
                     let response: axum::response::Response = inner.call(request).await?;
                     Ok(response)
-                },
+                }
                 Err(response) => Ok(response),
             }
         })
     }
 }
 
+static XU: &str = "X-U";
+static XT: &str = "X-T";
+static XR: &str = "X-R";
+static XS: &str = "X-S";
+static DS: &str = "X-DEVELOPMENT-SKIP";
+
 struct Payload {
     method: String,
     path: String,
 
-    xu: Option<String>, // userid
-    xt: Option<String>, // timestamp
-    xr: Option<String>, // nonce
-    xs: Option<String>, // signature
+    xu: Option<String>,
+    xt: Option<String>,
+    xr: Option<String>,
+    xs: Option<String>,
     ds: Option<String>, // X-DEVELOPMENT-SKIP
 
     queries: HashMap<String, String>,
@@ -277,38 +295,26 @@ struct Debug {
     client: String,
 }
 
-mod header_names {
-
-    /// user id
-    pub(crate) const U: &'static str = "X-U";
-
-    /// timestamp
-    pub(crate) const T: &'static str = "X-T";
-
-    /// nonce
-    pub(crate) const R: &'static str = "X-R";
-
-    ///signature
-    pub(crate) const S: &'static str = "X-S";
-
-    /// development skip
-    pub(crate) const D: &'static str = "X-DEVELOPMENT-SKIP";
-}
 
 impl Payload {
-    fn new(method: String, path: String, queries: HashMap<String, String>) -> Self {
-        Payload { method, path, xu: None, xt: None, xr: None, xs: None, ds: None, queries, body: None }
-    }
-
     async fn from_request(req: axum::extract::Request) -> Result<Self, String> {
         let (parts, body) = req.into_parts();
 
+        let headers = parts.headers;
+        let header = |n| -> Option<String> { headers.get(n).and_then(|value| value.to_str().ok()).map(String::from) };
+
+        let xu = header(XU);
+        let xt = header(XT);
+        let xr = header(XR);
+        let xs = header(XS);
+        let ds = header(DS);
+
         let path = parts.uri.path().to_string();
         let method = parts.method.as_str();
+
         let queries = parse_query(parts.uri.query().unwrap_or_default());
 
-        let mut payload = Payload::new(method.to_uppercase(), path, queries);
-        payload.load_header(parts.headers);
+        let mut bd: Option<serde_json::Value> = None;
 
         use crate::web::define::HttpMethod;
 
@@ -320,7 +326,8 @@ impl Payload {
             || HttpMethod::PATCH.is(method);
 
         if body_guard {
-            let body: Result<serde_json::Value, String> = match axum::body::to_bytes(body, MAX_BODY_SIZE).await {
+            const LIMIT: usize = 1024 * 1024 * 32;
+            let body: Result<serde_json::Value, String> = match axum::body::to_bytes(body, LIMIT).await {
                 Ok(bytes) => {
                     if bytes.len() < 1 {
                         Ok(serde_json::Value::default())
@@ -330,47 +337,40 @@ impl Payload {
                             Err(err) => Err(err.to_string()),
                         }
                     }
-                },
+                }
                 Err(err) => Err(err.to_string()),
             };
 
             if let Err(err) = body {
                 return Err(err);
             }
-            payload.body = body.ok();
+            bd = body.ok();
         }
+
+        let method = method.to_uppercase().to_string();
+        let payload = Payload { method, path, xu, xt, xr, xs, ds, queries, body: bd };
 
         Ok(payload)
     }
 
-    fn load_header(&mut self, headers: HeaderMap<HeaderValue>) {
-        let header = |n| -> Option<String> { headers.get(n).and_then(|value| value.to_str().ok()).map(String::from) };
-
-        self.xu = header(header_names::U);
-        self.xt = header(header_names::T);
-        self.xr = header(header_names::R);
-        self.xs = header(header_names::S);
-        self.ds = header(header_names::D);
-    }
-
-    pub fn xuser(&self) -> String {
+    pub fn val_or_default_u(&self) -> String {
         self.xu.clone().unwrap_or_default()
     }
 
-    pub fn xnonce(&self) -> String {
+    pub fn val_or_default_r(&self) -> String {
         self.xr.clone().unwrap_or_default()
     }
 
-    pub fn xsignature(&self) -> String {
+    pub fn val_or_default_s(&self) -> String {
         self.xs.clone().unwrap_or_default()
     }
 
     #[allow(unused)]
-    pub fn xtimestamp(&self) -> String {
+    pub fn val_or_default_t(&self) -> String {
         self.xt.clone().unwrap_or_default()
     }
 
-    pub fn xdevskip(&self) -> String {
+    pub fn val_or_default_d(&self) -> String {
         self.ds.clone().unwrap_or_default()
     }
 
@@ -379,7 +379,7 @@ impl Payload {
         let hash = hash::hmac_sha1(&load, &key);
 
         if !hash.eq(self.xs.as_ref().unwrap_or(&String::default())) {
-            let debug = Debug { payload: load, key: key.clone(), client: self.xsignature(), server: hash };
+            let debug = Debug { payload: load, key: key.clone(), client: self.val_or_default_s(), server: hash };
             return Err((String::from("invalid signature"), debug));
         }
 
@@ -391,17 +391,18 @@ impl Payload {
             return Err("missing signature data in header");
         }
 
+        const MAX: i64 = 60 * 5;
         let xti = self.xt.as_ref().unwrap().parse::<i64>().unwrap_or(0);
-        if xti < MAX_TIME_DIFF || (chrono::Utc::now().timestamp() - xti).abs() > MAX_TIME_DIFF {
+        if xti < MAX || (chrono::Utc::now().timestamp() - xti).abs() > MAX {
             return Err("the time difference is too large");
         }
 
         let length = self.xr.as_ref().unwrap().len();
-        if length <= MIN_NONCE_LENGTH || length >= MAX_NONCE_LENGTH {
+        if length <= 8 || length >= 40 {
             return Err("random string length invalid");
         }
 
-        if self.xs.as_ref().unwrap().len() != SIGNATURE_LENGTH {
+        if self.xs.as_ref().unwrap().len() != 40 {
             return Err("invalid signature data in header");
         }
 
