@@ -106,12 +106,6 @@ impl Manager {
         });
     }
 
-    pub fn integrated(_manager: Arc<Manager>, router: axum::Router) -> axum::Router {
-        // 创建一个新的中间件层
-
-        router
-    }
-
     pub fn applys(&self, parts: &Parts) -> Vec<&Box<dyn Middleware>> {
         let mut middlewares = Vec::new();
         for middleware in &self.middlewares {
@@ -159,6 +153,14 @@ impl Manager {
             Pattern::Regex(regex) => regex::Regex::new(regex).unwrap().is_match(path),
         }
     }
+
+
+    pub fn integrated(_manager: Arc<Manager>, router: axum::Router) -> axum::Router {
+        // 创建一个新的中间件层
+
+        router
+    }
+    
 }
  
   
