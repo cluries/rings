@@ -127,7 +127,7 @@ impl Signator {
         payload.guard().map_err(|e| rout!(error_codes::FORMAT, e.into()))?;
 
         let loader = Arc::clone(&self.key_loader);
-        let key = loader(payload.xuser()).await.map_err(|e| rout!(error_codes::LOAD, e.message_string()))?;
+        let key = loader(payload.xget_u()).await.map_err(|e| rout!(error_codes::LOAD, e.message_string()))?;
 
         if let Err((error, debug)) = payload.valid(key) {
             if self.backdoor.is_empty() || !self.backdoor.eq(&payload.xdevskip()) {
@@ -137,7 +137,7 @@ impl Signator {
 
         self.rand_guard(&payload).await.map_err(|e| rout!(error_codes::INVALID, e.message_string()))?;
 
-        let context = crate::web::context::Context::new(payload.xuser());
+        let context = crate::web::context::Context::new(payload.xget_u());
         request.extensions_mut().insert(context);
 
         Ok(request)
@@ -146,8 +146,8 @@ impl Signator {
     async fn rand_guard(&self, payload:&Payload) -> erx::ResultEX {
         let mut conn: redis::aio::MultiplexedConnection = self.redis_client.get_multiplexed_tokio_connection().await.map_err(erx::smp)?;
 
-        let name = format!("XR:{}", payload.xuser());
-        let xr = payload.xnonce();
+        let name = format!("XR:{}", payload.xget_u());
+        let xr = payload.xget_r();
 
         let score: Option<i64> = conn.zscore(name.as_str(), &xr ).await.map_err(erx::smp)?;
 
@@ -359,24 +359,19 @@ impl Payload {
         self.ds = header(header_names::D);
     }
 
-    pub fn xuser(&self) -> String {
+    pub fn xget_u(&self) -> String {
         self.xu.clone().unwrap_or_default()
     }
 
-    pub fn xnonce(&self) -> String {
+    pub fn xget_r(&self) -> String {
         self.xr.clone().unwrap_or_default()
     }
 
-    pub fn xsignature(&self) -> String {
+    pub fn xget_s(&self) -> String {
         self.xs.clone().unwrap_or_default()
     }
 
-    #[allow(unused)]
-    pub fn xtimestamp(&self) -> String {
-        self.xt.clone().unwrap_or_default()
-    }
-
-    pub fn xdevskip(&self) -> String {
+    pub fn xget_d(&self) -> String {
         self.ds.clone().unwrap_or_default()
     }
 
@@ -385,7 +380,7 @@ impl Payload {
         let hash = hash::hmac_sha1(&load, &key);
 
         if !hash.eq(self.xs.as_ref().unwrap_or(&String::default())) {
-            let debug = Debug { payload: load, key: key.clone(), client: self.xsignature(), server: hash };
+            let debug = Debug { payload: load, key: key.clone(), client: self.xget_s(), server: hash };
             return Err((String::from("invalid signature"), debug));
         }
 
