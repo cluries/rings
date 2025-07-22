@@ -228,13 +228,20 @@ where
     fn call(&mut self, req: Request) -> Self::Future {
         let manager = Arc::clone(&self.manager);
         let (parts, body) = req.into_parts();
+
         let applicable_middlewares = manager.applys(&parts);
-        let mut context = Context::new(Request::from_parts(parts, body));
 
         Box::pin(async move {
-            for m in applicable_middlewares {}
+            let mut context = Context::new(Request::from_parts(parts, body));
 
-            for m in applicable_middlewares {}
+            for m in applicable_middlewares {
+
+            }
+
+            for m in applicable_middlewares {
+
+            }
+            
         })
     }
 }
