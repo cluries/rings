@@ -1,19 +1,17 @@
-
-
 // 实现对axum middleware的抽象
-pub mod signature; 
-
+pub mod signature;
 
 use axum::http::request::Parts;
 use axum::{extract::Request, response::Response};
 use std::future::Future;
 use std::pin::Pin;
 use std::time::Instant;
+use std::sync::{Arc};
 
-use axum::http::Method;
 use crate::erx;
+use axum::http::Method;
 
-pub enum Pattern  {
+pub enum Pattern {
     Prefix(String),
     Suffix(String),
     Contains(String),
@@ -25,9 +23,6 @@ pub enum ApplyKind<T> {
     Exclude(T),
 }
 
- 
-
-
 #[derive(Debug, Clone)]
 pub struct Metrics {
     pub start_time: Instant,
@@ -38,22 +33,19 @@ pub struct Metrics {
 
 pub struct Chain {
     pub name: String,
-    pub metrics: Metrics, 
+    pub metrics: Metrics,
 }
 
 pub struct Context {
     pub request: Request,
     pub response: Option<Response>,
-    pub metrics: Metrics,
     pub chains: Vec<Chain>,
     pub aborted: bool,
 }
 
-
 pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<Context, erx::Erx>> + Send>>;
 
 pub trait Middleware: Send + Sync {
-
     fn name(&self) -> &'static str;
 
     fn on_request(&self, _context: Context) -> Option<MiddlewareFuture> {
@@ -63,12 +55,11 @@ pub trait Middleware: Send + Sync {
     fn on_response(&self, _context: Context) -> Option<MiddlewareFuture> {
         None
     }
- 
-    /// 可选：中间件优先级，数值越大优先级越高 
+
+    /// 可选：中间件优先级，数值越大优先级越高
     fn priority(&self) -> Option<i32> {
         None
     }
-
 
     /// 可选：判断中间件是否应该处理这个请求
     /// 优先级 focus > methods > patterns  
@@ -81,12 +72,11 @@ pub trait Middleware: Send + Sync {
     fn methods(&self) -> Option<Vec<ApplyKind<Method>>> {
         None
     }
-    
+
     /// 可选：路径匹配模式
     fn patterns(&self) -> Option<Vec<ApplyKind<Pattern>>> {
         None
     }
-
 }
 
 pub struct Manager {
@@ -95,9 +85,7 @@ pub struct Manager {
 
 impl Manager {
     pub fn new() -> Self {
-        Self {
-            middlewares: Vec::new(),
-        }
+        Self { middlewares: Vec::new() }
     }
 
     pub fn add(&mut self, middleware: Box<dyn Middleware>) -> &mut Self {
@@ -118,96 +106,59 @@ impl Manager {
         });
     }
 
-    pub fn integrated(&self, router:axum::Router) -> axum::Router {
+    pub fn integrated(_manager: Arc<Manager>, router: axum::Router) -> axum::Router {
+        // 创建一个新的中间件层
+
         router
     }
 
     pub fn applys(&self, parts: &Parts) -> Vec<&Box<dyn Middleware>> {
         let mut middlewares = Vec::new();
         for middleware in &self.middlewares {
-            if let Some(apply) = middleware.apply(parts) {
-                if apply {
-                    middlewares.push(middleware);
-                }
-            } else {
-                if let Some(methods) = middleware.methods() {
-                    for method in methods {
-                        match method {
-                            ApplyKind::Include(method) => {
-                                if parts.method == method {
-                                    middlewares.push(middleware);
-                                }
-                            }
-                            ApplyKind::Exclude(method) => {
-                                if parts.method != method {
-                                    middlewares.push(middleware);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if let Some(patterns) = middleware.patterns() {
-                    for pattern in patterns {
-                        match pattern {
-                            ApplyKind::Include(pattern) => {
-                                match pattern {
-                                    Pattern::Prefix(prefix) => {
-                                        if parts.uri.path().starts_with(&prefix) {
-                                            middlewares.push(middleware);
-                                        }
-                                    }
-                                    Pattern::Suffix(suffix) => {
-                                        if parts.uri.path().ends_with(&suffix) {
-                                            middlewares.push(middleware);
-                                        }
-                                    }
-                                    Pattern::Contains(contains) => {
-                                        if parts.uri.path().contains(&contains) {
-                                            middlewares.push(middleware);
-                                        }
-                                    }
-                                    Pattern::Regex(regex) => {
-                                        if regex::Regex::new(&regex).unwrap().is_match(parts.uri.path()) {
-                                            middlewares.push(middleware);
-                                        }
-                                    }
-                                }
-                            }
-                            ApplyKind::Exclude(pattern) => {
-                                match pattern {
-                                    Pattern::Prefix(prefix) => {
-                                        if !parts.uri.path().starts_with(&prefix) {
-                                            middlewares.push(middleware);
-                                        }
-                                    }
-                                    Pattern::Suffix(suffix) => {
-                                        if !parts.uri.path().ends_with(&suffix) {
-                                            middlewares.push(middleware);
-                                        }
-                                    }
-                                    Pattern::Contains(contains) => {
-                                        if !parts.uri.path().contains(&contains) {
-                                            middlewares.push(middleware);
-                                        }
-                                    }
-                                    Pattern::Regex(regex) => {
-                                        if !regex::Regex::new(&regex).unwrap().is_match(parts.uri.path()) {
-                                            middlewares.push(middleware);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }  
+            if self.should_apply_middleware(middleware, parts) {
+                middlewares.push(middleware);
             }
         }
-        
         middlewares
     }
 
-    
-}
+    fn should_apply_middleware(&self, middleware: &Box<dyn Middleware>, parts: &Parts) -> bool {
+        if let Some(apply) = middleware.apply(parts) {
+            return apply;
+        }
 
+        if let Some(methods) = middleware.methods() {
+            let request_method = parts.method.clone();
+            for method in methods {
+                match method {
+                    ApplyKind::Include(m) => if request_method == &m { return true },
+                    ApplyKind::Exclude(m) => if request_method != &m { return true },
+                }
+            }
+        }
+
+        if let Some(patterns) = middleware.patterns() {
+            let path = parts.uri.path();
+            for pattern in patterns {
+                match pattern {
+                    ApplyKind::Include(p) => if self.check_pattern(&p, path) { return true },
+                    ApplyKind::Exclude(p) => if !self.check_pattern(&p, path) { return true },
+                }
+            }
+        }
+
+        false
+    }
+
+    
+    fn check_pattern(&self, pattern: &Pattern, path: &str) -> bool {
+        match pattern {
+            Pattern::Prefix(prefix) => path.starts_with(prefix),
+            Pattern::Suffix(suffix) => path.ends_with(suffix),
+            Pattern::Contains(contains) => path.contains(contains),
+            Pattern::Regex(regex) => regex::Regex::new(regex).unwrap().is_match(path),
+        }
+    }
+}
  
+  

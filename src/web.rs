@@ -52,7 +52,7 @@ pub struct Web {
     stage: SafeRS,
     luactions: Arc<RwLock<Vec<LuaAction>>>,
     routes_maker: fn() -> Vec<Router>,
-    middleware_manager:crate::web::middleware::Manager,
+    middleware_manager: Arc<crate::web::middleware::Manager>,
     pub extra_router_config: Option<fn(router: Router) -> Router>,
 }
 
@@ -64,7 +64,7 @@ pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>) -> We
         stage: RingState::srs_init(),
         luactions: Default::default(),
         routes_maker: router_maker,
-        middleware_manager: crate::web::middleware::Manager::new(),
+        middleware_manager: Arc::new(crate::web::middleware::Manager::new()),
         extra_router_config: None,
     }
 }
@@ -102,8 +102,8 @@ impl Web {
         self.router = router
     }
 
-    pub fn middleware_manager(&mut self) -> &mut crate::web::middleware::Manager {
-        &mut self.middleware_manager
+    pub fn middleware_manager(&mut self) -> Arc<crate::web::middleware::Manager> {
+        Arc::clone(&self.middleware_manager)
     }
 
  
@@ -173,7 +173,7 @@ impl RingsMod for Web {
     // }
 
     async fn fire(&mut self) -> Result<(), crate::erx::Erx> {
-        
+
         let web_listen = |name: String, bind: String, router: Router, stage: Arc<RwLock<RingState>>| async move {
             let listen = tokio::net::TcpListener::bind(bind.as_str()).await;
             if listen.is_err() {
@@ -201,7 +201,7 @@ impl RingsMod for Web {
             let _ = RingState::srs_set_must(&stage, RingState::Terminated);
         };
         
-        let integrated = self.middleware_manager.integrated(self.router.clone());
+        let integrated = crate::web::middleware::Manager::integrated(self.middleware_manager.clone(), self.router.clone());
         tokio::spawn(web_listen(self.name.clone(), self.bind.clone(), integrated, Arc::clone(&self.stage)));
 
         Ok(())
