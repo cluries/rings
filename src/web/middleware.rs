@@ -1,286 +1,213 @@
-pub mod jwt;
-pub mod profile;
-pub mod signature;
-pub mod signator;
-pub mod examples;
+
+
+// 实现对axum middleware的抽象
+pub mod signature; 
 
 
 use axum::http::request::Parts;
-use axum::{Router, extract::Request, response::Response};
+use axum::{extract::Request, response::Response};
 use std::future::Future;
 use std::pin::Pin;
-use std::collections::HashMap;
+use std::time::Instant;
+
 use axum::http::Method;
+use crate::erx;
 
-/// 中间件 trait，设计为 dyn compatible
+pub enum Pattern  {
+    Prefix(String),
+    Suffix(String),
+    Contains(String),
+    Regex(String),
+}
+
+pub enum ApplyKind<T> {
+    Include(T),
+    Exclude(T),
+}
+
+ 
+
+
+#[derive(Debug, Clone)]
+pub struct Metrics {
+    pub start_time: Instant,
+    pub request_count: u64,
+    pub error_count: u64,
+    pub processing_time: Option<std::time::Duration>,
+}
+
+pub struct Chain {
+    pub name: String,
+    pub metrics: Metrics, 
+}
+
+pub struct Context {
+    pub request: Request,
+    pub response: Option<Response>,
+    pub metrics: Metrics,
+    pub chains: Vec<Chain>,
+    pub aborted: bool,
+}
+
+
+pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<Context, erx::Erx>> + Send>>;
+
 pub trait Middleware: Send + Sync {
-    /// 判断中间件是否应该处理这个请求
-    fn focus(&self, parts: &Parts) -> bool;
 
-    /// 中间件优先级，数值越大优先级越高
-    fn priority(&self) -> i32;
+    fn name(&self) -> &'static str;
 
-    /// 处理请求的核心方法
-    fn call(&self, request: Request) -> Pin<Box<dyn Future<Output = Result<Request, Response>> + Send + '_>>;
-
-    /// 可选：中间件名称，用于调试和日志
-    fn name(&self) -> &'static str {
-        "UnnamedMiddleware"
+    fn on_request(&self, _context: Context) -> Option<MiddlewareFuture> {
+        None
     }
 
-    /// 可选：路径匹配模式
-    fn path_pattern(&self) -> Option<&str> {
+    fn on_response(&self, _context: Context) -> Option<MiddlewareFuture> {
+        None
+    }
+ 
+    /// 可选：中间件优先级，数值越大优先级越高 
+    fn priority(&self) -> Option<i32> {
+        None
+    }
+
+
+    /// 可选：判断中间件是否应该处理这个请求
+    /// 优先级 focus > methods > patterns  
+    /// - 如果foucs返回不为None,直接使用foucs的返回值判定
+    fn apply(&self, _parts: &Parts) -> Option<bool> {
         None
     }
 
     /// 可选：HTTP 方法过滤
-    fn methods(&self) -> Option<&[Method]> {
+    fn methods(&self) -> Option<Vec<ApplyKind<Method>>> {
         None
     }
-}
-
-/// 中间件执行上下文
-#[derive(Debug, Clone)]
-pub struct MiddlewareContext {
-    pub request_id: String,
-    pub start_time: std::time::Instant,
-    pub metadata: HashMap<String, String>,
-}
-
-impl MiddlewareContext {
-    pub fn new() -> Self {
-        Self {
-            request_id: uuid::Uuid::new_v4().to_string(),
-            start_time: std::time::Instant::now(),
-            metadata: HashMap::new(),
-        }
+    
+    /// 可选：路径匹配模式
+    fn patterns(&self) -> Option<Vec<ApplyKind<Pattern>>> {
+        None
     }
 
-    pub fn set_metadata(&mut self, key: String, value: String) {
-        self.metadata.insert(key, value);
-    }
-
-    pub fn get_metadata(&self, key: &str) -> Option<&String> {
-        self.metadata.get(key)
-    }
 }
 
-/// 中间件管理器
-pub struct MiddlewareManager {
+pub struct Manager {
     middlewares: Vec<Box<dyn Middleware>>,
 }
 
-impl MiddlewareManager {
+impl Manager {
     pub fn new() -> Self {
         Self {
             middlewares: Vec::new(),
         }
     }
 
-    pub fn add<M>(&mut self, middleware: M) 
-    where 
-        M: Middleware + 'static 
-    {
-        self.middlewares.push(Box::new(middleware));
-    }
-
-    pub fn sort_by_priority(&mut self) {
-        self.middlewares.sort_by(|a, b| b.priority().cmp(&a.priority()));
-    }
-
-    /// 获取适用于特定请求的中间件
-    pub fn get_applicable_middlewares(&self, parts: &Parts) -> Vec<&dyn Middleware> {
-        self.middlewares
-            .iter()
-            .filter(|m| m.focus(parts))
-            .map(|m| m.as_ref())
-            .collect()
-    }
-}
-
-/// 单个中间件的启动器
-pub struct LaunchPad<M: Middleware> {
-    middleware: M,
-}
-
-impl<M: Middleware> LaunchPad<M> {
-    pub fn new(middleware: M) -> Self {
-        Self { middleware }
-    }
-
-    pub fn using(self, router: Router) -> Router {
-        // 这里可以实现具体的中间件应用逻辑
-        // 例如使用 tower 的 layer 系统
-        let _middleware = self.middleware; // 使用 middleware 避免警告
-        router
-    }
-}
-
-/// 中间件链执行器
-pub struct MiddlewareChain {
-    manager: MiddlewareManager,
-}
-
-impl MiddlewareChain {
-    pub fn new(manager: MiddlewareManager) -> Self {
-        Self { manager }
-    }
-
-    /// 执行中间件链
-    pub async fn execute(&self, mut request: Request) -> Result<Request, Response> {
-        let (parts, body) = request.into_parts();
-        let applicable_middlewares = self.manager.get_applicable_middlewares(&parts);
-        
-        // 重新构建请求
-        request = Request::from_parts(parts, body);
-
-        // 按优先级顺序执行中间件
-        for middleware in applicable_middlewares {
-            match middleware.call(request).await {
-                Ok(req) => request = req,
-                Err(err) => return Err(err),
+    pub fn add(&mut self, middleware: Box<dyn Middleware>) -> &mut Self {
+        for m in &self.middlewares {
+            if m.name() == middleware.name() {
+                panic!("Middleware with name '{}' already exists", middleware.name());
             }
         }
-
-        Ok(request)
-    }
-}
-
-/// 中间件构建器，用于链式配置
-pub struct MiddlewareBuilder {
-    manager: MiddlewareManager,
-}
-
-impl MiddlewareBuilder {
-    pub fn new() -> Self {
-        Self {
-            manager: MiddlewareManager::new(),
-        }
-    }
-
-    pub fn add<M>(mut self, middleware: M) -> Self 
-    where 
-        M: Middleware + 'static 
-    {
-        self.manager.add(middleware);
+        self.middlewares.push(middleware);
         self
     }
 
-    pub fn build(mut self) -> MiddlewareManager {
-        self.manager.sort_by_priority();
-        self.manager
+    pub fn sort(&mut self) {
+        self.middlewares.sort_by(|a, b| {
+            let a_priority = a.priority().unwrap_or(0);
+            let b_priority = b.priority().unwrap_or(0);
+            b_priority.cmp(&a_priority)
+        });
     }
-}
 
-/// 路径匹配辅助函数
-pub fn path_matches(pattern: &str, path: &str) -> bool {
-    if pattern == "*" {
-        return true;
+    pub fn integrated(&self, router:axum::Router) -> axum::Router {
+        router
     }
+
+    pub fn applys(&self, parts: &Parts) -> Vec<&Box<dyn Middleware>> {
+        let mut middlewares = Vec::new();
+        for middleware in &self.middlewares {
+            if let Some(apply) = middleware.apply(parts) {
+                if apply {
+                    middlewares.push(middleware);
+                }
+            } else {
+                if let Some(methods) = middleware.methods() {
+                    for method in methods {
+                        match method {
+                            ApplyKind::Include(method) => {
+                                if parts.method == method {
+                                    middlewares.push(middleware);
+                                }
+                            }
+                            ApplyKind::Exclude(method) => {
+                                if parts.method != method {
+                                    middlewares.push(middleware);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if let Some(patterns) = middleware.patterns() {
+                    for pattern in patterns {
+                        match pattern {
+                            ApplyKind::Include(pattern) => {
+                                match pattern {
+                                    Pattern::Prefix(prefix) => {
+                                        if parts.uri.path().starts_with(&prefix) {
+                                            middlewares.push(middleware);
+                                        }
+                                    }
+                                    Pattern::Suffix(suffix) => {
+                                        if parts.uri.path().ends_with(&suffix) {
+                                            middlewares.push(middleware);
+                                        }
+                                    }
+                                    Pattern::Contains(contains) => {
+                                        if parts.uri.path().contains(&contains) {
+                                            middlewares.push(middleware);
+                                        }
+                                    }
+                                    Pattern::Regex(regex) => {
+                                        if regex::Regex::new(&regex).unwrap().is_match(parts.uri.path()) {
+                                            middlewares.push(middleware);
+                                        }
+                                    }
+                                }
+                            }
+                            ApplyKind::Exclude(pattern) => {
+                                match pattern {
+                                    Pattern::Prefix(prefix) => {
+                                        if !parts.uri.path().starts_with(&prefix) {
+                                            middlewares.push(middleware);
+                                        }
+                                    }
+                                    Pattern::Suffix(suffix) => {
+                                        if !parts.uri.path().ends_with(&suffix) {
+                                            middlewares.push(middleware);
+                                        }
+                                    }
+                                    Pattern::Contains(contains) => {
+                                        if !parts.uri.path().contains(&contains) {
+                                            middlewares.push(middleware);
+                                        }
+                                    }
+                                    Pattern::Regex(regex) => {
+                                        if !regex::Regex::new(&regex).unwrap().is_match(parts.uri.path()) {
+                                            middlewares.push(middleware);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }  
+            }
+        }
+        
+        middlewares
+    }
+
     
-    if pattern.ends_with("/*") {
-        let prefix = &pattern[..pattern.len() - 2];
-        return path.starts_with(prefix);
-    }
-    
-    pattern == path
 }
 
-/// 方法匹配辅助函数
-pub fn method_matches(allowed_methods: &[Method], request_method: &Method) -> bool {
-    allowed_methods.contains(request_method)
-}
-
-// 辅助函数：按优先级排序多个中间件
-pub fn sort_middlewares_by_priority<M: Middleware>(middlewares: &mut [M]) {
-    middlewares.sort_by(|a, b| b.priority().cmp(&a.priority()));
-}
-
-/// 示例：日志中间件
-pub struct LoggingMiddleware {
-    enabled: bool,
-}
-
-impl LoggingMiddleware {
-    pub fn new(enabled: bool) -> Self {
-        Self { enabled }
-    }
-}
-
-impl Middleware for LoggingMiddleware {
-    fn focus(&self, _parts: &Parts) -> bool {
-        self.enabled
-    }
-
-    fn priority(&self) -> i32 {
-        100 // 高优先级，最先执行
-    }
-
-    fn call(&self, request: Request) -> Pin<Box<dyn Future<Output = Result<Request, Response>> + Send + '_>> {
-        Box::pin(async move {
-            let method = request.method().clone();
-            let uri = request.uri().clone();
-            
-            println!("Request: {} {}", method, uri);
-            
-            Ok(request)
-        })
-    }
-
-    fn name(&self) -> &'static str {
-        "LoggingMiddleware"
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::http::Method;
-
-    #[test]
-    fn test_path_matching() {
-        assert!(path_matches("*", "/any/path"));
-        assert!(path_matches("/api/*", "/api/users"));
-        assert!(path_matches("/api/users", "/api/users"));
-        assert!(!path_matches("/api/users", "/api/posts"));
-    }
-
-    #[test]
-    fn test_method_matching() {
-        let methods = vec![Method::GET, Method::POST];
-        assert!(method_matches(&methods, &Method::GET));
-        assert!(method_matches(&methods, &Method::POST));
-        assert!(!method_matches(&methods, &Method::DELETE));
-    }
-
-    #[test]
-    fn test_middleware_priority_sorting() {
-        let mut middlewares = vec![
-            LoggingMiddleware::new(true),
-            LoggingMiddleware::new(true),
-        ];
-        
-        sort_middlewares_by_priority(&mut middlewares);
-        // 由于优先级相同，顺序保持不变
-        assert_eq!(middlewares.len(), 2);
-    }
-
-    #[tokio::test]
-    async fn test_middleware_chain() {
-        let manager = MiddlewareBuilder::new()
-            .add(LoggingMiddleware::new(true))
-            .build();
-        
-        let chain = MiddlewareChain::new(manager);
-        
-        // 这里需要创建一个测试请求
-        // let request = Request::builder()
-        //     .method(Method::GET)
-        //     .uri("/test")
-        //     .body(axum::body::Body::empty())
-        //     .unwrap();
-        
-        // let result = chain.execute(request).await;
-        // assert!(result.is_ok());
-    }
-}
+ 
