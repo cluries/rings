@@ -130,7 +130,7 @@ impl Signator {
         let key = loader(payload.xget_u()).await.map_err(|e| rout!(error_codes::LOAD, e.message_string()))?;
 
         if let Err((error, debug)) = payload.valid(key) {
-            if self.backdoor.is_empty() || !self.backdoor.eq(&payload.xdevskip()) {
+            if self.backdoor.is_empty() || !self.backdoor.eq(&payload.xget_d()) {
                 return Err(rout!(error_codes::INVALID, error, debug));
             }
         }
