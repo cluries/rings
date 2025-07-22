@@ -135,9 +135,24 @@ impl Manager {
             let path = parts.uri.path();
             for pattern in patterns {
                 match pattern {
-                    ApplyKind::Include(p) => if self.check_pattern(&p, path) { return true },
-                    ApplyKind::Exclude(p) => if !self.check_pattern(&p, path) { return true },
+                    ApplyKind::Include(p) => if  check_pattern(&p, path) { return true },
+                    ApplyKind::Exclude(p) => if !check_pattern(&p, path) { return true },
                 }
+            }
+        }
+        
+        #[inline]
+        fn check_pattern(pattern: &Pattern, path: &str) -> bool {
+            match pattern {
+                Pattern::Prefix(prefix) => path.starts_with(prefix),
+                Pattern::Suffix(suffix) => path.ends_with(suffix),
+                Pattern::Contains(contains) => path.contains(contains),
+                Pattern::Regex(regex) => {
+                    match regex::Regex::new(regex) {
+                        Ok(re) => re.is_match(path),
+                        Err(_) => false,
+                    }
+                },
             }
         }
 
@@ -145,14 +160,7 @@ impl Manager {
     }
 
     
-    fn check_pattern(&self, pattern: &Pattern, path: &str) -> bool {
-        match pattern {
-            Pattern::Prefix(prefix) => path.starts_with(prefix),
-            Pattern::Suffix(suffix) => path.ends_with(suffix),
-            Pattern::Contains(contains) => path.contains(contains),
-            Pattern::Regex(regex) => regex::Regex::new(regex).unwrap().is_match(path),
-        }
-    }
+    
 
 
     pub fn integrated(_manager: Arc<Manager>, router: axum::Router) -> axum::Router {
@@ -160,7 +168,7 @@ impl Manager {
 
         router
     }
-    
+
 }
  
   
