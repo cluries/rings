@@ -10,6 +10,8 @@ use std::time::Instant;
 
 use crate::erx;
 use axum::http::Method;
+use std::task::{Context as TaskContext, Poll};
+use tower::{Layer, Service};
 
 pub enum Pattern {
     Prefix(String),
@@ -43,16 +45,16 @@ pub struct Context {
     pub aborted: bool,
 }
 
-pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<Context, erx::Erx>> + Send>>;
+pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<Arc<Context>, erx::Erx>> + Send>>;
 
 pub trait Middleware: Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn on_request(&self, _context: Context) -> Option<MiddlewareFuture> {
+    fn on_request(&self, _context: Arc<Context>) -> Option<MiddlewareFuture> {
         None
     }
 
-    fn on_response(&self, _context: Context) -> Option<MiddlewareFuture> {
+    fn on_response(&self, _context: Arc<Context>) -> Option<MiddlewareFuture> {
         None
     }
 
@@ -81,6 +83,21 @@ pub trait Middleware: Send + Sync {
 
 pub struct Manager {
     middlewares: Vec<Box<dyn Middleware>>,
+}
+
+pub struct ManagerLayer {
+    manager: Arc<Manager>,
+}
+
+pub struct ManagerService<S> {
+    inner: S,
+    manager: Arc<Manager>,
+}
+
+impl Context {
+    pub fn new(request: Request) -> Self {
+        Self { request, response: None, chains: vec![], aborted: false }
+    }
 }
 
 impl Pattern {
@@ -178,5 +195,46 @@ impl Manager {
         // 创建一个新的中间件层
 
         router
+    }
+}
+
+impl<S> Layer<S> for ManagerLayer
+where
+    S: Service<Request, Response = Response> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Error: Into<erx::Erx>,
+{
+    type Service = ManagerService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        ManagerService { inner, manager: Arc::clone(&self.manager) }
+    }
+}
+
+impl<S> Service<Request> for ManagerService<S>
+where
+    S: Service<Request, Response = Response> + Send + 'static,
+    S::Future: Send + 'static,
+    S::Error: Into<erx::Erx>,
+{
+    type Response = Response;
+    type Error = erx::Erx;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut TaskContext<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx).map_err(Into::into)
+    }
+
+    fn call(&mut self, req: Request) -> Self::Future {
+        let manager = Arc::clone(&self.manager);
+        let (parts, body) = req.into_parts();
+        let applicable_middlewares = manager.applys(&parts);
+        let mut context = Context::new(Request::from_parts(parts, body));
+
+        Box::pin(async move {
+            for m in applicable_middlewares {}
+
+            for m in applicable_middlewares {}
+        })
     }
 }
