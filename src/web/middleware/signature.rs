@@ -8,6 +8,7 @@
 use crate::erx::{Erx, Layouted, LayoutedC};
 use crate::tools::hash;
 use crate::web::api::Out;
+use crate::web::define::HttpMethod;
 use crate::web::request::clone_request;
 use crate::web::url::parse_query;
 use redis::AsyncCommands;
@@ -134,20 +135,21 @@ impl Signator {
             }
         }
 
-        self.rand_guard(payload.xuser(), payload.xnonce()).await.map_err(|e| rout!(error_codes::INVALID, e.message_string()))?;
+        self.rand_guard(&payload).await.map_err(|e| rout!(error_codes::INVALID, e.message_string()))?;
 
-        use crate::web::context::Context;
-        let context = Context::new(payload.xuser());
+        let context = crate::web::context::Context::new(payload.xuser());
         request.extensions_mut().insert(context);
 
         Ok(request)
     }
 
-    async fn rand_guard(&self, xu: String, xr: String) -> erx::ResultEX {
-        let mut conn = self.redis_client.get_multiplexed_tokio_connection().await.map_err(erx::smp)?;
+    async fn rand_guard(&self, payload:&Payload) -> erx::ResultEX {
+        let mut conn: redis::aio::MultiplexedConnection = self.redis_client.get_multiplexed_tokio_connection().await.map_err(erx::smp)?;
 
-        let name = format!("XR:{}", xu);
-        let score: Option<i64> = conn.zscore(name.as_str(), xr.as_str()).await.map_err(erx::smp)?;
+        let name = format!("XR:{}", payload.xuser());
+        let xr = payload.xnonce();
+
+        let score: Option<i64> = conn.zscore(name.as_str(), &xr ).await.map_err(erx::smp)?;
 
         let score = score.unwrap_or(0);
         let current: i64 = chrono::Local::now().timestamp();
@@ -157,13 +159,14 @@ impl Signator {
         }
 
         let mut pipe = redis::pipe();
-        pipe.zadd(name.as_str(), xr.as_str(), current);
+        pipe.zadd(name.as_str(), &xr, current);
         pipe.zrembyscore(name.as_str(), "-inf", current - self.nonce_lifetime);
         pipe.expire(name.as_str(), self.nonce_lifetime);
         let _r = pipe.query_async::<Vec<i64>>(&mut conn).await.map_err(erx::smp)?;
 
         Ok(())
     }
+
 }
 
 #[derive(Clone)]
@@ -300,26 +303,25 @@ impl Payload {
         Payload { method, path, xu: None, xt: None, xr: None, xs: None, ds: None, queries, body: None }
     }
 
+    fn body_guard(&self) -> bool {
+        HttpMethod::POST.is(&self.method)
+            || HttpMethod::PUT.is(&self.method)
+            || HttpMethod::DELETE.is(&self.method)
+            || HttpMethod::OPTIONS.is(&self.method)
+            || HttpMethod::PATCH.is(&self.method)
+            || HttpMethod::PATCH.is(&self.method)
+    }
+
     async fn from_request(req: axum::extract::Request) -> Result<Self, String> {
         let (parts, body) = req.into_parts();
 
         let path = parts.uri.path().to_string();
-        let method = parts.method.as_str();
+        let method = parts.method.as_str().to_uppercase();
         let queries = parse_query(parts.uri.query().unwrap_or_default());
 
-        let mut payload = Payload::new(method.to_uppercase(), path, queries);
-        payload.load_header(parts.headers);
+        let mut payload = Payload::new(method, path, queries);
 
-        use crate::web::define::HttpMethod;
-
-        let body_guard = HttpMethod::POST.is(method)
-            || HttpMethod::PUT.is(method)
-            || HttpMethod::DELETE.is(method)
-            || HttpMethod::OPTIONS.is(method)
-            || HttpMethod::PATCH.is(method)
-            || HttpMethod::PATCH.is(method);
-
-        if body_guard {
+        if payload.body_guard() {
             let body: Result<serde_json::Value, String> = match axum::body::to_bytes(body, MAX_BODY_SIZE).await {
                 Ok(bytes) => {
                     if bytes.len() < 1 {
@@ -337,10 +339,14 @@ impl Payload {
             if let Err(err) = body {
                 return Err(err);
             }
+
             payload.body = body.ok();
         }
+        
+        payload.load_header(parts.headers);
 
         Ok(payload)
+        
     }
 
     fn load_header(&mut self, headers: HeaderMap<HeaderValue>) {
