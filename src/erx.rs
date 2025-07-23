@@ -320,6 +320,14 @@ impl From<Infallible> for Erx {
     }
 }
 
+// impl<E> From<E> for Erx
+// where
+//     E: std::error::Error,
+// {
+//     fn from(err: E) -> Self {
+//         Erx::new(&err.to_string())
+//     }
+// }
 
 impl From<&str> for Erx {
     fn from(s: &str) -> Self {
