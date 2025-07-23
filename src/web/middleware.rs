@@ -1,7 +1,9 @@
 // 实现对axum middleware的抽象
 pub mod signature;
 
+use crate::erx;
 use axum::http::request::Parts;
+use axum::http::Method;
 use axum::{extract::Request, response::Response};
 use futures_util::future::BoxFuture;
 use once_cell::sync::Lazy;
@@ -9,11 +11,8 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
-
-use crate::erx;
-use axum::http::Method;
 use std::task::{Context as TaskContext, Poll};
+use std::time::Instant;
 use tower::layer::util::{Identity, Stack};
 use tower::{Layer, Service, ServiceBuilder};
 
@@ -45,23 +44,30 @@ pub struct Chain {
 }
 
 pub struct Context {
-    pub request: Request,
+    pub request: Option<Request>,
     pub response: Option<Response>,
+
     pub chains: Vec<Chain>,
-    pub metadata: std::collections::HashMap<String, String>,
+    pub metadata: HashMap<String, String>,
     pub aborted: bool,
 }
 
-pub type MiddlewareFuture = Pin<Box<dyn Future<Output = erx::ResultEX> + Send>>;
+pub enum Error {
+    Abort(erx::Erx),
+    Ingore(erx::Erx),
+    Continue(erx::Erx),
+}
+
+pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
 
 pub trait Middleware: Send + Sync {
     fn name(&self) -> &'static str;
 
-    fn on_request(&self, _context: &mut Context) -> Option<MiddlewareFuture> {
+    fn on_request(&self, _context: &mut Context, _request: &mut Request) -> Option<MiddlewareFuture> {
         None
     }
 
-    fn on_response(&self, _context: &mut Context) -> Option<MiddlewareFuture> {
+    fn on_response(&self, _context: &mut Context, _response: &mut Response) -> Option<MiddlewareFuture> {
         None
     }
 
@@ -71,7 +77,7 @@ pub trait Middleware: Send + Sync {
     }
 
     /// 可选：判断中间件是否应该处理这个请求
-    /// 优先级 focus > methods > patterns  
+    /// 优先级 focus > methods > patterns
     /// - 如果foucs返回不为None,直接使用foucs的返回值判定
     fn apply(&self, _parts: &Parts) -> Option<bool> {
         None
@@ -105,8 +111,14 @@ where
 }
 
 impl Context {
-    pub fn new(request: Request) -> Self {
-        Self { request, response: None, chains: vec![], aborted: false }
+    pub fn new() -> Self {
+        Context::default()
+    }
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self { request: None, response: None, chains: vec![], metadata: Default::default(), aborted: false }
     }
 }
 
@@ -251,9 +263,9 @@ where
     }
 }
 
-impl<S> Service<axum::extract::Request> for ManagerService<S>
+impl<S> Service<Request> for ManagerService<S>
 where
-    S: Service<axum::extract::Request, Response = axum::response::Response> + Send + Clone + 'static,
+    S: Service<Request, Response = Response> + Send + Clone + 'static,
     S::Future: Send + 'static,
     S::Error: Into<erx::Erx>,
 {
@@ -266,42 +278,44 @@ where
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
-        let manager = Arc::clone(&self.manager);
-        let (parts, body) = req.into_parts();
-        let middles = manager.applys(&parts);
-
         let mut inner = self.inner.clone();
-        let mut context = Context::new(Request::from_parts(parts, body));
+        let manager = Arc::clone(&self.manager);
 
         Box::pin(async move {
+            let (parts, body) = req.into_parts();
+            let middles = manager.applys(&parts);
+
+            let mut context = Context::new();
+            let mut req = Request::from_parts(parts, body);
+
+            let mut counter = 0;
             for m in middles.iter() {
-                if let Some(mifuture) = m.on_request(&mut context) {
-                    match mifuture.await {
-                        Ok(response) => continue,
-                        Err(e) => {},
+                if let Some(mifuture) = m.on_request(&mut context, &mut req) {
+                    counter += 1;
+                    if let Err(e) = mifuture.await {
+                        tracing::error!("Failed to handle request: {}", e.description());
                     }
                 }
             }
 
-            let req = context.request;
+            let mut res = match inner.call(req).await {
+                Ok(response) => response,
+                Err(e) => Response::builder().status(500).body(axum::body::Body::from("Internal Server Error")).unwrap(),
+            };
 
-            match inner.call(req).await {
-                Ok(response) => {
-                    context.response = Some(response);
-                },
-                Err(_err) => {},
-            }
-
-            for m in middles.iter() {
-                if let Some(mifuture) = m.on_response(&mut context) {
+            while counter >= 0 {
+                if let Some(mifuture) = middles[counter].on_response(&mut context, &mut res) {
                     match mifuture.await {
-                        Ok(response) => continue,
-                        Err(e) => {},
+                        Ok(_) => continue,
+                        Err(e) => {
+                            tracing::error!("Failed to handle response: {}", e.description());
+                        },
                     }
                 }
+                counter -= 1;
             }
 
-            Ok(context.response.unwrap())
+            Ok(res)
         })
     }
 }
