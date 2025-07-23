@@ -43,8 +43,6 @@ pub struct Metrics {
     pub total_on_response_time: u64,
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct Chain {
     pub name: String,
@@ -68,8 +66,7 @@ pub enum Error {
     Continue(erx::Erx),
 }
 
-
-/// 
+///
 pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
 
 pub trait Middleware: Send + Sync {
