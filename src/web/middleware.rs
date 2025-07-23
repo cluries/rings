@@ -137,39 +137,31 @@ impl Pattern {
             Pattern::Prefix(prefix) => path.starts_with(prefix),
             Pattern::Suffix(suffix) => path.ends_with(suffix),
             Pattern::Contains(contains) => path.contains(contains),
-            Pattern::Regex(regs) => {
-                match REGEX_CACHE.try_lock() {
-                    Ok(mut cache) => {
-                        // 检查缓存中是否已有编译好的正则表达式
-                        if let Some(regex) = cache.get(regs) {
-                            return regex.is_match(path);
-                        }
+            Pattern::Regex(regs) => Self::regex(regs, path),
+        }
+    }
 
-                        // 编译新的正则表达式
-                        match regex::Regex::new(regs) {
-                            Ok(regex) => {
-                                let result = regex.is_match(path);
-                                cache.insert(regs.clone(), regex);
-                                result
-                            },
-                            Err(e) => {
-                                tracing::error!("Invalid regex pattern '{}': {}", regs, e);
-                                false
-                            },
-                        }
+    fn regex(regs: &str, path: &str) -> bool {
+        let invalid_regex = |pattern, error| -> bool {
+            tracing::error!("Invalid regex pattern '{}': {}", pattern, error);
+            false
+        };
+
+        match REGEX_CACHE.try_lock() {
+            Ok(mut cache) => match cache.get(regs) {
+                Some(regex) => regex.is_match(path),
+                _ => match regex::Regex::new(regs) {
+                    Ok(regex) => {
+                        let result = regex.is_match(path);
+                        cache.insert(regs.to_string(), regex);
+                        result
                     },
-                    Err(e) => {
-                        tracing::error!("Failed to acquire regex cache lock: {}", e);
-                        // 直接编译并测试，不使用缓存
-                        match regex::Regex::new(regs) {
-                            Ok(regex) => regex.is_match(path),
-                            Err(e) => {
-                                tracing::error!("Invalid regex pattern '{}': {}", regs, e);
-                                false
-                            },
-                        }
-                    },
-                }
+                    Err(e) => invalid_regex(regs, e),
+                },
+            },
+            Err(_) => match regex::Regex::new(regs) {
+                Ok(regex) => regex.is_match(path),
+                Err(e) => invalid_regex(regs, e),
             },
         }
     }
