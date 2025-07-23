@@ -38,11 +38,13 @@ pub struct Metrics {
     pub processing_time: Option<std::time::Duration>,
 }
 
+#[derive(Debug, Clone)]
 pub struct Chain {
     pub name: String,
     pub metrics: Metrics,
 }
 
+#[derive(Debug)]
 pub struct Context {
     pub request: Option<Request>,
     pub response: Option<Response>,
@@ -52,6 +54,7 @@ pub struct Context {
     pub aborted: bool,
 }
 
+#[derive(Debug, Clone)]
 pub enum Error {
     Abort(erx::Erx),
     Ingore(erx::Erx),
@@ -267,7 +270,7 @@ impl<S> Service<Request> for ManagerService<S>
 where
     S: Service<Request, Response = Response> + Send + Clone + 'static,
     S::Future: Send + 'static,
-    S::Error: Into<erx::Erx>,
+    S::Error: std::fmt::Debug,
 {
     type Response = S::Response;
     type Error = S::Error;
@@ -288,31 +291,34 @@ where
             let mut context = Context::new();
             let mut req = Request::from_parts(parts, body);
 
-            let mut counter = 0;
+            let mut counter: usize = 0;
             for m in middles.iter() {
+                counter += 1;
                 if let Some(mifuture) = m.on_request(&mut context, &mut req) {
-                    counter += 1;
                     if let Err(e) = mifuture.await {
-                        tracing::error!("Failed to handle request: {}", e.description());
+                        tracing::error!("Failed to handle request: {:?}", e);
                     }
                 }
             }
 
             let mut res = match inner.call(req).await {
                 Ok(response) => response,
-                Err(e) => Response::builder().status(500).body(axum::body::Body::from("Internal Server Error")).unwrap(),
+                Err(e) => {
+                    tracing::error!("Failed to handle request: {:?}", e);
+                    Response::builder().status(500).body(axum::body::Body::from("Internal Server Error")).unwrap()
+                },
             };
 
-            while counter >= 0 {
+            while counter > 0 {
+                counter -= 1;
                 if let Some(mifuture) = middles[counter].on_response(&mut context, &mut res) {
                     match mifuture.await {
                         Ok(_) => continue,
                         Err(e) => {
-                            tracing::error!("Failed to handle response: {}", e.description());
+                            tracing::error!("Failed to handle response: {:?}", e);
                         },
                     }
                 }
-                counter -= 1;
             }
 
             Ok(res)
