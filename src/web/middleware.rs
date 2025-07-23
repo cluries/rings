@@ -2,9 +2,11 @@
 pub mod signature;
 
 use crate::erx;
-use axum::http::request::Parts;
-use axum::http::Method;
-use axum::{extract::Request, response::Response};
+use axum::{
+    extract::Request,
+    http::{request::Parts, Method},
+    response::Response,
+};
 use futures_util::future::BoxFuture;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -12,9 +14,10 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context as TaskContext, Poll};
-use std::time::Instant;
-use tower::layer::util::{Identity, Stack};
-use tower::{Layer, Service, ServiceBuilder};
+use tower::{
+    layer::util::{Identity, Stack},
+    Layer, Service, ServiceBuilder,
+};
 
 static REGEX_CACHE: Lazy<Mutex<HashMap<String, regex::Regex>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
@@ -30,13 +33,17 @@ pub enum ApplyKind<T> {
     Exclude(T),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Metrics {
-    pub start_time: Instant,
     pub request_count: u64,
     pub error_count: u64,
-    pub processing_time: Option<std::time::Duration>,
+    pub longest_on_request_time: u64,
+    pub total_on_request_time: u64,
+    pub longest_on_response_time: u64,
+    pub total_on_response_time: u64,
 }
+
+
 
 #[derive(Debug, Clone)]
 pub struct Chain {
@@ -61,6 +68,8 @@ pub enum Error {
     Continue(erx::Erx),
 }
 
+
+/// 
 pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
 
 pub trait Middleware: Send + Sync {
