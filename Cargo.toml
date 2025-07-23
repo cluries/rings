@@ -27,6 +27,7 @@ log = { version = "0.4" }
 md5 = { version = "0" }
 mlua = { version = "0.10", features = ["lua54", "vendored"] }
 ofb = { version = "0.6" }
+once_cell = {version="1"}
 pem = { version = "3.0" }
 percent-encoding = { version = "2.3" }
 rand = { version = "0.9" }
@@ -72,6 +73,7 @@ log = { workspace = true }
 md5 = { workspace = true }
 mlua = { workspace = true }
 ofb = { workspace = true }
+once_cell = { workspace = true }
 pem = { workspace = true }
 percent-encoding = { workspace = true }
 rand = { workspace = true }
