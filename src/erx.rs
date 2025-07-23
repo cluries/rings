@@ -7,6 +7,7 @@ use crate::conf;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::fmt::Display;
 
 
@@ -312,6 +313,13 @@ impl Into<(String, String)> for Erx {
         (self.code.into(), self.message)
     }
 }
+
+impl From<Infallible> for Erx {
+    fn from(_: Infallible) -> Self {
+        Erx::default()
+    }
+}
+
 
 impl From<&str> for Erx {
     fn from(s: &str) -> Self {

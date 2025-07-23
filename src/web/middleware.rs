@@ -69,7 +69,7 @@ pub enum Error {
 ///
 pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
 
-pub trait Middleware: Send + Sync {
+pub trait Middleware: Send + Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
 
     fn on_request(&self, _context: &mut Context, _request: &mut Request) -> Option<MiddlewareFuture> {
@@ -103,14 +103,17 @@ pub trait Middleware: Send + Sync {
     }
 }
 
+#[derive(Debug)]
 pub struct Manager {
     middlewares: Vec<Box<dyn Middleware>>,
 }
 
+#[derive(Debug, Clone)]
 pub struct ManagerLayer {
     pub manager: Arc<Manager>,
 }
 
+#[derive(Debug, Clone)]
 pub struct ManagerService<S>
 where
     S: Clone,
@@ -234,11 +237,8 @@ impl Manager {
             })
     }
 
-    pub fn integrated(_manager: Arc<Manager>, router: axum::Router) -> axum::Router {
-        // 创建一个新的中间件层
-        // router.layer(ManagerLayer { manager: Arc::clone(&manager) })
-
-        router
+    pub fn integrated(manager: Arc<Manager>, router: axum::Router) -> axum::Router {
+        router.layer(ManagerLayer { manager: manager.clone() })
     }
 }
 
