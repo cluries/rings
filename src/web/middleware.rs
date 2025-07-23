@@ -131,6 +131,19 @@ impl Default for Context {
     }
 }
 
+impl<T> ApplyKind<T> {
+    /// pub fn apply(&self, tester: impl Fn(&T) -> bool) -> bool
+    pub fn apply<F>(&self, checker: F) -> bool
+    where
+        F: Fn(&T) -> bool,
+    {
+        match self {
+            ApplyKind::Include(p) => checker(p),
+            ApplyKind::Exclude(p) => !checker(p),
+        }
+    }
+}
+
 impl Pattern {
     pub fn check(&self, path: &str) -> bool {
         match self {
@@ -198,43 +211,27 @@ impl Manager {
             return apply;
         }
 
-        if let Some(methods) = middleware.methods() {
-            let request_method = parts.method.clone();
-            for method in methods {
-                match method {
-                    ApplyKind::Include(m) => {
-                        if request_method == &m {
-                            return true;
-                        }
-                    },
-                    ApplyKind::Exclude(m) => {
-                        if request_method != &m {
-                            return true;
-                        }
-                    },
-                }
-            }
-        }
+        // if let Some(methods) = middleware.methods() {
+        //     if methods.iter().any(|method| method.apply(|m| m.eq(&parts.method))) {
+        //         return true;
+        //     }
+        // }
+        //
+        //
+        // if let Some(patterns) = middleware.patterns() {
+        //     let path = parts.uri.path();
+        //     if patterns.iter().any(|pattern| pattern.apply(|p| p.check(path))) {
+        //         return true;
+        //     }
+        // }
+        //
+        // false
 
-        if let Some(patterns) = middleware.patterns() {
-            let path = parts.uri.path();
-            for pattern in patterns {
-                match pattern {
-                    ApplyKind::Include(p) => {
-                        if p.check(path) {
-                            return true;
-                        }
-                    },
-                    ApplyKind::Exclude(p) => {
-                        if !p.check(path) {
-                            return true;
-                        }
-                    },
-                }
-            }
-        }
-
-        false
+        middleware.methods().map_or(false, |methods| methods.iter().any(|method| method.apply(|m| m.eq(&parts.method))))
+            || middleware.patterns().map_or(false, |patterns| {
+                let path = parts.uri.path();
+                patterns.iter().any(|pattern| pattern.apply(|p| p.check(path)))
+            })
     }
 
     pub fn integrated(_manager: Arc<Manager>, router: axum::Router) -> axum::Router {
