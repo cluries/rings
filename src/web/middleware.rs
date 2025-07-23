@@ -238,7 +238,7 @@ impl Manager {
     }
 
     pub fn integrated(manager: Arc<Manager>, router: axum::Router) -> axum::Router {
-        router.layer(ManagerLayer { manager: manager.clone() })
+        router.layer(ManagerLayer { manager: Arc::clone(&manager) })
     }
 }
 
