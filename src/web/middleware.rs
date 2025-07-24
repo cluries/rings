@@ -250,104 +250,65 @@ impl AvgCalculator {
 
 #[derive(Debug, Clone)]
 pub struct Point {
-    created: Instant,
-    esapsed: Duration,
-    errored: bool,
+    pub created: Option<Instant>,
+    pub esapsed: Duration,
+    pub errored: bool,
 }
 
 impl Point {
-    pub fn elapsed(&mut self) -> Duration {
-        self.esapsed = self.created.elapsed();
-        self.esapsed
-    }
-
-    pub fn errored(&self) -> bool {
-        self.errored
-    }
-
-    pub fn mark_errored(&mut self) -> &mut Self {
-        self.errored = true;
+    pub fn clac_elapsed(&mut self) -> &mut Self {
+        if let Some(instant) = self.created {
+            self.esapsed = instant.elapsed();
+        }
         self
     }
 }
 
 impl Default for Point {
     fn default() -> Self {
-        Self { created: Instant::now(), esapsed: Duration::default(), errored: false }
+        Self { created: None, esapsed: Duration::default(), errored: false }
     }
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Node {
     pub name: String,
-    pub request: Option<Point>,
-    pub response: Option<Point>,
+    pub request: Point,
+    pub response: Point,
 }
 
 impl Node {
     pub fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), request: None, response: None }
+        Self { name: name.into(), request: Default::default(), response: Default::default() }
     }
 
-    pub fn request_start(&mut self) -> &mut Self {
-        self.request = Some(Point::default());
+    pub fn re_begin(&mut self) -> &mut Self {
+        self.request.created = Some(Instant::now());
         self
     }
 
-    pub fn request_errored(&mut self) -> &mut Self {
-        match self.request.as_mut() {
-            Some(point) => {
-                point.mark_errored();
-            },
-            None => {
-                tracing::error!("request not has value")
-            },
-        };
-
+    pub fn re_errored(&mut self) -> &mut Self {
+        self.request.errored = true;
         self
     }
 
-    pub fn request_end(&mut self) -> &mut Self {
-        match self.request.as_mut() {
-            Some(point) => {
-                point.elapsed();
-            },
-            None => {
-                tracing::error!("request not has value")
-            },
-        }
-
+    pub fn re_end(&mut self) -> &mut Self {
+        self.request.clac_elapsed();
         self
     }
 
-    pub fn response_start(&mut self) -> &mut Self {
-        self.response = Some(Point::default());
+    pub fn rs_begin(&mut self) -> &mut Self {
+        self.response.created = Some(Instant::now());
         self
     }
 
-    pub fn response_errored(&mut self) -> &mut Self {
-        match self.response.as_mut() {
-            Some(point) => {
-                point.mark_errored();
-            },
-            None => {
-                tracing::error!("response not has value")
-            },
-        }
-
+    pub fn rs_errored(&mut self) -> &mut Self {
+        self.response.errored = true;
         self
     }
 
-    pub fn response_end(&mut self) -> &mut Self {
-        match self.response.as_mut() {
-            Some(point) => {
-                point.elapsed();
-            },
-            None => {
-                tracing::error!("response not has value")
-            },
-        }
-
+    pub fn rs_end(&mut self) -> &mut Self {
+        self.response.clac_elapsed();
         self
     }
 }
@@ -648,20 +609,19 @@ where
                 let name = m.name();
 
                 let mut node = Node::new(name);
-                node.request_start();
+                node.re_begin();
 
                 if let Some(f) = m.on_request(&mut context, &mut req) {
                     if let Err(e) = f.await {
-                        node.request_errored();
+                        node.re_errored();
                         tracing::error!("middleware '{}' on_request handle error: {}", name, e);
                     }
                 }
 
-                node.request_end();
+                node.re_end();
 
                 let _ = manager.metrics_update(name, |m| {
-                    
-                    m.add_request(errored, duration);
+                    m.add_request(node.request.errored, node.request.esapsed);
                     Ok(())
                 });
 
