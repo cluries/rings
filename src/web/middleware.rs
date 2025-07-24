@@ -46,7 +46,6 @@ pub struct Metrics {
 #[derive(Debug, Clone)]
 pub struct Chain {
     pub name: String,
-    pub metrics: Metrics,
 }
 
 #[derive(Debug)]
@@ -59,18 +58,15 @@ pub struct Context {
     pub aborted: bool,
 }
 
-#[derive(Debug, Clone)]
-pub enum Error {
-    Abort(erx::Erx),
-    Ingore(erx::Erx),
-    Continue(erx::Erx),
-}
-
 ///
-pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>;
+pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<(), erx::Erx>> + Send>>;
 
 pub trait Middleware: Send + Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
+
+    fn mertrics(&self) -> &Metrics;
+
+    fn mut_mertrics(&mut self) -> &mut Metrics;
 
     fn on_request(&self, _context: &mut Context, _request: &mut Request) -> Option<MiddlewareFuture> {
         None
@@ -107,6 +103,15 @@ pub trait Middleware: Send + Sync + std::fmt::Debug {
 pub struct Manager {
     middlewares: Vec<Box<dyn Middleware>>,
 }
+
+
+// #[derive(Debug)]
+// pub struct Manager<M>
+// where
+//     M: Middleware,
+// {
+//     middlewares: Vec<M>,
+// }
 
 #[derive(Debug, Clone)]
 pub struct ManagerLayer {
@@ -194,6 +199,7 @@ impl Manager {
                 panic!("Middleware with name '{}' already exists", middleware.name());
             }
         }
+
         self.middlewares.push(middleware);
         self.middlewares.sort_by(|a, b| a.priority().cmp(&b.priority()));
         self
