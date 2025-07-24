@@ -248,14 +248,50 @@ impl AvgCalculator {
     }
 }
 
+
 #[derive(Debug, Clone)]
+pub struct ChainPoint {
+    pub created: Instant,
+    pub esapsed: Duration,
+    pub errored: bool, 
+}
+
+impl Default for ChainPoint {
+    fn default() -> Self {
+        ChainPoint {
+            created: Instant::now(),
+            esapsed: Duration::default(),
+            errored: false,
+        }
+    }
+}
+ 
+
+#[derive(Debug, Clone, Default)]
 pub struct Chain {
     pub name: String,
-    pub request_at: std::time::Instant,
-    pub request_end_at: Option<std::time::Instant>,
-    pub response_at: Option<std::time::Instant>,
-    pub response_end_at: Option<std::time::Instant>,
+    pub request: ChainPoint,
+    pub response: ChainPoint,
 }
+
+impl Chain {
+    pub fn new(name: impl Into<String>) -> Self {
+        Chain {
+            name: name.into(),
+            request: Default::default(),
+            response  : Default::default(),
+        }
+    }
+
+
+    pub fn request_end(&mut self, error:bool) {
+        self.request_esapsed = Some(self.request_at.elapsed());
+        self.request_error = error;
+    }
+}
+
+ 
+
 
 #[derive(Debug)]
 pub struct Abort {
@@ -543,20 +579,21 @@ where
             let mut req = Request::from_parts(parts, body);
 
             let mut counter: usize = 0;
+            
+
 
             for m in middles.iter_mut() {
                 if context.aborted() {
                     break;
                 }
                 counter += 1;
-                let name = m.name();
 
-                let start = Instant::now();
-                let mut errored = false;
+                let name = m.name();
+                let mut chain = Chain::new(name);
 
                 if let Some(f) = m.on_request(&mut context, &mut req) {
                     if let Err(e) = f.await {
-                        errored = true;
+                        chain.error = true;
                         tracing::error!("middleware '{}' on_request handle error: {}", name, e);
                     }
                 }
