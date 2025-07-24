@@ -21,6 +21,7 @@ ctr = { version = "0" }
 futures-util = { version = "0.3", features = ["default"] }
 hex = { version = "0.4" }
 hmac = { version = "0" }
+indexmap = { version = "2" }
 jsonwebtoken = { version = "9" }
 lazy_static = { version = "1" }
 log = { version = "0.4" }
@@ -67,6 +68,7 @@ ctr = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }
 hmac = { workspace = true }
+indexmap = { workspace = true }
 jsonwebtoken = { workspace = true }
 lazy_static = { workspace = true }
 log = { workspace = true }
