@@ -7,20 +7,21 @@ use axum::{
     http::{request::Parts, Method},
     response::Response,
 };
+use dashmap::DashMap;
 use futures_util::future::BoxFuture;
 use indexmap::IndexMap;
 use once_cell::sync::Lazy;
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::task::{Context as TaskContext, Poll};
+use std::time::{Duration, Instant};
 use tower::{
     layer::util::{Identity, Stack},
     Layer, Service, ServiceBuilder,
 };
 
-static REGEX_CACHE: Lazy<Mutex<HashMap<String, regex::Regex>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static REGEX_CACHE: Lazy<Mutex<DashMap<String, regex::Regex>>> = Lazy::new(|| Default::default());
 
 pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<(), erx::Erx>> + Send>>;
 
@@ -48,7 +49,7 @@ impl Pattern {
         };
 
         match REGEX_CACHE.try_lock() {
-            Ok(mut cache) => match cache.get(regs) {
+            Ok(cache) => match cache.get(regs) {
                 Some(regex) => regex.is_match(path),
                 _ => match regex::Regex::new(regs) {
                     Ok(regex) => {
@@ -91,11 +92,9 @@ impl<T> ApplyKind<T> {
 /// - Request and response counts
 /// - Error counts
 /// - Latency measurements (total, min, max, average)
+/// - Latency Units (microseconds) μs
 #[derive(Debug, Clone)]
 pub struct Metrics {
-    /// Total count of requests processed
-    pub total_count: u64,
-
     /// Count of requests received
     pub request_count: u64,
 
@@ -158,12 +157,39 @@ impl Metrics {
 
         self
     }
+
+    pub fn add_request(&mut self, errored: bool, duration: Duration) -> &mut Self {
+        self.request_count += 1;
+        if errored {
+            self.request_error_count += 1;
+        } else {
+            let latency = duration.as_micros() as u64;
+            self.avg_request_latency_tailer.add(latency);
+            self.min_request_latency = self.min_request_latency.min(latency);
+            self.max_request_latency = self.max_request_latency.max(latency);
+        }
+
+        self
+    }
+
+    pub fn add_response(&mut self, errored: bool, duration: Duration) -> &mut Self {
+        self.response_count += 1;
+        if errored {
+            self.response_error_count += 1;
+        } else {
+            let latency = duration.as_micros() as u64;
+            self.avg_response_latency_tailer.add(latency);
+            self.min_response_latency = self.min_response_latency.min(latency);
+            self.max_response_latency = self.max_response_latency.max(latency);
+        }
+
+        self
+    }
 }
 
 impl Default for Metrics {
     fn default() -> Self {
         Metrics {
-            total_count: 0,
             request_count: 0,
             response_count: 0,
             request_error_count: 0,
@@ -326,6 +352,17 @@ impl Context {
         }
         self
     }
+
+    ///
+    pub fn extend_metadata_owned<I>(&mut self, iter: I) -> &mut Self
+    where
+        I: IntoIterator<Item = (String, String)>,
+    {
+        for (key, value) in iter {
+            self.metadata.insert(key, value);
+        }
+        self
+    }
 }
 
 impl Default for Context {
@@ -338,10 +375,6 @@ impl Default for Context {
 
 pub trait Middleware: Send + Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
-
-    fn mertrics(&self) -> &Metrics;
-
-    fn mut_mertrics(&mut self) -> &mut Metrics;
 
     fn on_request(&self, _context: &mut Context, _request: &mut Request) -> Option<MiddlewareFuture> {
         None
@@ -377,6 +410,7 @@ pub trait Middleware: Send + Sync + std::fmt::Debug {
 #[derive(Debug)]
 pub struct Manager {
     middlewares: Vec<Box<dyn Middleware>>,
+    metrics: DashMap<String, Arc<RwLock<Metrics>>>,
 }
 
 // #[derive(Debug)]
@@ -387,30 +421,21 @@ pub struct Manager {
 //     middlewares: Vec<M>,
 // }
 
-#[derive(Debug, Clone)]
-pub struct ManagerLayer {
-    pub manager: Arc<Manager>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ManagerService<S>
-where
-    S: Clone,
-{
-    inner: S,
-    manager: Arc<Manager>,
-}
-
 impl Manager {
     pub fn new() -> Self {
-        Self { middlewares: Vec::new() }
+        Self { middlewares: Vec::new(), metrics: Default::default() }
     }
 
     pub fn add(&mut self, middleware: Box<dyn Middleware>) -> &mut Self {
+        let name = middleware.name().to_string();
         for m in &self.middlewares {
-            if m.name() == middleware.name() {
-                panic!("Middleware with name '{}' already exists", middleware.name());
+            if m.name() == name {
+                panic!("Middleware with name '{}' already exists", name);
             }
+        }
+
+        if !self.metrics.contains_key(&name) {
+            self.metrics.insert(name, Default::default());
         }
 
         self.middlewares.push(middleware);
@@ -433,27 +458,25 @@ impl Manager {
             return apply;
         }
 
-        // if let Some(methods) = middleware.methods() {
-        //     if methods.iter().any(|method| method.apply(|m| m.eq(&parts.method))) {
-        //         return true;
-        //     }
-        // }
-        //
-        //
-        // if let Some(patterns) = middleware.patterns() {
-        //     let path = parts.uri.path();
-        //     if patterns.iter().any(|pattern| pattern.apply(|p| p.check(path))) {
-        //         return true;
-        //     }
-        // }
-        //
-        // false
-
         middleware.methods().map_or(false, |methods| methods.iter().any(|method| method.apply(|m| m.eq(&parts.method))))
-            || middleware.patterns().map_or(false, |patterns| {
+            && middleware.patterns().map_or(false, |patterns| {
                 let path = parts.uri.path();
                 patterns.iter().any(|pattern| pattern.apply(|p| p.check(path)))
             })
+    }
+
+    pub fn metrics_update<F>(&self, name: &str, f: F) -> Result<(), erx::Erx>
+    where
+        F: FnOnce(&mut Metrics) -> Result<(), erx::Erx>,
+    {
+        self.metrics.get_mut(name).map_or(Err(erx::Erx::new("metrics not found")), |metrics_ref| {
+            let metrics_ref = Arc::clone(&metrics_ref);
+            let metrics_guard = metrics_ref.try_write();
+            match metrics_guard {
+                Ok(mut metrics_guard) => f(&mut metrics_guard),
+                Err(ex) => Err(erx::Erx::new(ex.to_string().as_str())),
+            }
+        })
     }
 
     pub fn integrated(manager: Arc<Manager>, router: axum::Router) -> axum::Router {
@@ -465,6 +488,20 @@ impl Into<ServiceBuilder<Stack<ManagerLayer, Identity>>> for ManagerLayer {
     fn into(self) -> ServiceBuilder<Stack<ManagerLayer, Identity>> {
         ServiceBuilder::new().layer(self)
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct ManagerLayer {
+    pub manager: Arc<Manager>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ManagerService<S>
+where
+    S: Clone,
+{
+    inner: S,
+    manager: Arc<Manager>,
 }
 
 impl<S> Layer<S> for ManagerLayer
@@ -500,49 +537,67 @@ where
 
         Box::pin(async move {
             let (parts, body) = req.into_parts();
-            let middles = manager.applys(&parts);
+            let mut middles = manager.applys(&parts);
 
             let mut context = Context::new();
             let mut req = Request::from_parts(parts, body);
 
             let mut counter: usize = 0;
-            for m in middles.iter() {
+
+            for m in middles.iter_mut() {
                 if context.aborted() {
                     break;
                 }
-
                 counter += 1;
-                if let Some(mifuture) = m.on_request(&mut context, &mut req) {
-                    if let Err(e) = mifuture.await {
-                        tracing::error!("Failed to handle request: {:?}", e);
+                let name = m.name();
+
+                let start = Instant::now();
+                let mut errored = false;
+
+                if let Some(f) = m.on_request(&mut context, &mut req) {
+                    if let Err(e) = f.await {
+                        errored = true;
+                        tracing::error!("middleware '{}' on_request handle error: {}", name, e);
                     }
                 }
+
+                let duration: Duration = start.elapsed();
+                let _ = manager.metrics_update(name, |m| {
+                    m.add_request(errored, duration);
+                    Ok(())
+                });
             }
 
-            let make_res = || Response::builder().status(500).body(axum::body::Body::from("Internal Server Error")).unwrap();
-
-            let mut res = if context.aborted() {
-                make_res()
+            let mut res = if let Some(abt) = &mut context.aborted {
+                abt.abort_response.take().unwrap_or_else(make_response)
             } else {
-                match inner.call(req).await {
-                    Ok(response) => response,
-                    Err(e) => {
-                        tracing::error!("Failed to handle request: {:?}", e);
-                        make_res()
-                    },
-                }
+                inner.call(req).await.unwrap_or_else(|e| {
+                    tracing::error!("Failed to handle request: {:?}", e);
+                    make_response()
+                })
             };
 
             while counter > 0 {
                 counter -= 1;
-                if let Some(mifuture) = middles[counter].on_response(&mut context, &mut res) {
-                    match mifuture.await {
-                        Ok(_) => continue,
-                        Err(e) => {
-                            tracing::error!("Failed to handle response: {:?}", e);
-                        },
+
+                let m = middles[counter];
+                let name = m.name();
+
+                let start = Instant::now();
+                let mut errored = false;
+
+                if let Some(f) = m.on_response(&mut context, &mut res) {
+                    if let Err(e) = f.await {
+                        errored = true;
+                        tracing::error!("middleware '{}' on_request handle error: {}", name, e);
                     }
                 }
+
+                let duration: Duration = start.elapsed();
+                let _ = manager.metrics_update(name, |m| {
+                    m.add_response(errored, duration);
+                    Ok(())
+                });
             }
 
             Ok(res)
@@ -550,7 +605,14 @@ where
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn make_response() -> Response {
+    let body = r#"{"message": "Hello, World!"}"#;
+    Response::builder()
+        .status(200)
+        .header("content-type", "application/json")
+        .body(axum::body::Body::from(body))
+        .unwrap_or_default()
 }
+
+#[cfg(test)]
+mod tests {}
