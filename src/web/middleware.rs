@@ -248,50 +248,109 @@ impl AvgCalculator {
     }
 }
 
-
 #[derive(Debug, Clone)]
-pub struct ChainPoint {
-    pub created: Instant,
-    pub esapsed: Duration,
-    pub errored: bool, 
+pub struct Point {
+    created: Instant,
+    esapsed: Duration,
+    errored: bool,
 }
 
-impl Default for ChainPoint {
-    fn default() -> Self {
-        ChainPoint {
-            created: Instant::now(),
-            esapsed: Duration::default(),
-            errored: false,
-        }
+impl Point {
+    pub fn elapsed(&mut self) -> Duration {
+        self.esapsed = self.created.elapsed();
+        self.esapsed
+    }
+
+    pub fn errored(&self) -> bool {
+        self.errored
+    }
+
+    pub fn mark_errored(&mut self) -> &mut Self {
+        self.errored = true;
+        self
     }
 }
- 
+
+impl Default for Point {
+    fn default() -> Self {
+        Self { created: Instant::now(), esapsed: Duration::default(), errored: false }
+    }
+}
 
 #[derive(Debug, Clone, Default)]
-pub struct Chain {
+pub struct Node {
     pub name: String,
-    pub request: ChainPoint,
-    pub response: ChainPoint,
+    pub request: Option<Point>,
+    pub response: Option<Point>,
 }
 
-impl Chain {
+impl Node {
     pub fn new(name: impl Into<String>) -> Self {
-        Chain {
-            name: name.into(),
-            request: Default::default(),
-            response  : Default::default(),
-        }
+        Self { name: name.into(), request: None, response: None }
     }
 
+    pub fn request_start(&mut self) -> &mut Self {
+        self.request = Some(Point::default());
+        self
+    }
 
-    pub fn request_end(&mut self, error:bool) {
-        self.request_esapsed = Some(self.request_at.elapsed());
-        self.request_error = error;
+    pub fn request_errored(&mut self) -> &mut Self {
+        match self.request.as_mut() {
+            Some(point) => {
+                point.mark_errored();
+            },
+            None => {
+                tracing::error!("request not has value")
+            },
+        };
+
+        self
+    }
+
+    pub fn request_end(&mut self) -> &mut Self {
+        match self.request.as_mut() {
+            Some(point) => {
+                point.elapsed();
+            },
+            None => {
+                tracing::error!("request not has value")
+            },
+        }
+
+        self
+    }
+
+    pub fn response_start(&mut self) -> &mut Self {
+        self.response = Some(Point::default());
+        self
+    }
+
+    pub fn response_errored(&mut self) -> &mut Self {
+        match self.response.as_mut() {
+            Some(point) => {
+                point.mark_errored();
+            },
+            None => {
+                tracing::error!("response not has value")
+            },
+        }
+
+        self
+    }
+
+    pub fn response_end(&mut self) -> &mut Self {
+        match self.response.as_mut() {
+            Some(point) => {
+                point.elapsed();
+            },
+            None => {
+                tracing::error!("response not has value")
+            },
+        }
+
+        self
     }
 }
-
- 
-
 
 #[derive(Debug)]
 pub struct Abort {
@@ -312,7 +371,7 @@ pub struct Context {
     pub metadata: IndexMap<String, String>,
     pub aborted: Option<Abort>,
     pub start_at: std::time::Instant,
-    pub chains: Vec<Chain>,
+    pub chains: Vec<Node>,
 }
 
 impl Context {
@@ -579,8 +638,6 @@ where
             let mut req = Request::from_parts(parts, body);
 
             let mut counter: usize = 0;
-            
-
 
             for m in middles.iter_mut() {
                 if context.aborted() {
@@ -589,20 +646,26 @@ where
                 counter += 1;
 
                 let name = m.name();
-                let mut chain = Chain::new(name);
+
+                let mut node = Node::new(name);
+                node.request_start();
 
                 if let Some(f) = m.on_request(&mut context, &mut req) {
                     if let Err(e) = f.await {
-                        chain.error = true;
+                        node.request_errored();
                         tracing::error!("middleware '{}' on_request handle error: {}", name, e);
                     }
                 }
 
-                let duration: Duration = start.elapsed();
+                node.request_end();
+
                 let _ = manager.metrics_update(name, |m| {
+                    
                     m.add_request(errored, duration);
                     Ok(())
                 });
+
+                context.chains.push(node);
             }
 
             let mut res = if let Some(abt) = &mut context.aborted {
