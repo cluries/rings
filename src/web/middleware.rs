@@ -13,7 +13,7 @@ use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::task::{Context as TaskContext, Poll};
 use std::time::{Duration, Instant};
 use tower::{
@@ -21,7 +21,7 @@ use tower::{
     Layer, Service, ServiceBuilder,
 };
 
-static REGEX_CACHE: Lazy<Mutex<DashMap<String, regex::Regex>>> = Lazy::new(|| Default::default());
+static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(|| Default::default());
 
 pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<(), erx::Erx>> + Send>>;
 
@@ -48,23 +48,35 @@ impl Pattern {
             false
         };
 
-        match REGEX_CACHE.try_lock() {
-            Ok(cache) => match cache.get(regs) {
-                Some(regex) => regex.is_match(path),
-                _ => match regex::Regex::new(regs) {
-                    Ok(regex) => {
-                        let result = regex.is_match(path);
-                        cache.insert(regs.to_string(), regex);
-                        result
-                    },
-                    Err(e) => invalid_regex(regs, e),
+        match REGEX_CACHE.get(regs) {
+            Some(regex) => regex.is_match(path),
+            None => match regex::Regex::new(regs) {
+                Ok(regex) => {
+                    let result = regex.is_match(path);
+                    REGEX_CACHE.insert(regs.to_string(), regex);
+                    result
                 },
-            },
-            Err(_) => match regex::Regex::new(regs) {
-                Ok(regex) => regex.is_match(path),
                 Err(e) => invalid_regex(regs, e),
             },
         }
+
+        // match REGEX_CACHE.try_lock() {
+        //     Ok(cache) => match cache.get(regs) {
+        //         Some(regex) => regex.is_match(path),
+        //         _ => match regex::Regex::new(regs) {
+        //             Ok(regex) => {
+        //                 let result = regex.is_match(path);
+        //                 cache.insert(regs.to_string(), regex);
+        //                 result
+        //             },
+        //             Err(e) => invalid_regex(regs, e),
+        //         },
+        //     },
+        //     Err(_) => match regex::Regex::new(regs) {
+        //         Ok(regex) => regex.is_match(path),
+        //         Err(e) => invalid_regex(regs, e),
+        //     },
+        // }
     }
 }
 
