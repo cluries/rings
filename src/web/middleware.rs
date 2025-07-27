@@ -643,19 +643,19 @@ where
                 let m = middles[counter];
                 let name = m.name();
 
-                let start = Instant::now();
-                let mut errored = false;
+                let mut node = Node::new(name);
+                node.rs_begin();
 
                 if let Some(f) = m.on_response(&mut context, &mut res) {
                     if let Err(e) = f.await {
-                        errored = true;
+                        node.rs_errored();
                         tracing::error!("middleware '{}' on_request handle error: {}", name, e);
                     }
                 }
 
-                let duration: Duration = start.elapsed();
+                node.rs_end();
                 let _ = manager.metrics_update(name, |m| {
-                    m.add_response(errored, duration);
+                    m.add_response(node.response.errored, node.response.esapsed);
                     Ok(())
                 });
             }
