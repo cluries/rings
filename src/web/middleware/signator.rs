@@ -1,7 +1,7 @@
 use crate::erx;
 use crate::erx::{Erx, Layouted, LayoutedC};
 use crate::tools::hash;
-use crate::web::middleware::{signator, ApplyKind, Context, Middleware, MiddlewareFuture, Pattern};
+use crate::web::middleware::{ApplyKind, Context, Middleware, MiddlewareFuture, Pattern};
 use crate::web::{api::Out, define::HttpMethod, request::clone_request, url::parse_query};
 use axum::{
     extract::Request,
@@ -170,17 +170,15 @@ impl Middleware for Signator {
     }
 
     fn on_request(&self, _context: &mut Context, request: Request) -> Option<MiddlewareFuture<Request>> {
+        let signator = self.clone();
         
-        let d = async {
-            self.exec(request).await
-        };
-
         let r = Box::pin(async move {
-            match d.await {
+            match signator.exec(request).await {
                 Ok(req) => Ok(req),
                 Err(_e) => Err(erx::Erx::new("message")),
             }
         });
+        
         Some(r)
     }
 
