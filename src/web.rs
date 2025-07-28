@@ -96,9 +96,9 @@ impl Web {
             }
         }
 
-        if self.luactions.read().unwrap().is_empty() {
-            //TODO
-        }
+        // if self.luactions.read().unwrap().is_empty() {
+        //     //TODO
+        // }
 
         router = router.layer(ValidateRequestHeaderLayer::accept("application/json"));
         if let Some(extra) = self.router_reconfiger {

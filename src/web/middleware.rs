@@ -144,10 +144,10 @@ pub struct Metrics {
     pub avg_response_latency: AvgCalculator,
 
     /// Trailing average request latency calculator
-    pub avg_request_latency_tailer: AvgCalculator,
+    pub avg_request_latency_trailer: AvgCalculator,
 
     /// Trailing average response latency calculator
-    pub avg_response_latency_tailer: AvgCalculator,
+    pub avg_response_latency_trailer: AvgCalculator,
     //请求延迟直方图 （Request Latency Histogram）
     // pub request_latency_hist: Vec<u64>,
 
@@ -159,11 +159,11 @@ impl Metrics {
     /// Update the average latency metrics by calculating the average from the tailer calculators
     /// and adding them to the main average calculators. Returns self for method chaining.
     pub fn update_avg(&mut self) -> &mut Self {
-        if let avg @ 1.. = self.avg_request_latency_tailer.avg_then_reset() {
+        if let avg @ 1.. = self.avg_request_latency_trailer.avg_then_reset() {
             self.avg_request_latency.add(avg);
         }
 
-        if let avg @ 1.. = self.avg_response_latency_tailer.avg_then_reset() {
+        if let avg @ 1.. = self.avg_response_latency_trailer.avg_then_reset() {
             self.avg_response_latency.add(avg);
         }
 
@@ -176,7 +176,7 @@ impl Metrics {
             self.request_error_count += 1;
         } else {
             let latency = duration.as_micros() as u64;
-            self.avg_request_latency_tailer.add(latency);
+            self.avg_request_latency_trailer.add(latency);
             self.min_request_latency = self.min_request_latency.min(latency);
             self.max_request_latency = self.max_request_latency.max(latency);
         }
@@ -190,7 +190,7 @@ impl Metrics {
             self.response_error_count += 1;
         } else {
             let latency = duration.as_micros() as u64;
-            self.avg_response_latency_tailer.add(latency);
+            self.avg_response_latency_trailer.add(latency);
             self.min_response_latency = self.min_response_latency.min(latency);
             self.max_response_latency = self.max_response_latency.max(latency);
         }
@@ -214,8 +214,8 @@ impl Default for Metrics {
             min_response_latency: u64::MAX,
             avg_request_latency: AvgCalculator::default(),
             avg_response_latency: AvgCalculator::default(),
-            avg_request_latency_tailer: AvgCalculator::default(),
-            avg_response_latency_tailer: AvgCalculator::default(),
+            avg_request_latency_trailer: AvgCalculator::default(),
+            avg_response_latency_trailer: AvgCalculator::default(),
         }
     }
 }
@@ -677,13 +677,16 @@ where
     }
 }
 
-fn make_response() -> Response {
-    let body = r#"{"message": "Hello, World!"}"#;
+fn make_error_response(error: &str) -> Response {
     Response::builder()
-        .status(200)
+        .status(500)
         .header("content-type", "application/json")
-        .body(axum::body::Body::from(body))
+        .body(axum::body::Body::from(format!(r#"{{"error": "{}"}}"#, error)))
         .unwrap_or_default()
+}
+
+fn make_response() -> Response {
+    make_error_response("internal server error")
 }
 
 #[cfg(test)]
