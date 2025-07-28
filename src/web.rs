@@ -44,6 +44,8 @@ macro_rules! web_route_merge {
 
 // #[derive(Clone)]
 // pub struct WebState {}
+ 
+ 
 
 pub struct Web {
     name: String,
@@ -51,9 +53,9 @@ pub struct Web {
     router: Router,
     stage: SafeRS,
     luactions: Arc<RwLock<Vec<LuaAction>>>,
-    routes_maker: fn() -> Vec<Router>,
+    router_maker: fn() -> Vec<Router>,
+    router_reconfiger: Option<fn(router: Router) -> Router>,
     middleware_manager: Arc<crate::web::middleware::Manager>,
-    pub extra_router_config: Option<fn(router: Router) -> Router>,
 }
 
 pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>) -> Web {
@@ -63,9 +65,9 @@ pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>) -> We
         router: Router::default(),
         stage: RingState::srs_init(),
         luactions: Default::default(),
-        routes_maker: router_maker,
+        router_maker,
         middleware_manager: Arc::new(crate::web::middleware::Manager::new()),
-        extra_router_config: None,
+        router_reconfiger: None,
     }
 }
 
@@ -79,16 +81,13 @@ impl crate::conf::Web {
 impl Web {
     fn web_spec(&mut self) {
         let mut router = Router::default();
-        let maker = self.routes_maker;
+        let maker = self.router_maker;
         for route in maker() {
             router = router.merge(route);
         }
 
-        router = router.layer(ValidateRequestHeaderLayer::accept("application/json"));
-        if let Some(extra) = self.extra_router_config {
-            router = extra(router);
-        }
 
+      
         let luactions = self.luactions.read().expect("luactions lock poisoned");
         if luactions.len() > 0 {
             info!("lua action found. adding lua [{}] actions", luactions.len());
@@ -97,16 +96,33 @@ impl Web {
             }
         }
 
-        if self.luactions.read().unwrap().is_empty() {}
+        if self.luactions.read().unwrap().is_empty() {
+            //TODO
+        }
+
+        router = router.layer(ValidateRequestHeaderLayer::accept("application/json"));
+        if let Some(extra) = self.router_reconfiger {
+            router = extra(router);
+        }
 
         self.router = router
+    }
+
+    pub fn set_router_maker(&mut self, maker: fn() -> Vec<Router>) -> &mut Self {
+        self.router_maker = maker;
+        self
+    }
+
+    pub fn set_router_reconfiger(&mut self, configer: fn(router: Router) -> Router) -> &mut Self {
+        self.router_reconfiger = Some(configer);
+        self
     }
 
     pub fn middleware_manager(&mut self) -> Arc<crate::web::middleware::Manager> {
         Arc::clone(&self.middleware_manager)
     }
 
- 
+  
 }
 
 #[async_trait]
@@ -200,9 +216,12 @@ impl RingsMod for Web {
             // *stage.write().unwrap() = RingState::Terminated;
             let _ = RingState::srs_set_must(&stage, RingState::Terminated);
         };
-        
-        let integrated = crate::web::middleware::Manager::integrated(self.middleware_manager.clone(), self.router.clone());
-        tokio::spawn(web_listen(self.name.clone(), self.bind.clone(), integrated, Arc::clone(&self.stage)));
+         
+        let integrated_router = crate::web::middleware::Manager::integrated(
+            self.middleware_manager.clone(), self.router.clone()
+        );
+
+        tokio::spawn(web_listen(self.name.clone(), self.bind.clone(), integrated_router, Arc::clone(&self.stage)));
 
         Ok(())
     }
