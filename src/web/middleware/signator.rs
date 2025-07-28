@@ -170,9 +170,13 @@ impl Middleware for Signator {
     }
 
     fn on_request(&self, _context: &mut Context, request: Request) -> Option<MiddlewareFuture<Request>> {
-        let exed = self.exec(request).clone();
+        
+        let d = async {
+            self.exec(request).await
+        };
+
         let r = Box::pin(async move {
-            match exed.await {
+            match d.await {
                 Ok(req) => Ok(req),
                 Err(_e) => Err(erx::Erx::new("message")),
             }
