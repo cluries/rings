@@ -1,5 +1,6 @@
 // 实现对axum middleware的抽象
 pub mod signature;
+pub mod signator;
 
 use crate::erx;
 use axum::{
