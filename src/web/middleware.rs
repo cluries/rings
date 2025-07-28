@@ -1,8 +1,8 @@
 // 实现对axum middleware的抽象
-pub mod signature;
 pub mod signator;
+pub mod signature;
 
-use crate::erx;
+use crate::{erx, web::request};
 use axum::{
     extract::Request,
     http::{request::Parts, Method},
@@ -24,7 +24,7 @@ use tower::{
 
 static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(|| Default::default());
 
-pub type MiddlewareFuture = Pin<Box<dyn Future<Output = Result<(), erx::Erx>> + Send>>;
+pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<T, erx::Erx>> + Send>>;
 
 pub enum Pattern {
     Prefix(String),
@@ -445,11 +445,11 @@ impl Default for Context {
 pub trait Middleware: Send + Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
 
-    fn on_request(&self, _context: &mut Context, _request: &mut Request) -> Option<MiddlewareFuture> {
+    fn on_request(&self, _context: &mut Context, _request: Request) -> Option<MiddlewareFuture<Request>> {
         None
     }
 
-    fn on_response(&self, _context: &mut Context, _response: &mut Response) -> Option<MiddlewareFuture> {
+    fn on_response(&self, _context: &mut Context, _response: Response) -> Option<MiddlewareFuture<Response>> {
         None
     }
 
@@ -607,10 +607,8 @@ where
         Box::pin(async move {
             let (parts, body) = req.into_parts();
             let mut middles = manager.applys(&parts);
-
             let mut context = Context::new();
-            let mut req = Request::from_parts(parts, body);
-
+            let mut req = Some(Request::from_parts(parts, body));
             let mut counter: usize = 0;
 
             for m in middles.iter_mut() {
@@ -620,14 +618,18 @@ where
                 counter += 1;
 
                 let name = m.name();
-
                 let mut node = Node::new(name);
                 node.re_begin();
 
-                if let Some(f) = m.on_request(&mut context, &mut req) {
-                    if let Err(e) = f.await {
-                        node.re_errored();
-                        tracing::error!("middleware '{}' on_request handle error: {}", name, e);
+                if let Some(f) = m.on_request(&mut context, req.take().unwrap()) {
+                    match f.await {
+                        Ok(r) => {
+                            req = Some(r);
+                        },
+                        Err(e) => {
+                            node.re_errored();
+                            tracing::error!("middleware '{}' on_request handle error: {}", name, e);
+                        },
                     }
                 }
 
@@ -641,28 +643,35 @@ where
                 context.chains.push(node);
             }
 
-            let mut res = if let Some(abt) = &mut context.aborted {
+            let res = if let Some(abt) = &mut context.aborted {
                 abt.abort_response.take().unwrap_or_else(make_response)
             } else {
-                inner.call(req).await.unwrap_or_else(|e| {
+                inner.call(req.take().unwrap()).await.unwrap_or_else(|e| {
                     tracing::error!("Failed to handle request: {:?}", e);
                     make_response()
                 })
             };
 
+            // start process response
+
+            let mut res = Some(res);
             while counter > 0 {
                 counter -= 1;
 
                 let m = middles[counter];
                 let name = m.name();
-
                 let mut node = Node::new(name);
                 node.rs_begin();
 
-                if let Some(f) = m.on_response(&mut context, &mut res) {
-                    if let Err(e) = f.await {
-                        node.rs_errored();
-                        tracing::error!("middleware '{}' on_request handle error: {}", name, e);
+                if let Some(f) = m.on_response(&mut context, res.take().unwrap()) {
+                    match f.await {
+                        Ok(r) => {
+                            res = Some(r);
+                        },
+                        Err(e) => {
+                            node.rs_errored();
+                            tracing::error!("middleware '{}' on_response handle error: {}", name, e);
+                        },
                     }
                 }
 
@@ -673,7 +682,7 @@ where
                 });
             }
 
-            Ok(res)
+            Ok(res.unwrap())
         })
     }
 }
