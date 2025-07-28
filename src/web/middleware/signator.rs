@@ -170,15 +170,28 @@ impl Middleware for Signator {
     }
 
     fn on_request(&self, _context: &mut Context, request: Request) -> Option<MiddlewareFuture<Request>> {
-        let signator = self.clone();
-        
+        // 只克隆必要的字段，避免克隆整个结构体
+        let backdoor = self.backdoor.clone();
+        let nonce_lifetime = self.nonce_lifetime;
+        let key_loader = Arc::clone(&self.key_loader);
+        let redis_client = self.redis_client.clone();
+
         let r = Box::pin(async move {
+            // 创建临时的 Signator 实例用于执行
+            let signator = Signator {
+                backdoor,
+                excludes: vec![], // exec 方法中不使用 excludes
+                nonce_lifetime,
+                key_loader,
+                redis_client,
+            };
+
             match signator.exec(request).await {
                 Ok(req) => Ok(req),
                 Err(_e) => Err(erx::Erx::new("message")),
             }
         });
-        
+
         Some(r)
     }
 
