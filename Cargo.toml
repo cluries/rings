@@ -8,7 +8,7 @@ members = ["rexamples", "ringb", "ringm"]
 
 [workspace.dependencies]
 aes = { version = "0" }
-async-openai = { version = "0.28" }
+async-openai = { version = "0" }
 async-trait = { version = "0.1" }
 axum = { version = "0.8", features = ["macros", "json", "tokio", "multipart"] }
 base64 = { version = "0.22" }
@@ -27,7 +27,7 @@ jsonwebtoken = { version = "9" }
 lazy_static = { version = "1" }
 log = { version = "0.4" }
 md5 = { version = "0" }
-mlua = { version = "0.10", features = ["lua54", "vendored"] }
+mlua = { version = "0.11", features = ["lua54", "vendored"] }
 ofb = { version = "0.6" }
 once_cell = {version="1"}
 pem = { version = "3.0" }
