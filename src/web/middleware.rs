@@ -120,16 +120,16 @@ pub struct Metrics {
     pub min_response_latency: u64,
 
     /// Average request latency calculator
-    pub avg_request_latency: AvgCalculator,
+    pub avg_request_latency: Averager,
 
     /// Average response latency calculator
-    pub avg_response_latency: AvgCalculator,
+    pub avg_response_latency: Averager,
 
     /// Trailing average request latency calculator
-    pub avg_request_latency_trailer: AvgCalculator,
+    pub avg_request_latency_trailer: Averager,
 
     /// Trailing average response latency calculator
-    pub avg_response_latency_trailer: AvgCalculator,
+    pub avg_response_latency_trailer: Averager,
     //请求延迟直方图 （Request Latency Histogram）
     // pub request_latency_hist: Vec<u64>,
 
@@ -194,10 +194,10 @@ impl Default for Metrics {
             max_response_latency: 0,
             min_request_latency: u64::MAX,
             min_response_latency: u64::MAX,
-            avg_request_latency: AvgCalculator::default(),
-            avg_response_latency: AvgCalculator::default(),
-            avg_request_latency_trailer: AvgCalculator::default(),
-            avg_response_latency_trailer: AvgCalculator::default(),
+            avg_request_latency: Averager::default(),
+            avg_response_latency: Averager::default(),
+            avg_request_latency_trailer: Averager::default(),
+            avg_response_latency_trailer: Averager::default(),
         }
     }
 }
@@ -208,12 +208,12 @@ impl Default for Metrics {
 /// It provides methods to add values, calculate the current average,
 /// calculate and reset in one operation, and reset the calculator.
 #[derive(Debug, Clone, Default)]
-pub struct AvgCalculator {
+pub struct Averager {
     pub sum: u64,
     pub count: u64,
 }
 
-impl AvgCalculator {
+impl Averager {
     pub fn add(&mut self, value: u64) -> &mut Self {
         self.sum += value;
         self.count += 1;
@@ -271,11 +271,14 @@ pub struct Node {
     pub response: Point,
 }
 
+/// re = request , so re_begin = request_begin
+/// rs = response, so rs_begin = response_begin
 impl Node {
     pub fn new(name: impl Into<String>) -> Self {
         Self { name: name.into(), request: Default::default(), response: Default::default() }
     }
 
+    /// request begin
     pub fn re_begin(&mut self) -> &mut Self {
         self.request.created = Some(Instant::now());
         self
@@ -421,8 +424,7 @@ impl Default for Context {
     }
 }
 
-///
-
+/// if apply,methods,patterns all return None, this method is use for every request.
 pub trait Middleware: Send + Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
 
@@ -434,24 +436,22 @@ pub trait Middleware: Send + Sync + std::fmt::Debug {
         None
     }
 
-    /// 可选：中间件优先级，数值越大优先级越高
+    /// Optional: middleware priority, higher values have higher priority
     fn priority(&self) -> i32 {
         0
     }
 
-    /// 可选：判断中间件是否应该处理这个请求
-    /// 优先级 focus > methods > patterns
-    /// - 如果foucs返回不为None,直接使用foucs的返回值判定
+    /// Optional: determine if the middleware should handle this request
+    /// Priority: apply > methods && patterns
+    /// - If apply returns Some, use its return value directly for determination
     fn apply(&self, _parts: &Parts) -> Option<bool> {
         None
     }
 
-    /// 可选：HTTP 方法过滤
     fn methods(&self) -> Option<Vec<ApplyKind<Method>>> {
         None
     }
 
-    /// 可选：路径匹配模式
     fn patterns(&self) -> Option<Vec<ApplyKind<Pattern>>> {
         None
     }
@@ -462,14 +462,6 @@ pub struct Manager {
     middlewares: Vec<Box<dyn Middleware>>,
     metrics: DashMap<String, Arc<RwLock<Metrics>>>,
 }
-
-// #[derive(Debug)]
-// pub struct Manager<M>
-// where
-//     M: Middleware,
-// {
-//     middlewares: Vec<M>,
-// }
 
 impl Manager {
     pub fn new() -> Self {
@@ -588,14 +580,11 @@ where
         let manager = Arc::clone(&self.manager);
 
         let implement = async move {
-            
             let (parts, body) = req.into_parts();
             let mut middles = manager.applies(&parts);
             let mut context = Context::new();
             let mut request = Some(Request::from_parts(parts, body));
             let mut counter: usize = 0;
-
-            
 
             for m in middles.iter_mut() {
                 if context.aborted() {
@@ -670,9 +659,8 @@ where
 
             Ok(response.unwrap())
         };
-        
-        Box::pin(implement)
 
+        Box::pin(implement)
     }
 }
 
