@@ -588,11 +588,14 @@ where
         let manager = Arc::clone(&self.manager);
 
         let implement = async move {
+            
             let (parts, body) = req.into_parts();
             let mut middles = manager.applies(&parts);
             let mut context = Context::new();
-            let mut req = Some(Request::from_parts(parts, body));
+            let mut request = Some(Request::from_parts(parts, body));
             let mut counter: usize = 0;
+
+            
 
             for m in middles.iter_mut() {
                 if context.aborted() {
@@ -604,10 +607,10 @@ where
                 let mut node = Node::new(name);
                 node.re_begin();
 
-                if let Some(f) = m.on_request(&mut context, req.take().unwrap()) {
+                if let Some(f) = m.on_request(&mut context, request.take().unwrap()) {
                     match f.await {
                         Ok(r) => {
-                            req = Some(r);
+                            request = Some(r);
                         },
                         Err(e) => {
                             node.re_errored();
@@ -626,10 +629,10 @@ where
                 context.chains.push(node);
             }
 
-            let res = if let Some(abt) = &mut context.aborted {
+            let response = if let Some(abt) = &mut context.aborted {
                 abt.abort_response.take().unwrap_or_else(make_response)
             } else {
-                inner.call(req.take().unwrap()).await.unwrap_or_else(|e| {
+                inner.call(request.take().unwrap()).await.unwrap_or_else(|e| {
                     tracing::error!("Failed to handle request: {:?}", e);
                     make_response()
                 })
@@ -637,7 +640,7 @@ where
 
             // start process response
 
-            let mut res = Some(res);
+            let mut response = Some(response);
             while counter > 0 {
                 counter -= 1;
 
@@ -646,10 +649,10 @@ where
                 let mut node = Node::new(name);
                 node.rs_begin();
 
-                if let Some(f) = m.on_response(&mut context, res.take().unwrap()) {
+                if let Some(f) = m.on_response(&mut context, response.take().unwrap()) {
                     match f.await {
                         Ok(r) => {
-                            res = Some(r);
+                            response = Some(r);
                         },
                         Err(e) => {
                             node.rs_errored();
@@ -665,7 +668,7 @@ where
                 });
             }
 
-            Ok(res.unwrap())
+            Ok(response.unwrap())
         };
         
         Box::pin(implement)
