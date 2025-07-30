@@ -143,12 +143,6 @@ pub struct Metrics {
     /// Count of response processing errors
     pub response_error_count: u64,
 
-    /// Cumulative request processing latency
-    pub request_latency: u64,
-
-    /// Cumulative response processing latency
-    pub response_latency: u64,
-
     /// Maximum request processing latency observed
     pub max_request_latency: u64,
 
@@ -230,8 +224,6 @@ impl Default for Metrics {
             response_count: 0,
             request_error_count: 0,
             response_error_count: 0,
-            request_latency: 0,
-            response_latency: 0,
             max_request_latency: 0,
             max_response_latency: 0,
             min_request_latency: u64::MAX,
