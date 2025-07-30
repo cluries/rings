@@ -1,8 +1,7 @@
 // 实现对axum middleware的抽象
 pub mod signator;
-pub mod signature;
 
-use crate::{erx, web::request};
+use crate::erx;
 use axum::{
     extract::Request,
     http::{request::Parts, Method},
@@ -54,30 +53,12 @@ impl Pattern {
             None => match regex::Regex::new(regs) {
                 Ok(regex) => {
                     let result = regex.is_match(path);
-                    REGEX_CACHE.insert(regs.to_string(), regex);
+                    REGEX_CACHE.insert(regs.into(), regex);
                     result
                 },
                 Err(e) => invalid_regex(regs, e),
             },
         }
-
-        // match REGEX_CACHE.try_lock() {
-        //     Ok(cache) => match cache.get(regs) {
-        //         Some(regex) => regex.is_match(path),
-        //         _ => match regex::Regex::new(regs) {
-        //             Ok(regex) => {
-        //                 let result = regex.is_match(path);
-        //                 cache.insert(regs.to_string(), regex);
-        //                 result
-        //             },
-        //             Err(e) => invalid_regex(regs, e),
-        //         },
-        //     },
-        //     Err(_) => match regex::Regex::new(regs) {
-        //         Ok(regex) => regex.is_match(path),
-        //         Err(e) => invalid_regex(regs, e),
-        //     },
-        // }
     }
 }
 
@@ -514,7 +495,7 @@ impl Manager {
         self
     }
 
-    pub fn applys(&self, parts: &Parts) -> Vec<&Box<dyn Middleware>> {
+    pub fn applies(&self, parts: &Parts) -> Vec<&Box<dyn Middleware>> {
         let mut middlewares = Vec::new();
         for middleware in &self.middlewares {
             if self.should_apply_middleware(middleware, parts) {
@@ -529,8 +510,8 @@ impl Manager {
             return apply;
         }
 
-        middleware.methods().map_or(false, |methods| methods.iter().any(|method| method.apply(|m| m.eq(&parts.method))))
-            && middleware.patterns().map_or(false, |patterns| {
+        middleware.methods().map_or(true, |methods| methods.iter().any(|method| method.apply(|m| m.eq(&parts.method))))
+            && middleware.patterns().map_or(true, |patterns| {
                 let path = parts.uri.path();
                 patterns.iter().any(|pattern| pattern.apply(|p| p.check(path)))
             })
@@ -606,9 +587,9 @@ where
         let mut inner = self.inner.clone();
         let manager = Arc::clone(&self.manager);
 
-        Box::pin(async move {
+        let implement = async move {
             let (parts, body) = req.into_parts();
-            let mut middles = manager.applys(&parts);
+            let mut middles = manager.applies(&parts);
             let mut context = Context::new();
             let mut req = Some(Request::from_parts(parts, body));
             let mut counter: usize = 0;
@@ -685,7 +666,10 @@ where
             }
 
             Ok(res.unwrap())
-        })
+        };
+        
+        Box::pin(implement)
+
     }
 }
 

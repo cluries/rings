@@ -56,11 +56,9 @@ macro_rules! rout {
 }
 
 pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
-pub type Excluder = fn(parts: &axum::http::request::Parts) -> bool;
 
 pub struct Signator {
     backdoor: String, // 后门，开发时候方便用
-    excludes: Vec<Excluder>,
     nonce_lifetime: i64,
     key_loader: KeyLoader,
     redis_client: redis::Client,
@@ -74,7 +72,6 @@ impl Signator {
     pub fn with_backdoor(redis_url: &str, key_loader: KeyLoader, backdoor: String) -> Self {
         Signator {
             backdoor,
-            excludes: vec![],
             nonce_lifetime: DEFAULT_NONCE_LIFETIME,
             key_loader,
             redis_client: redis::Client::open(redis_url).unwrap_or_else(|err| {
@@ -82,15 +79,6 @@ impl Signator {
                 panic!("failed to connect to redis: {}", err);
             }),
         }
-    }
-
-    pub fn add_exclude(&mut self, exclude: fn(parts: &axum::http::request::Parts) -> bool) -> &mut Self {
-        self.excludes.push(exclude);
-        self
-    }
-
-    pub fn exclude(&self, parts: &axum::http::request::Parts) -> bool {
-        self.excludes.iter().any(|exclude| exclude(parts))
     }
 
     pub async fn exec(&self, request: axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response> {
@@ -145,7 +133,6 @@ impl Clone for Signator {
     fn clone(&self) -> Self {
         Signator {
             backdoor: self.backdoor.clone(),
-            excludes: self.excludes.clone(),
             nonce_lifetime: self.nonce_lifetime,
             key_loader: Arc::clone(&self.key_loader),
             redis_client: self.redis_client.clone(),
@@ -157,7 +144,6 @@ impl std::fmt::Debug for Signator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Signator")
             .field("backdoor", &self.backdoor)
-            .field("excludes", &self.excludes)
             .field("nonce_lifetime", &self.nonce_lifetime)
             .field("redis_client", &self.redis_client)
             .finish()
@@ -170,22 +156,9 @@ impl Middleware for Signator {
     }
 
     fn on_request(&self, _context: &mut Context, request: Request) -> Option<MiddlewareFuture<Request>> {
-        // 只克隆必要的字段，避免克隆整个结构体
-        let backdoor = self.backdoor.clone();
-        let nonce_lifetime = self.nonce_lifetime;
-        let key_loader = Arc::clone(&self.key_loader);
-        let redis_client = self.redis_client.clone();
+        let signator = self.clone();
 
         let r = Box::pin(async move {
-            // 创建临时的 Signator 实例用于执行
-            let signator = Signator {
-                backdoor,
-                excludes: vec![], // exec 方法中不使用 excludes
-                nonce_lifetime,
-                key_loader,
-                redis_client,
-            };
-
             match signator.exec(request).await {
                 Ok(req) => Ok(req),
                 Err(_e) => Err(erx::Erx::new("message")),
