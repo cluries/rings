@@ -5,7 +5,7 @@ use crate::web::middleware::{ApplyKind, Context, Middleware, MiddlewareFuture, P
 use crate::web::{api::Out, define::HttpMethod, request::clone_request, url::parse_query};
 use axum::{
     extract::Request,
-    http::{request::Parts, HeaderMap, HeaderValue, Method},
+    http::{request::Parts, HeaderMap, HeaderValue},
     response::{IntoResponse, Response},
 };
 use redis::AsyncCommands;
@@ -185,7 +185,7 @@ impl Middleware for Signator {
     }
 
     /// 可选：HTTP 方法过滤
-    fn methods(&self) -> Option<Vec<ApplyKind<Method>>> {
+    fn methods(&self) -> Option<Vec<ApplyKind<HttpMethod>>> {
         None
     }
 

@@ -2,11 +2,8 @@
 pub mod signator;
 
 use crate::erx;
-use axum::{
-    extract::Request,
-    http::{request::Parts, Method},
-    response::Response,
-};
+use crate::web::define::HttpMethod;
+use axum::{extract::Request, http::request::Parts, response::Response};
 use dashmap::DashMap;
 use futures_util::future::BoxFuture;
 use indexmap::IndexMap;
@@ -23,7 +20,40 @@ use tower::{
 
 static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(|| Default::default());
 
+///
 pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<T, erx::Erx>> + Send>>;
+
+pub trait ApplyTrait {
+    fn apply(&self, value: &str) -> bool;
+}
+
+pub enum ApplyKind<T: ApplyTrait> {
+    Include(T),
+    Exclude(T),
+}
+
+impl<T> ApplyKind<T>
+where
+    T: ApplyTrait,
+{
+    /// pub fn apply(&self, tester: impl Fn(&T) -> bool) -> bool
+    // pub fn apply<F>(&self, checker: F) -> bool
+    // where
+    //     F: Fn(&T) -> bool,
+    // {
+    //     match self {
+    //         ApplyKind::Include(p) => checker(p),
+    //         ApplyKind::Exclude(p) => !checker(p),
+    //     }
+    // }
+
+    pub fn apply(&self, value: &str) -> bool {
+        match self {
+            ApplyKind::Include(t) => t.apply(value),
+            ApplyKind::Exclude(t) => !t.apply(value),
+        }
+    }
+}
 
 pub enum Pattern {
     Prefix(String),
@@ -33,15 +63,6 @@ pub enum Pattern {
 }
 
 impl Pattern {
-    pub fn check(&self, path: &str) -> bool {
-        match self {
-            Pattern::Prefix(prefix) => path.starts_with(prefix),
-            Pattern::Suffix(suffix) => path.ends_with(suffix),
-            Pattern::Contains(contains) => path.contains(contains),
-            Pattern::Regex(regs) => Self::regex(regs, path),
-        }
-    }
-
     fn regex(regs: &str, path: &str) -> bool {
         let invalid_regex = |pattern, error| -> bool {
             tracing::error!("Invalid regex pattern '{}': {}", pattern, error);
@@ -62,21 +83,20 @@ impl Pattern {
     }
 }
 
-pub enum ApplyKind<T> {
-    Include(T),
-    Exclude(T),
+impl ApplyTrait for Pattern {
+    fn apply(&self, path: &str) -> bool {
+        match self {
+            Pattern::Prefix(prefix) => path.starts_with(prefix),
+            Pattern::Suffix(suffix) => path.ends_with(suffix),
+            Pattern::Contains(contains) => path.contains(contains),
+            Pattern::Regex(regs) => Self::regex(regs, path),
+        }
+    }
 }
 
-impl<T> ApplyKind<T> {
-    /// pub fn apply(&self, tester: impl Fn(&T) -> bool) -> bool
-    pub fn apply<F>(&self, checker: F) -> bool
-    where
-        F: Fn(&T) -> bool,
-    {
-        match self {
-            ApplyKind::Include(p) => checker(p),
-            ApplyKind::Exclude(p) => !checker(p),
-        }
+impl ApplyTrait for HttpMethod {
+    fn apply(&self, method: &str) -> bool {
+        self.is(method)
     }
 }
 
@@ -448,7 +468,7 @@ pub trait Middleware: Send + Sync + std::fmt::Debug {
         None
     }
 
-    fn methods(&self) -> Option<Vec<ApplyKind<Method>>> {
+    fn methods(&self) -> Option<Vec<ApplyKind<HttpMethod>>> {
         None
     }
 
@@ -502,11 +522,15 @@ impl Manager {
             return apply;
         }
 
-        middleware.methods().map_or(true, |methods| methods.iter().any(|method| method.apply(|m| m.eq(&parts.method))))
-            && middleware.patterns().map_or(true, |patterns| {
-                let path = parts.uri.path();
-                patterns.iter().any(|pattern| pattern.apply(|p| p.check(path)))
+        middleware.methods().map_or(true, |methods| {
+            methods.iter().any(|method| {
+                let m = parts.method.as_str();
+                method.apply(m)
             })
+        }) && middleware.patterns().map_or(true, |patterns| {
+            let path = parts.uri.path();
+            patterns.iter().any(|pattern| pattern.apply(path))
+        })
     }
 
     pub fn metrics_update<F>(&self, name: &str, f: F) -> Result<(), erx::Erx>
