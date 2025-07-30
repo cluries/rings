@@ -596,6 +596,7 @@ impl Manager {
     }
 }
 
+/// Convert ManagerLayer into a ServiceBuilder with Identity layer
 impl Into<ServiceBuilder<Stack<ManagerLayer, Identity>>> for ManagerLayer {
     fn into(self) -> ServiceBuilder<Stack<ManagerLayer, Identity>> {
         ServiceBuilder::new().layer(self)
@@ -686,9 +687,16 @@ where
                     m.add_request(node.request.errored, node.request.esapsed);
                     Ok(())
                 });
-
-                context.as_mut().unwrap().chains.push(node);
-                // context.unwrap().chains.push(node);
+            
+                match context.as_mut() {
+                    Some(ctx) => {
+                        ctx.chains.push(node);
+                    },
+                    None => {
+                        tracing::warn!("Context is None, skipping push on_request middleware chain node:{}", node.name);
+                        break;
+                    },
+                }
             }
 
             let response = if let Some(abt) = &mut context.as_mut().unwrap().aborted {
@@ -732,7 +740,16 @@ where
                     m.add_response(node.response.errored, node.response.esapsed);
                     Ok(())
                 });
-                context.as_mut().unwrap().chains.push(node);
+
+                match context.as_mut() {
+                    Some(ctx) => {
+                        ctx.chains.push(node);
+                    },
+                    None => {
+                        tracing::warn!("Context is None, skipping push on_response middleware chain node:{}", node.name);
+                        break;
+                    },
+                }
             }
 
             Ok(response.unwrap())
