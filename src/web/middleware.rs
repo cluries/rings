@@ -18,6 +18,8 @@ use tower::{
     Layer, Service, ServiceBuilder,
 };
 
+
+/// Considering the intended usage, the quantity here cannot be excessive, regardless of memory consumption.
 static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(|| Default::default());
 
 ///
@@ -56,13 +58,14 @@ where
 }
 
 pub enum Pattern {
-    Prefix(String),
-    Suffix(String),
-    Contains(String),
+    Prefix(String, bool),
+    Suffix(String, bool),
+    Contains(String, bool),
     Regex(String),
 }
 
 impl Pattern {
+
     fn regex(regs: &str, path: &str) -> bool {
         let invalid_regex = |pattern, error| -> bool {
             tracing::error!("Invalid regex pattern '{}': {}", pattern, error);
@@ -83,14 +86,58 @@ impl Pattern {
     }
 }
 
+ 
 impl ApplyTrait for Pattern {
     fn apply(&self, path: &str) -> bool {
         match self {
-            Pattern::Prefix(prefix) => path.starts_with(prefix),
-            Pattern::Suffix(suffix) => path.ends_with(suffix),
-            Pattern::Contains(contains) => path.contains(contains),
+            Pattern::Prefix(prefix, match_case) => {
+                if *match_case {
+                    path.starts_with(prefix)
+                } else {
+                    path.len() >= prefix.len() && path.as_bytes()[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes())
+                }
+            },
+            Pattern::Suffix(suffix, match_case) => {
+                if *match_case {
+                    path.ends_with(suffix)
+                } else {
+                    path.len() >= suffix.len() && path.as_bytes()[path.len() - suffix.len()..].eq_ignore_ascii_case(suffix.as_bytes())
+                }
+            },
+            Pattern::Contains(contains, match_case) => {
+                if *match_case {
+                    path.contains(contains)
+                } else {
+                    path.to_ascii_lowercase().contains(&contains.to_ascii_lowercase())
+                }
+            },
             Pattern::Regex(regs) => Self::regex(regs, path),
         }
+
+        // match self {
+        //     Pattern::Prefix(prefix, match_case) => {
+        //         if *match_case {
+        //             path.starts_with(prefix)
+        //         } else {
+        //             path.to_lowercase().starts_with(&prefix.to_lowercase())
+        //         }
+        //     },
+        //     Pattern::Suffix(suffix, match_case) => {
+        //         if *match_case {
+        //             path.ends_with(suffix)
+        //         } else {
+        //             path.to_lowercase().ends_with(&suffix.to_lowercase())
+        //         }
+        //     },
+        //     Pattern::Contains(contains, match_case) => {
+        //         if *match_case {
+        //             path.contains(contains)
+        //         } else {
+        //             path.to_lowercase().contains(&contains.to_lowercase())
+        //         }
+        //     },
+        //     Pattern::Regex(regs) => Self::regex(regs, path),
+        // }
     }
 }
 
