@@ -499,6 +499,8 @@ impl Manager {
         let name = middleware.name().to_string();
         for m in &self.middlewares {
             if m.name() == name {
+                // panics is more suitable for all environments
+                // reason:  middleware name is unique, if exists, it should panic.
                 panic!("Middleware with name '{}' already exists", name);
             }
         }
