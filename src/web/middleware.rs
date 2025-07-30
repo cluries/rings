@@ -1,4 +1,7 @@
-// 实现对axum middleware的抽象
+/// web/middleware.rs 
+/// 实现对tower middleware的抽象
+
+
 pub mod signator;
 
 use crate::erx;
@@ -110,31 +113,6 @@ impl ApplyTrait for Pattern {
             },
             Pattern::Regex(regs) => Self::regex(regs, path),
         }
-
-        // match self {
-        //     Pattern::Prefix(prefix, match_case) => {
-        //         if *match_case {
-        //             path.starts_with(prefix)
-        //         } else {
-        //             path.to_lowercase().starts_with(&prefix.to_lowercase())
-        //         }
-        //     },
-        //     Pattern::Suffix(suffix, match_case) => {
-        //         if *match_case {
-        //             path.ends_with(suffix)
-        //         } else {
-        //             path.to_lowercase().ends_with(&suffix.to_lowercase())
-        //         }
-        //     },
-        //     Pattern::Contains(contains, match_case) => {
-        //         if *match_case {
-        //             path.contains(contains)
-        //         } else {
-        //             path.to_lowercase().contains(&contains.to_lowercase())
-        //         }
-        //     },
-        //     Pattern::Regex(regs) => Self::regex(regs, path),
-        // }
     }
 }
 
@@ -309,14 +287,14 @@ impl Averager {
 #[derive(Debug, Clone)]
 pub struct Point {
     pub created: Option<Instant>,
-    pub esapsed: Duration,
+    pub elapsed: Duration,
     pub errored: bool,
 }
 
 impl Point {
-    pub fn clac_elapsed(&mut self) -> &mut Self {
+    pub fn calc_elapsed(&mut self) -> &mut Self {
         if let Some(instant) = self.created {
-            self.esapsed = instant.elapsed();
+            self.elapsed = instant.elapsed();
         }
         self
     }
@@ -324,7 +302,7 @@ impl Point {
 
 impl Default for Point {
     fn default() -> Self {
-        Self { created: None, esapsed: Duration::default(), errored: false }
+        Self { created: None, elapsed: Duration::default(), errored: false }
     }
 }
 
@@ -354,7 +332,7 @@ impl Node {
     }
 
     pub fn re_end(&mut self) -> &mut Self {
-        self.request.clac_elapsed();
+        self.request.calc_elapsed();
         self
     }
 
@@ -369,7 +347,7 @@ impl Node {
     }
 
     pub fn rs_end(&mut self) -> &mut Self {
-        self.response.clac_elapsed();
+        self.response.calc_elapsed();
         self
     }
 }
@@ -684,7 +662,7 @@ where
                 node.re_end();
 
                 let _ = manager.metrics_update(name, |m| {
-                    m.add_request(node.request.errored, node.request.esapsed);
+                    m.add_request(node.request.errored, node.request.elapsed);
                     Ok(())
                 });
             
@@ -700,12 +678,12 @@ where
             }
 
             let response = if let Some(abt) = &mut context.as_mut().unwrap().aborted {
-                abt.abort_response.take().unwrap_or_else(make_response)
+                abt.abort_response.take().unwrap_or_else(internal_server_error_response)
             } else {
                 inner.call(request.take().unwrap()).await.unwrap_or_else(|e| {
                     tracing::error!("Failed to handle request: {:?}", e);
-                    make_response()
-                })
+                    internal_server_error_response()
+                }) 
             };
 
             // start process response
@@ -737,7 +715,7 @@ where
 
                 node.rs_end();
                 let _ = manager.metrics_update(name, |m| {
-                    m.add_response(node.response.errored, node.response.esapsed);
+                    m.add_response(node.response.errored, node.response.elapsed);
                     Ok(())
                 });
 
@@ -767,7 +745,7 @@ fn make_error_response(error: &str) -> Response {
         .unwrap_or_default()
 }
 
-fn make_response() -> Response {
+fn internal_server_error_response() -> Response {
     make_error_response("internal server error")
 }
 
