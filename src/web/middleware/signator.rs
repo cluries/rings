@@ -22,40 +22,17 @@ const MAX_TIME_DIFF: i64 = 60 * 5; // 5分钟时间差
 const MIN_NONCE_LENGTH: usize = 8;
 const MAX_NONCE_LENGTH: usize = 40;
 const SIGNATURE_LENGTH: usize = 40;
-
-// 错误码常量
-mod error_c {
-    pub const SIGNATURE: &str = "SIGN";
-    pub const PAYLOAD: &str = "PAYL";
-    pub const FORMAT: &str = "FRMT";
-    pub const LOAD: &str = "LOAD";
-    pub const INVALID: &str = "INVD";
-}
-
-#[inline]
-fn layouted_middleware(detail: &str) -> LayoutedC {
-    Layouted::middleware(error_c::SIGNATURE, detail)
-}
-
-macro_rules! rout {
-    ($x:expr) => {
-        Out::<()>{code:layouted_middleware($x).into(), message:None, data:None, debug:None, profile:None}.into_response()
-    };
-
-    ($x:expr, $y:expr) => {
-       Out::<()> {code:layouted_middleware($x).into(), message:Some($y), data:None, debug:None, profile:None}.into_response()
-    };
-
-    ($x:expr, $y:expr, $z:expr) => {
-        Out{code:layouted_middleware($x).into(), message:Some($y), data:Some($z), debug:None, profile:None}.into_response()
-    };
-
-    ($($x:expr),*) => {
-        panic!("processing more than 3 arguments: {:?}", [$($x),*]);
-    };
-}
+ 
 
 pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
+
+pub enum Error {
+    With(String),
+    Format(String),
+    Random(String),
+    KeyLoad(Erx),
+    Invalid(Debug),
+}
 
 pub struct Signator {
     backdoor: String, // 后门，开发时候方便用
@@ -81,22 +58,23 @@ impl Signator {
         }
     }
 
-    pub async fn exec(&self, request: axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response> {
+
+    pub async fn exec(&self, request: axum::extract::Request) -> Result<axum::extract::Request, Error> {
         let (payload_request, mut request) = clone_request(request).await;
 
-        let payload = Payload::from_request(payload_request).await.map_err(|e| rout!(error_c::PAYLOAD, e))?;
-        payload.guard().map_err(|e| rout!(error_c::FORMAT, e.into()))?;
+        let payload = Payload::from_request(payload_request).await?;
+        payload.guard()?;
 
         let loader = Arc::clone(&self.key_loader);
-        let key = loader(payload.xget_u()).await.map_err(|e| rout!(error_c::LOAD, e.message_string()))?;
+        let key = loader(payload.xget_u()).await.map_err(|e| Error::KeyLoad(e) )?;
 
-        if let Err((error, debug)) = payload.valid(key) {
+        if let Err(invalid) = payload.valid(key) {
             if self.backdoor.is_empty() || !self.backdoor.eq(&payload.xget_d()) {
-                return Err(rout!(error_c::INVALID, error, debug));
+                return Err(invalid);
             }
         }
 
-        self.rand_guard(&payload).await.map_err(|e| rout!(error_c::INVALID, e.message_string()))?;
+        self.rand_guard(&payload).await?;
 
         let context = crate::web::context::Context::new(payload.xget_u());
         request.extensions_mut().insert(context);
@@ -104,26 +82,28 @@ impl Signator {
         Ok(request)
     }
 
-    async fn rand_guard(&self, payload: &Payload) -> erx::ResultEX {
-        let mut conn: redis::aio::MultiplexedConnection = self.redis_client.get_multiplexed_tokio_connection().await.map_err(erx::smp)?;
+    async fn rand_guard(&self, payload: &Payload) -> Result<(), Error> {
+        let rdser = |e:redis::RedisError| Error::Random(e.to_string());
+
+        let mut conn: redis::aio::MultiplexedConnection = self.redis_client.get_multiplexed_tokio_connection().await.map_err(rdser)?;
 
         let name = format!("XR:{}", payload.xget_u());
         let xr = payload.xget_r();
 
-        let score: Option<i64> = conn.zscore(name.as_str(), &xr).await.map_err(erx::smp)?;
+        let score: Option<i64> = conn.zscore(name.as_str(), &xr).await.map_err(rdser)?;
 
         let score = score.unwrap_or(0);
         let current: i64 = chrono::Local::now().timestamp();
 
         if (current - score).abs() < self.nonce_lifetime {
-            return Err("duplicate rand value".into());
+            return Err(Error::Random("duplicate rand value".into()));
         }
 
         let mut pipe = redis::pipe();
         pipe.zadd(name.as_str(), &xr, current);
         pipe.zrembyscore(name.as_str(), "-inf", current - self.nonce_lifetime);
         pipe.expire(name.as_str(), self.nonce_lifetime);
-        let _r = pipe.query_async::<Vec<i64>>(&mut conn).await.map_err(erx::smp)?;
+        let _r = pipe.query_async::<Vec<i64>>(&mut conn).await.map_err(rdser)?;
 
         Ok(())
     }
@@ -151,19 +131,31 @@ impl std::fmt::Debug for Signator {
 }
 
 impl Middleware for Signator {
+
+
     fn name(&self) -> &'static str {
-        "signator"
+        Signator::middleware_name()
     }
 
     fn on_request(&self, context: Context, request: Request) -> Option<MiddlewareFuture<Request>> {
+
+        
         let signator = self.clone();
 
         let r = Box::pin(async move {
+
             match signator.exec(request).await {
                 Ok(req) => Ok((context, req)),
-                Err(res) => {
+                Err(_res) => {
                     let mut context = context;
-                    context.make_abort_with_response("signator", "message", res);
+                    //TODO
+                    let res = Response::builder()
+                    .status(500)
+                    .header("content-type", "application/json")
+                    .body(axum::body::Body::from(""))
+                    .unwrap_or_default();
+
+                    context.make_abort_with_response(Signator::middleware_name(), "message", res);
                     Err((context, erx::Erx::new("signator")))
                 },
             }
@@ -214,7 +206,7 @@ struct Payload {
 }
 
 #[derive(Default, Debug, Serialize)]
-struct Debug {
+pub struct Debug {
     payload: String,
     key: String,
     server: String,
@@ -253,7 +245,7 @@ impl Payload {
             || HttpMethod::PATCH.is(&self.method)
     }
 
-    async fn from_request(req: axum::extract::Request) -> Result<Self, String> {
+    async fn from_request(req: axum::extract::Request) -> Result<Self, Error> {
         let (parts, body) = req.into_parts();
 
         let path = parts.uri.path().to_string();
@@ -278,7 +270,7 @@ impl Payload {
             };
 
             if let Err(err) = body {
-                return Err(err);
+                return Err(Error::With(err));
             }
 
             payload.body = body.ok();
@@ -315,35 +307,36 @@ impl Payload {
         self.ds.clone().unwrap_or_default()
     }
 
-    fn valid(&self, key: String) -> Result<(), (String, Debug)> {
+    fn valid(&self, key: String) -> Result<(),  Error> {
         let load = self.payload();
         let hash = hash::hmac_sha1(&load, &key);
 
         if !hash.eq(self.xs.as_ref().unwrap_or(&String::default())) {
-            let debug = Debug { payload: load, key: key.clone(), client: self.xget_s(), server: hash };
-            return Err((String::from("invalid signature"), debug));
+            return Err( 
+                Error::Invalid(Debug { payload: load, key: key.clone(), client: self.xget_s(), server: hash })
+            );
         }
 
         Ok(())
     }
 
-    fn guard(&self) -> Result<(), &str> {
+    fn guard(&self) -> Result<(), Error> {
         if self.xu.is_none() || self.xt.is_none() || self.xr.is_none() || self.xs.is_none() {
-            return Err("missing signature data in header");
+            return Err(Error::Format("missing signature data in header".to_string()));
         }
 
         let xti = self.xt.as_ref().unwrap().parse::<i64>().unwrap_or(0);
         if xti < MAX_TIME_DIFF || (chrono::Utc::now().timestamp() - xti).abs() > MAX_TIME_DIFF {
-            return Err("the time difference is too large");
+            return Err(Error::Format("the time difference is too large".to_string()));
         }
 
         let length = self.xr.as_ref().unwrap().len();
         if length <= MIN_NONCE_LENGTH || length >= MAX_NONCE_LENGTH {
-            return Err("random string length invalid");
+            return Err(Error::Format("random string length invalid".to_string()));
         }
 
         if self.xs.as_ref().unwrap().len() != SIGNATURE_LENGTH {
-            return Err("invalid signature data in header");
+            return  Err(Error::Format("invalid signature data in header".to_string()));
         }
 
         Ok(())

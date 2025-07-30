@@ -458,6 +458,14 @@ impl Default for Context {
 
 /// if apply,methods,patterns all return None, this method is use for every request.
 pub trait Middleware: Send + Sync + std::fmt::Debug {
+
+    fn middleware_name() -> &'static str
+    where
+        Self: Sized,
+    {
+        std::any::type_name::<Self>()
+    }
+
     fn name(&self) -> &'static str;
 
     fn on_request(&self, _context: Context, _request: Request) -> Option<MiddlewareFuture<Request>> {
