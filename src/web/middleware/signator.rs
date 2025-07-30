@@ -57,7 +57,6 @@ macro_rules! rout {
 
 pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
 
-
 pub struct Signator {
     backdoor: String, // 后门，开发时候方便用
     nonce_lifetime: i64,
@@ -163,10 +162,9 @@ impl Middleware for Signator {
             match signator.exec(request).await {
                 Ok(req) => Ok((context, req)),
                 Err(res) => {
-
-                    // context.make_abort_with_response("signator", "message", res);
-                    
-                    Err(erx::Erx::new("message"))
+                    let mut context = context;
+                    context.make_abort_with_response("signator", "message", res);
+                    Err((context, erx::Erx::new("signator")))
                 },
             }
         });

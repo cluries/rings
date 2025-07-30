@@ -22,7 +22,7 @@ use tower::{
 static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(|| Default::default());
 
 ///
-pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<(Context, T), erx::Erx>> + Send>>;
+pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<(Context, T), (Context, erx::Erx)>> + Send>>;
 
 pub trait ApplyTrait {
     fn apply(&self, value: &str) -> bool;
@@ -650,13 +650,14 @@ where
         let implement = async move {
             let (parts, body) = req.into_parts();
             let mut middles = manager.applies(&parts);
+
             let mut context = Some(Context::new());
             let mut request = Some(Request::from_parts(parts, body));
             let mut counter: usize = 0;
 
             for m in middles.iter_mut() {
-                let mc = context.take().unwrap();
-                if mc.aborted() {
+                let mictx = context.take().unwrap();
+                if mictx.aborted() {
                     break;
                 }
                 counter += 1;
@@ -665,7 +666,7 @@ where
                 let mut node = Node::new(name);
                 node.re_begin();
 
-                if let Some(f) = m.on_request(mc, request.take().unwrap()) {
+                if let Some(f) = m.on_request(mictx, request.take().unwrap()) {
                     match f.await {
                         Ok(r) => {
                             context = Some(r.0);
@@ -673,7 +674,8 @@ where
                         },
                         Err(e) => {
                             node.re_errored();
-                            tracing::error!("middleware '{}' on_request handle error: {}", name, e);
+                            context = Some(e.0);
+                            tracing::error!("middleware '{}' on_request handle error: {}", name, e.1);
                         },
                     }
                 }
@@ -685,10 +687,11 @@ where
                     Ok(())
                 });
 
-                context.unwrap().chains.push(node);
+                context.as_mut().unwrap().chains.push(node);
+                // context.unwrap().chains.push(node);
             }
 
-            let response = if let Some(abt) = &mut  context.unwrap().aborted {
+            let response = if let Some(abt) = &mut context.as_mut().unwrap().aborted {
                 abt.abort_response.take().unwrap_or_else(make_response)
             } else {
                 inner.call(request.take().unwrap()).await.unwrap_or_else(|e| {
@@ -708,7 +711,9 @@ where
                 let mut node = Node::new(name);
                 node.rs_begin();
 
-                if let Some(f) = m.on_response(context.take().unwrap(), response.take().unwrap()) {
+                let mictx = context.take().unwrap();
+
+                if let Some(f) = m.on_response(mictx, response.take().unwrap()) {
                     match f.await {
                         Ok(r) => {
                             context = Some(r.0);
@@ -716,7 +721,8 @@ where
                         },
                         Err(e) => {
                             node.rs_errored();
-                            tracing::error!("middleware '{}' on_response handle error: {}", name, e);
+                            context = Some(e.0);
+                            tracing::error!("middleware '{}' on_response handle error: {}", name, e.1);
                         },
                     }
                 }
@@ -726,6 +732,7 @@ where
                     m.add_response(node.response.errored, node.response.esapsed);
                     Ok(())
                 });
+                context.as_mut().unwrap().chains.push(node);
             }
 
             Ok(response.unwrap())
