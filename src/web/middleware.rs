@@ -1,7 +1,5 @@
-/// web/middleware.rs 
+/// web/middleware.rs
 /// 实现对tower middleware的抽象
-
-
 pub mod signator;
 
 use crate::erx;
@@ -657,7 +655,7 @@ where
                     m.add_request(node.request.errored, node.request.elapsed);
                     Ok(())
                 });
-            
+
                 match context.as_mut() {
                     Some(ctx) => {
                         ctx.chains.push(node);
@@ -675,7 +673,7 @@ where
                 inner.call(request.take().unwrap()).await.unwrap_or_else(|e| {
                     tracing::error!("Failed to handle request: {:?}", e);
                     internal_server_error_response()
-                }) 
+                })
             };
 
             // start process response
