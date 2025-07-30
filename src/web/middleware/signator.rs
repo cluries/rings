@@ -1,12 +1,11 @@
-use crate::erx;
-use crate::erx::{Erx, Layouted, LayoutedC};
+use crate::erx::{self, Erx};
 use crate::tools::hash;
 use crate::web::middleware::{ApplyKind, Context, Middleware, MiddlewareFuture, Pattern};
-use crate::web::{api::Out, define::HttpMethod, request::clone_request, url::parse_query};
+use crate::web::{define::HttpMethod, request::clone_request, url::parse_query};
 use axum::{
     extract::Request,
     http::{request::Parts, HeaderMap, HeaderValue},
-    response::{IntoResponse, Response},
+    response::Response,
 };
 use redis::AsyncCommands;
 use serde::Serialize;
@@ -22,16 +21,39 @@ const MAX_TIME_DIFF: i64 = 60 * 5; // 5分钟时间差
 const MIN_NONCE_LENGTH: usize = 8;
 const MAX_NONCE_LENGTH: usize = 40;
 const SIGNATURE_LENGTH: usize = 40;
- 
 
 pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
 
+#[derive(Debug)]
 pub enum Error {
-    With(String),
-    Format(String),
-    Random(String),
-    KeyLoad(Erx),
-    Invalid(Debug),
+    /// 请求体解析错误
+    BodyParsing(String),
+    /// 签名格式错误
+    InvalidFormat(String),
+    /// Redis 随机数检查错误
+    NonceValidation(String),
+    /// 密钥加载错误
+    KeyLoading(Erx),
+    /// 签名验证失败
+    SignatureInvalid(SignatureDebugInfo),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::BodyParsing(msg) => write!(f, "Body parsing error: {}", msg),
+            Error::InvalidFormat(msg) => write!(f, "Invalid format: {}", msg),
+            Error::NonceValidation(msg) => write!(f, "Nonce validation error: {}", msg),
+            Error::KeyLoading(err) => write!(f, "Key loading error: {}", err.description()),
+            Error::SignatureInvalid(debug) => write!(f, "Signature validation failed: {}", debug),
+        }
+    }
+}
+
+impl From<redis::RedisError> for Error {
+    fn from(err: redis::RedisError) -> Self {
+        Error::NonceValidation(err.to_string())
+    }
 }
 
 pub struct Signator {
@@ -58,7 +80,6 @@ impl Signator {
         }
     }
 
-
     pub async fn exec(&self, request: axum::extract::Request) -> Result<axum::extract::Request, Error> {
         let (payload_request, mut request) = clone_request(request).await;
 
@@ -66,7 +87,7 @@ impl Signator {
         payload.guard()?;
 
         let loader = Arc::clone(&self.key_loader);
-        let key = loader(payload.xget_u()).await.map_err(|e| Error::KeyLoad(e) )?;
+        let key = loader(payload.xget_u()).await.map_err(Error::KeyLoading)?;
 
         if let Err(invalid) = payload.valid(key) {
             if self.backdoor.is_empty() || !self.backdoor.eq(&payload.xget_d()) {
@@ -83,27 +104,25 @@ impl Signator {
     }
 
     async fn rand_guard(&self, payload: &Payload) -> Result<(), Error> {
-        let rdser = |e:redis::RedisError| Error::Random(e.to_string());
-
-        let mut conn: redis::aio::MultiplexedConnection = self.redis_client.get_multiplexed_tokio_connection().await.map_err(rdser)?;
+        let mut conn: redis::aio::MultiplexedConnection = self.redis_client.get_multiplexed_tokio_connection().await?;
 
         let name = format!("XR:{}", payload.xget_u());
         let xr = payload.xget_r();
 
-        let score: Option<i64> = conn.zscore(name.as_str(), &xr).await.map_err(rdser)?;
+        let score: Option<i64> = conn.zscore(name.as_str(), &xr).await?;
 
         let score = score.unwrap_or(0);
         let current: i64 = chrono::Local::now().timestamp();
 
         if (current - score).abs() < self.nonce_lifetime {
-            return Err(Error::Random("duplicate rand value".into()));
+            return Err(Error::NonceValidation("duplicate nonce value".into()));
         }
 
         let mut pipe = redis::pipe();
         pipe.zadd(name.as_str(), &xr, current);
         pipe.zrembyscore(name.as_str(), "-inf", current - self.nonce_lifetime);
         pipe.expire(name.as_str(), self.nonce_lifetime);
-        let _r = pipe.query_async::<Vec<i64>>(&mut conn).await.map_err(rdser)?;
+        let _r = pipe.query_async::<Vec<i64>>(&mut conn).await?;
 
         Ok(())
     }
@@ -131,31 +150,39 @@ impl std::fmt::Debug for Signator {
 }
 
 impl Middleware for Signator {
-
-
     fn name(&self) -> &'static str {
         Signator::middleware_name()
     }
 
     fn on_request(&self, context: Context, request: Request) -> Option<MiddlewareFuture<Request>> {
-
-        
         let signator = self.clone();
 
         let r = Box::pin(async move {
-
             match signator.exec(request).await {
                 Ok(req) => Ok((context, req)),
-                Err(_res) => {
+                Err(error) => {
                     let mut context = context;
-                    //TODO
-                    let res = Response::builder()
-                    .status(500)
-                    .header("content-type", "application/json")
-                    .body(axum::body::Body::from(""))
-                    .unwrap_or_default();
 
-                    context.make_abort_with_response(Signator::middleware_name(), "message", res);
+                    let (status_code, error_message) = match &error {
+                        Error::BodyParsing(_) | Error::InvalidFormat(_) => (400, "Bad Request"),
+                        Error::SignatureInvalid(_) => (401, "Unauthorized"),
+                        Error::NonceValidation(_) => (409, "Conflict"),
+                        Error::KeyLoading(_) => (500, "Internal Server Error"),
+                    };
+
+                    let error_body = serde_json::json!({
+                        "error": error_message,
+                        "message": error.to_string(),
+                        "code": status_code
+                    });
+
+                    let res = Response::builder()
+                        .status(status_code)
+                        .header("content-type", "application/json")
+                        .body(axum::body::Body::from(error_body.to_string()))
+                        .unwrap_or_default();
+
+                    context.make_abort_with_response(Signator::middleware_name(), &error.to_string(), res);
                     Err((context, erx::Erx::new("signator")))
                 },
             }
@@ -206,11 +233,17 @@ struct Payload {
 }
 
 #[derive(Default, Debug, Serialize)]
-pub struct Debug {
+pub struct SignatureDebugInfo {
     payload: String,
     key: String,
-    server: String,
-    client: String,
+    server_signature: String,
+    client_signature: String,
+}
+
+impl std::fmt::Display for SignatureDebugInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "payload='{}', expected='{}', received='{}'", self.payload, self.server_signature, self.client_signature)
+    }
 }
 
 mod header_names {
@@ -270,7 +303,7 @@ impl Payload {
             };
 
             if let Err(err) = body {
-                return Err(Error::With(err));
+                return Err(Error::BodyParsing(err));
             }
 
             payload.body = body.ok();
@@ -307,14 +340,13 @@ impl Payload {
         self.ds.clone().unwrap_or_default()
     }
 
-    fn valid(&self, key: String) -> Result<(),  Error> {
-        let load = self.payload();
-        let hash = hash::hmac_sha1(&load, &key);
+    fn valid(&self, key: String) -> Result<(), Error> {
+        let payload = self.payload();
+        let server_signature = hash::hmac_sha1(&payload, &key);
+        let client_signature = self.xget_s();
 
-        if !hash.eq(self.xs.as_ref().unwrap_or(&String::default())) {
-            return Err( 
-                Error::Invalid(Debug { payload: load, key: key.clone(), client: self.xget_s(), server: hash })
-            );
+        if server_signature != client_signature {
+            return Err(Error::SignatureInvalid(SignatureDebugInfo { payload, key: key.clone(), server_signature, client_signature }));
         }
 
         Ok(())
@@ -322,21 +354,24 @@ impl Payload {
 
     fn guard(&self) -> Result<(), Error> {
         if self.xu.is_none() || self.xt.is_none() || self.xr.is_none() || self.xs.is_none() {
-            return Err(Error::Format("missing signature data in header".to_string()));
+            return Err(Error::InvalidFormat("missing required signature headers".to_string()));
         }
 
         let xti = self.xt.as_ref().unwrap().parse::<i64>().unwrap_or(0);
         if xti < MAX_TIME_DIFF || (chrono::Utc::now().timestamp() - xti).abs() > MAX_TIME_DIFF {
-            return Err(Error::Format("the time difference is too large".to_string()));
+            return Err(Error::InvalidFormat("timestamp out of acceptable range".to_string()));
         }
 
-        let length = self.xr.as_ref().unwrap().len();
-        if length <= MIN_NONCE_LENGTH || length >= MAX_NONCE_LENGTH {
-            return Err(Error::Format("random string length invalid".to_string()));
+        let nonce_length = self.xr.as_ref().unwrap().len();
+        if nonce_length <= MIN_NONCE_LENGTH || nonce_length >= MAX_NONCE_LENGTH {
+            return Err(Error::InvalidFormat(format!(
+                "nonce length {} is not within valid range [{}, {}]",
+                nonce_length, MIN_NONCE_LENGTH, MAX_NONCE_LENGTH
+            )));
         }
 
         if self.xs.as_ref().unwrap().len() != SIGNATURE_LENGTH {
-            return  Err(Error::Format("invalid signature data in header".to_string()));
+            return Err(Error::InvalidFormat(format!("signature length must be exactly {} characters", SIGNATURE_LENGTH)));
         }
 
         Ok(())
