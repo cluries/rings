@@ -18,12 +18,11 @@ use tower::{
     Layer, Service, ServiceBuilder,
 };
 
-
 /// Considering the intended usage, the quantity here cannot be excessive, regardless of memory consumption.
 static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(|| Default::default());
 
 ///
-pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<T, erx::Erx>> + Send>>;
+pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<(Context, T), erx::Erx>> + Send>>;
 
 pub trait ApplyTrait {
     fn apply(&self, value: &str) -> bool;
@@ -65,7 +64,6 @@ pub enum Pattern {
 }
 
 impl Pattern {
-
     fn regex(regs: &str, path: &str) -> bool {
         let invalid_regex = |pattern, error| -> bool {
             tracing::error!("Invalid regex pattern '{}': {}", pattern, error);
@@ -86,7 +84,6 @@ impl Pattern {
     }
 }
 
- 
 impl ApplyTrait for Pattern {
     fn apply(&self, path: &str) -> bool {
         match self {
@@ -495,11 +492,11 @@ impl Default for Context {
 pub trait Middleware: Send + Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
 
-    fn on_request(&self, _context: &mut Context, _request: Request) -> Option<MiddlewareFuture<Request>> {
+    fn on_request(&self, _context: Context, _request: Request) -> Option<MiddlewareFuture<Request>> {
         None
     }
 
-    fn on_response(&self, _context: &mut Context, _response: Response) -> Option<MiddlewareFuture<Response>> {
+    fn on_response(&self, _context: Context, _response: Response) -> Option<MiddlewareFuture<Response>> {
         None
     }
 
@@ -653,12 +650,13 @@ where
         let implement = async move {
             let (parts, body) = req.into_parts();
             let mut middles = manager.applies(&parts);
-            let mut context = Context::new();
+            let mut context = Some(Context::new());
             let mut request = Some(Request::from_parts(parts, body));
             let mut counter: usize = 0;
 
             for m in middles.iter_mut() {
-                if context.aborted() {
+                let mc = context.take().unwrap();
+                if mc.aborted() {
                     break;
                 }
                 counter += 1;
@@ -667,10 +665,11 @@ where
                 let mut node = Node::new(name);
                 node.re_begin();
 
-                if let Some(f) = m.on_request(&mut context, request.take().unwrap()) {
+                if let Some(f) = m.on_request(mc, request.take().unwrap()) {
                     match f.await {
                         Ok(r) => {
-                            request = Some(r);
+                            context = Some(r.0);
+                            request = Some(r.1);
                         },
                         Err(e) => {
                             node.re_errored();
@@ -686,10 +685,10 @@ where
                     Ok(())
                 });
 
-                context.chains.push(node);
+                context.unwrap().chains.push(node);
             }
 
-            let response = if let Some(abt) = &mut context.aborted {
+            let response = if let Some(abt) = &mut  context.unwrap().aborted {
                 abt.abort_response.take().unwrap_or_else(make_response)
             } else {
                 inner.call(request.take().unwrap()).await.unwrap_or_else(|e| {
@@ -709,10 +708,11 @@ where
                 let mut node = Node::new(name);
                 node.rs_begin();
 
-                if let Some(f) = m.on_response(&mut context, response.take().unwrap()) {
+                if let Some(f) = m.on_response(context.take().unwrap(), response.take().unwrap()) {
                     match f.await {
                         Ok(r) => {
-                            response = Some(r);
+                            context = Some(r.0);
+                            response = Some(r.1);
                         },
                         Err(e) => {
                             node.rs_errored();

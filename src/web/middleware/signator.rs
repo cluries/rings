@@ -24,8 +24,8 @@ const MAX_NONCE_LENGTH: usize = 40;
 const SIGNATURE_LENGTH: usize = 40;
 
 // 错误码常量
-mod error_codes {
-    pub const SIGN: &str = "SIGN";
+mod error_c {
+    pub const SIGNATURE: &str = "SIGN";
     pub const PAYLOAD: &str = "PAYL";
     pub const FORMAT: &str = "FRMT";
     pub const LOAD: &str = "LOAD";
@@ -33,21 +33,21 @@ mod error_codes {
 }
 
 #[inline]
-fn make_code(detail: &str) -> LayoutedC {
-    Layouted::middleware(error_codes::SIGN, detail)
+fn layouted_middleware(detail: &str) -> LayoutedC {
+    Layouted::middleware(error_c::SIGNATURE, detail)
 }
 
 macro_rules! rout {
     ($x:expr) => {
-        Out::<()>{code:make_code($x).into(), message:None, data:None, debug:None, profile:None}.into_response()
+        Out::<()>{code:layouted_middleware($x).into(), message:None, data:None, debug:None, profile:None}.into_response()
     };
 
     ($x:expr, $y:expr) => {
-       Out::<()> {code:make_code($x).into(), message:Some($y), data:None, debug:None,profile:None}.into_response()
+       Out::<()> {code:layouted_middleware($x).into(), message:Some($y), data:None, debug:None, profile:None}.into_response()
     };
 
     ($x:expr, $y:expr, $z:expr) => {
-        Out{code:make_code($x).into(), message:Some($y), data:Some($z), debug:None, profile:None}.into_response()
+        Out{code:layouted_middleware($x).into(), message:Some($y), data:Some($z), debug:None, profile:None}.into_response()
     };
 
     ($($x:expr),*) => {
@@ -56,6 +56,7 @@ macro_rules! rout {
 }
 
 pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
+
 
 pub struct Signator {
     backdoor: String, // 后门，开发时候方便用
@@ -84,19 +85,19 @@ impl Signator {
     pub async fn exec(&self, request: axum::extract::Request) -> Result<axum::extract::Request, axum::response::Response> {
         let (payload_request, mut request) = clone_request(request).await;
 
-        let payload = Payload::from_request(payload_request).await.map_err(|e| rout!(error_codes::PAYLOAD, e))?;
-        payload.guard().map_err(|e| rout!(error_codes::FORMAT, e.into()))?;
+        let payload = Payload::from_request(payload_request).await.map_err(|e| rout!(error_c::PAYLOAD, e))?;
+        payload.guard().map_err(|e| rout!(error_c::FORMAT, e.into()))?;
 
         let loader = Arc::clone(&self.key_loader);
-        let key = loader(payload.xget_u()).await.map_err(|e| rout!(error_codes::LOAD, e.message_string()))?;
+        let key = loader(payload.xget_u()).await.map_err(|e| rout!(error_c::LOAD, e.message_string()))?;
 
         if let Err((error, debug)) = payload.valid(key) {
             if self.backdoor.is_empty() || !self.backdoor.eq(&payload.xget_d()) {
-                return Err(rout!(error_codes::INVALID, error, debug));
+                return Err(rout!(error_c::INVALID, error, debug));
             }
         }
 
-        self.rand_guard(&payload).await.map_err(|e| rout!(error_codes::INVALID, e.message_string()))?;
+        self.rand_guard(&payload).await.map_err(|e| rout!(error_c::INVALID, e.message_string()))?;
 
         let context = crate::web::context::Context::new(payload.xget_u());
         request.extensions_mut().insert(context);
@@ -155,20 +156,25 @@ impl Middleware for Signator {
         "signator"
     }
 
-    fn on_request(&self, _context: &mut Context, request: Request) -> Option<MiddlewareFuture<Request>> {
+    fn on_request(&self, context: Context, request: Request) -> Option<MiddlewareFuture<Request>> {
         let signator = self.clone();
 
         let r = Box::pin(async move {
             match signator.exec(request).await {
-                Ok(req) => Ok(req),
-                Err(_e) => Err(erx::Erx::new("message")),
+                Ok(req) => Ok((context, req)),
+                Err(res) => {
+
+                    // context.make_abort_with_response("signator", "message", res);
+                    
+                    Err(erx::Erx::new("message"))
+                },
             }
         });
 
         Some(r)
     }
 
-    fn on_response(&self, _context: &mut Context, _response: Response) -> Option<MiddlewareFuture<Response>> {
+    fn on_response(&self, _context: Context, _response: Response) -> Option<MiddlewareFuture<Response>> {
         None
     }
 
