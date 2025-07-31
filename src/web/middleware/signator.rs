@@ -54,13 +54,7 @@ impl std::fmt::Debug for SignatorConfig {
 
 impl Default for SignatorConfig {
     fn default() -> Self {
-        Self {
-            priority: 0,
-            apply: None,
-            methods: None,
-            patterns: None,
-            nonce_lifetime: DEFAULT_NONCE_LIFETIME,
-        }
+        Self { priority: 0, apply: None, methods: None, patterns: None, nonce_lifetime: DEFAULT_NONCE_LIFETIME }
     }
 }
 
@@ -77,7 +71,7 @@ impl SignatorConfig {
     }
 
     /// 设置自定义应用逻辑
-    pub fn apply<F>(mut self, apply: F) -> Self 
+    pub fn apply<F>(mut self, apply: F) -> Self
     where
         F: Fn(&Parts) -> bool + Send + Sync + 'static,
     {
@@ -743,7 +737,7 @@ mod tests {
     use crate::web::middleware::{ApplyKind, Pattern};
 
     use crate::web::middleware::ApplyTrait;
-    
+
     #[test]
     fn test_signator_config_default() {
         let config = SignatorConfig::default();
@@ -770,7 +764,7 @@ mod tests {
 
         let methods = config.methods.unwrap();
         assert_eq!(methods.len(), 1);
-        
+
         let patterns = config.patterns.unwrap();
         assert_eq!(patterns.len(), 2);
     }
@@ -805,9 +799,7 @@ mod tests {
 
     #[test]
     fn test_signator_config_debug() {
-        let config = SignatorConfig::new()
-            .priority(50)
-            .apply(|_| true);
+        let config = SignatorConfig::new().priority(50).apply(|_| true);
 
         let debug_str = format!("{:?}", config);
         assert!(debug_str.contains("SignatorConfig"));
@@ -818,17 +810,17 @@ mod tests {
     #[test]
     fn test_pattern_matching() {
         // 测试前缀匹配
-        let prefix_pattern =  &Pattern::Prefix("/api/".to_string(), true);
+        let prefix_pattern = &Pattern::Prefix("/api/".to_string(), true);
         assert!(prefix_pattern.apply("/api/users"));
         assert!(!prefix_pattern.apply("/public/info"));
 
         // 测试后缀匹配
-        let suffix_pattern =  &Pattern::Suffix(".json".to_string(), true);
+        let suffix_pattern = &Pattern::Suffix(".json".to_string(), true);
         assert!(suffix_pattern.apply("/api/users.json"));
         assert!(!suffix_pattern.apply("/api/users.html"));
 
         // 测试包含匹配
-        let contains_pattern =  &Pattern::Contains("admin".to_string(), true);
+        let contains_pattern = &Pattern::Contains("admin".to_string(), true);
         assert!(contains_pattern.apply("/admin/users"));
         assert!(contains_pattern.apply("/api/admin/settings"));
         assert!(!contains_pattern.apply("/public/info"));
@@ -843,7 +835,7 @@ mod tests {
     #[test]
     fn test_apply_kind() {
         let method = HttpMethod::POST;
-        
+
         let include_kind = ApplyKind::Include(method.clone());
         assert!(include_kind.apply("POST"));
         assert!(!include_kind.apply("GET"));
