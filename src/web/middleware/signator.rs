@@ -25,6 +25,153 @@ const SIGNATURE_LENGTH: usize = 40;
 
 pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
 
+/// Signator 中间件配置
+#[derive(Clone)]
+pub struct SignatorConfig {
+    /// 中间件优先级，数值越大优先级越高
+    pub priority: i32,
+    /// 自定义应用逻辑
+    pub apply: Option<Arc<dyn Fn(&Parts) -> bool + Send + Sync>>,
+    /// HTTP 方法过滤
+    pub methods: Option<Vec<ApplyKind<HttpMethod>>>,
+    /// 路径匹配模式
+    pub patterns: Option<Vec<ApplyKind<Pattern>>>,
+    /// 随机数生命周期（秒）
+    pub nonce_lifetime: i64,
+}
+
+impl std::fmt::Debug for SignatorConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SignatorConfig")
+            .field("priority", &self.priority)
+            .field("apply", &self.apply.as_ref().map(|_| "Some(Fn)"))
+            .field("methods", &self.methods)
+            .field("patterns", &self.patterns)
+            .field("nonce_lifetime", &self.nonce_lifetime)
+            .finish()
+    }
+}
+
+impl Default for SignatorConfig {
+    fn default() -> Self {
+        Self {
+            priority: 0,
+            apply: None,
+            methods: None,
+            patterns: None,
+            nonce_lifetime: DEFAULT_NONCE_LIFETIME,
+        }
+    }
+}
+
+impl SignatorConfig {
+    /// 创建新的配置
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 设置优先级
+    pub fn priority(mut self, priority: i32) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    /// 设置自定义应用逻辑
+    pub fn apply<F>(mut self, apply: F) -> Self 
+    where
+        F: Fn(&Parts) -> bool + Send + Sync + 'static,
+    {
+        self.apply = Some(Arc::new(apply));
+        self
+    }
+
+    /// 设置 HTTP 方法过滤
+    pub fn methods(mut self, methods: Vec<ApplyKind<HttpMethod>>) -> Self {
+        self.methods = Some(methods);
+        self
+    }
+
+    /// 添加包含的 HTTP 方法
+    pub fn include_method(mut self, method: HttpMethod) -> Self {
+        let methods = self.methods.get_or_insert_with(Vec::new);
+        methods.push(ApplyKind::Include(method));
+        self
+    }
+
+    /// 添加排除的 HTTP 方法
+    pub fn exclude_method(mut self, method: HttpMethod) -> Self {
+        let methods = self.methods.get_or_insert_with(Vec::new);
+        methods.push(ApplyKind::Exclude(method));
+        self
+    }
+
+    /// 设置路径匹配模式
+    pub fn patterns(mut self, patterns: Vec<ApplyKind<Pattern>>) -> Self {
+        self.patterns = Some(patterns);
+        self
+    }
+
+    /// 添加包含的路径模式
+    pub fn include_pattern(mut self, pattern: Pattern) -> Self {
+        let patterns = self.patterns.get_or_insert_with(Vec::new);
+        patterns.push(ApplyKind::Include(pattern));
+        self
+    }
+
+    /// 添加排除的路径模式
+    pub fn exclude_pattern(mut self, pattern: Pattern) -> Self {
+        let patterns = self.patterns.get_or_insert_with(Vec::new);
+        patterns.push(ApplyKind::Exclude(pattern));
+        self
+    }
+
+    /// 添加前缀匹配模式（包含）
+    pub fn include_prefix(self, prefix: impl Into<String>, case_sensitive: bool) -> Self {
+        self.include_pattern(Pattern::Prefix(prefix.into(), case_sensitive))
+    }
+
+    /// 添加前缀匹配模式（排除）
+    pub fn exclude_prefix(self, prefix: impl Into<String>, case_sensitive: bool) -> Self {
+        self.exclude_pattern(Pattern::Prefix(prefix.into(), case_sensitive))
+    }
+
+    /// 添加后缀匹配模式（包含）
+    pub fn include_suffix(self, suffix: impl Into<String>, case_sensitive: bool) -> Self {
+        self.include_pattern(Pattern::Suffix(suffix.into(), case_sensitive))
+    }
+
+    /// 添加后缀匹配模式（排除）
+    pub fn exclude_suffix(self, suffix: impl Into<String>, case_sensitive: bool) -> Self {
+        self.exclude_pattern(Pattern::Suffix(suffix.into(), case_sensitive))
+    }
+
+    /// 添加包含匹配模式（包含）
+    pub fn include_contains(self, contains: impl Into<String>, case_sensitive: bool) -> Self {
+        self.include_pattern(Pattern::Contains(contains.into(), case_sensitive))
+    }
+
+    /// 添加包含匹配模式（排除）
+    pub fn exclude_contains(self, contains: impl Into<String>, case_sensitive: bool) -> Self {
+        self.exclude_pattern(Pattern::Contains(contains.into(), case_sensitive))
+    }
+
+    /// 添加正则表达式匹配模式（包含）
+    pub fn include_regex(self, regex: impl Into<String>) -> Self {
+        self.include_pattern(Pattern::Regex(regex.into()))
+    }
+
+    /// 添加正则表达式匹配模式（排除）
+    pub fn exclude_regex(self, regex: impl Into<String>) -> Self {
+        self.exclude_pattern(Pattern::Regex(regex.into()))
+    }
+
+    /// 设置随机数生命周期（秒）
+    pub fn nonce_lifetime(mut self, lifetime: i64) -> Self {
+        self.nonce_lifetime = lifetime;
+        self
+    }
+}
+
 #[derive(Debug)]
 pub enum Error {
     /// 请求体过大
@@ -130,20 +277,29 @@ impl From<redis::RedisError> for Error {
 
 pub struct Signator {
     backdoor: String, // 后门，开发时候方便用
-    nonce_lifetime: i64,
+    config: SignatorConfig,
     key_loader: KeyLoader,
     redis_client: redis::Client,
 }
 
 impl Signator {
     pub fn new(redis_url: &str, key_loader: KeyLoader) -> Self {
-        Self::with_backdoor(redis_url, Arc::clone(&key_loader), String::default())
+        Self::with_config(redis_url, key_loader, SignatorConfig::default())
     }
 
     pub fn with_backdoor(redis_url: &str, key_loader: KeyLoader, backdoor: String) -> Self {
+        let config = SignatorConfig::default();
+        Self::with_config_and_backdoor(redis_url, key_loader, config, backdoor)
+    }
+
+    pub fn with_config(redis_url: &str, key_loader: KeyLoader, config: SignatorConfig) -> Self {
+        Self::with_config_and_backdoor(redis_url, key_loader, config, String::default())
+    }
+
+    pub fn with_config_and_backdoor(redis_url: &str, key_loader: KeyLoader, config: SignatorConfig, backdoor: String) -> Self {
         Signator {
             backdoor,
-            nonce_lifetime: DEFAULT_NONCE_LIFETIME,
+            config,
             key_loader,
             redis_client: redis::Client::open(redis_url).unwrap_or_else(|err| {
                 tracing::error!("{} {}", redis_url, err);
@@ -186,14 +342,14 @@ impl Signator {
         let score = score.unwrap_or(0);
         let current: i64 = chrono::Local::now().timestamp();
 
-        if (current - score).abs() < self.nonce_lifetime {
+        if (current - score).abs() < self.config.nonce_lifetime {
             return Err(Error::NonceReused(payload.get_nonce()));
         }
 
         let mut pipe = redis::pipe();
         pipe.zadd(name.as_str(), &nonce, current);
-        pipe.zrembyscore(name.as_str(), "-inf", current - self.nonce_lifetime);
-        pipe.expire(name.as_str(), self.nonce_lifetime);
+        pipe.zrembyscore(name.as_str(), "-inf", current - self.config.nonce_lifetime);
+        pipe.expire(name.as_str(), self.config.nonce_lifetime);
         let _r = pipe.query_async::<Vec<i64>>(&mut conn).await?;
 
         Ok(())
@@ -204,7 +360,7 @@ impl Clone for Signator {
     fn clone(&self) -> Self {
         Signator {
             backdoor: self.backdoor.clone(),
-            nonce_lifetime: self.nonce_lifetime,
+            config: self.config.clone(),
             key_loader: Arc::clone(&self.key_loader),
             redis_client: self.redis_client.clone(),
         }
@@ -215,7 +371,7 @@ impl std::fmt::Debug for Signator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Signator")
             .field("backdoor", &self.backdoor)
-            .field("nonce_lifetime", &self.nonce_lifetime)
+            .field("config", &self.config)
             .field("redis_client", &self.redis_client)
             .finish()
     }
@@ -253,24 +409,24 @@ impl Middleware for Signator {
 
     /// 可选：中间件优先级，数值越大优先级越高
     fn priority(&self) -> i32 {
-        0
+        self.config.priority
     }
 
     /// 可选：判断中间件是否应该处理这个请求
-    /// 优先级 focus > methods > patterns
-    /// - 如果foucs返回不为None,直接使用foucs的返回值判定
-    fn apply(&self, _parts: &Parts) -> Option<bool> {
-        None
+    /// 优先级 apply > methods > patterns
+    /// - 如果 apply 返回不为 None，直接使用 apply 的返回值判定
+    fn apply(&self, parts: &Parts) -> Option<bool> {
+        self.config.apply.as_ref().map(|f| f(parts))
     }
 
     /// 可选：HTTP 方法过滤
     fn methods(&self) -> Option<Vec<ApplyKind<HttpMethod>>> {
-        None
+        self.config.methods.clone()
     }
 
     /// 可选：路径匹配模式
     fn patterns(&self) -> Option<Vec<ApplyKind<Pattern>>> {
-        None
+        self.config.patterns.clone()
     }
 }
 
@@ -574,5 +730,124 @@ impl Payload {
             serde_json::Value::Array(array) => Self::serialize_array(array),
             serde_json::Value::Object(object) => Self::serialize_object(object),
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::web::define::HttpMethod;
+    use crate::web::middleware::{ApplyKind, Pattern};
+    use axum::http::{Method, Uri};
+    use axum::http::request::Parts;
+    use std::sync::Arc;
+    use crate::web::middleware::ApplyTrait;
+    
+    #[test]
+    fn test_signator_config_default() {
+        let config = SignatorConfig::default();
+        assert_eq!(config.priority, 0);
+        assert_eq!(config.nonce_lifetime, DEFAULT_NONCE_LIFETIME);
+        assert!(config.apply.is_none());
+        assert!(config.methods.is_none());
+        assert!(config.patterns.is_none());
+    }
+
+    #[test]
+    fn test_signator_config_builder() {
+        let config = SignatorConfig::new()
+            .priority(100)
+            .nonce_lifetime(600)
+            .include_method(HttpMethod::POST)
+            .include_prefix("/api/".to_string(), true)
+            .exclude_suffix(".html".to_string(), false);
+
+        assert_eq!(config.priority, 100);
+        assert_eq!(config.nonce_lifetime, 600);
+        assert!(config.methods.is_some());
+        assert!(config.patterns.is_some());
+
+        let methods = config.methods.unwrap();
+        assert_eq!(methods.len(), 1);
+        
+        let patterns = config.patterns.unwrap();
+        assert_eq!(patterns.len(), 2);
+    }
+
+    // #[test]
+    // fn test_signator_config_apply() {
+    //     let config = SignatorConfig::new()
+    //         .apply(|parts| {
+    //             parts.uri.path().starts_with("/admin/")
+    //         });
+
+    //     assert!(config.apply.is_some());
+
+    //     // 创建一个模拟的 Parts 来测试 apply 函数
+    //     let uri: Uri = "/admin/users".parse().unwrap();
+    //     let method = Method::GET;
+    //     let mut parts = Parts::default();
+    //     parts.uri = uri;
+    //     parts.method = method;
+
+    //     let apply_fn = config.apply.unwrap();
+    //     assert!(apply_fn(&parts));
+
+    //     // 测试不匹配的路径
+    //     let uri: Uri = "/public/info".parse().unwrap();
+    //     let mut parts = Parts::default();
+    //     parts.uri = uri;
+    //     parts.method = Method::GET;
+
+    //     assert!(!apply_fn(&parts));
+    // }
+
+    #[test]
+    fn test_signator_config_debug() {
+        let config = SignatorConfig::new()
+            .priority(50)
+            .apply(|_| true);
+
+        let debug_str = format!("{:?}", config);
+        assert!(debug_str.contains("SignatorConfig"));
+        assert!(debug_str.contains("priority: 50"));
+        assert!(debug_str.contains("Some(Fn)"));
+    }
+
+    #[test]
+    fn test_pattern_matching() {
+        // 测试前缀匹配
+        let prefix_pattern =  &Pattern::Prefix("/api/".to_string(), true);
+        assert!(prefix_pattern.apply("/api/users"));
+        assert!(!prefix_pattern.apply("/public/info"));
+
+        // 测试后缀匹配
+        let suffix_pattern =  &Pattern::Suffix(".json".to_string(), true);
+        assert!(suffix_pattern.apply("/api/users.json"));
+        assert!(!suffix_pattern.apply("/api/users.html"));
+
+        // 测试包含匹配
+        let contains_pattern =  &Pattern::Contains("admin".to_string(), true);
+        assert!(contains_pattern.apply("/admin/users"));
+        assert!(contains_pattern.apply("/api/admin/settings"));
+        assert!(!contains_pattern.apply("/public/info"));
+
+        // 测试正则表达式匹配
+        let regex_pattern = &Pattern::Regex(r"^/api/v\d+/.*$".to_string());
+        assert!(regex_pattern.apply("/api/v1/users"));
+        assert!(regex_pattern.apply("/api/v2/posts"));
+        assert!(!regex_pattern.apply("/api/users"));
+    }
+
+    #[test]
+    fn test_apply_kind() {
+        let method = HttpMethod::POST;
+        
+        let include_kind = ApplyKind::Include(method.clone());
+        assert!(include_kind.apply("POST"));
+        assert!(!include_kind.apply("GET"));
+
+        let exclude_kind = ApplyKind::Exclude(method);
+        assert!(!exclude_kind.apply("POST"));
+        assert!(exclude_kind.apply("GET"));
     }
 }

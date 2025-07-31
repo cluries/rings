@@ -29,6 +29,7 @@ pub trait ApplyTrait {
     fn apply(&self, value: &str) -> bool;
 }
 
+#[derive(Debug, Clone)]
 pub enum ApplyKind<T: ApplyTrait> {
     Include(T),
     Exclude(T),
@@ -57,6 +58,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Pattern {
     Prefix(String, bool),
     Suffix(String, bool),
