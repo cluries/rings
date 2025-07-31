@@ -1,6 +1,6 @@
 use crate::erx::{Erx, Layouted};
-use crate::web::api::Out;
 use crate::tools::hash;
+use crate::web::api::Out;
 use crate::web::middleware::{ApplyKind, Context, Middleware, MiddlewareFuture, Pattern};
 use crate::web::{define::HttpMethod, request::clone_request, url::parse_query};
 use axum::{
@@ -27,7 +27,6 @@ pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<St
 
 #[derive(Debug)]
 pub enum Error {
-    // === 请求体相关错误 ===
     /// 请求体过大
     BodyTooLarge(usize),
     /// 请求体JSON格式错误
@@ -35,7 +34,6 @@ pub enum Error {
     /// 请求体读取失败
     BodyReadFailed(String),
 
-    // === 签名头部相关错误 ===
     /// 缺少必需的签名头部
     MissingHeaders(Vec<String>),
     /// 用户ID格式错误
@@ -43,13 +41,22 @@ pub enum Error {
     /// 时间戳格式错误
     InvalidTimestamp(String),
     /// 时间戳超出允许范围
-    TimestampOutOfRange { timestamp: i64, max_diff: i64 },
+    TimestampOutOfRange {
+        timestamp: i64,
+        max_diff: i64,
+    },
     /// 随机数长度不符合要求
-    InvalidNonceLength { length: usize, min: usize, max: usize },
+    InvalidNonceLength {
+        length: usize,
+        min: usize,
+        max: usize,
+    },
     /// 签名长度不符合要求
-    InvalidSignatureLength { length: usize, expected: usize },
+    InvalidSignatureLength {
+        length: usize,
+        expected: usize,
+    },
 
-    // === 随机数验证相关错误 ===
     /// Redis连接失败
     RedisConnectionFailed(String),
     /// 随机数重复使用
@@ -57,14 +64,11 @@ pub enum Error {
     /// Redis操作失败
     RedisOperationFailed(String),
 
-    // === 密钥和签名验证相关错误 ===
     /// 密钥加载失败
     KeyLoadingFailed(Erx),
     /// 签名验证失败
     SignatureVerificationFailed(SignatureDebugInfo),
 
-    // === 系统级错误 ===
-    /// 内部服务器错误
     InternalError(String),
 }
 
@@ -75,8 +79,7 @@ impl Into<Out<()>> for Error {
         Out::new(c, Some(message), None)
     }
 }
-    
- 
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -226,21 +229,22 @@ impl Middleware for Signator {
     fn on_request(&self, context: Context, request: Request) -> Option<MiddlewareFuture<Request>> {
         let signator = self.clone();
 
-        let r = Box::pin(async move {
+        let future = Box::pin(async move {
             match signator.exec(request).await {
                 Ok(req) => Ok((context, req)),
                 Err(error) => {
-                    let mut context = context;
                     let message = &error.to_string();
                     let erx = Erx::new(&message);
                     let out: Out<()> = error.into();
+
+                    let mut context = context;
                     context.make_abort_with_response(Signator::middleware_name(), message, out.into_response());
                     Err((context, erx))
                 },
             }
         });
 
-        Some(r)
+        Some(future)
     }
 
     fn on_response(&self, _context: Context, _response: Response) -> Option<MiddlewareFuture<Response>> {
