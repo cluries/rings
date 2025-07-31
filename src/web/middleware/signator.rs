@@ -17,7 +17,7 @@ use std::sync::Arc;
 // 默认配置常量
 const DEFAULT_NONCE_LIFETIME: i64 = 300; // 5分钟
 const MAX_BODY_SIZE: usize = 1024 * 1024 * 32; // 32MB
-const MAX_TIME_DIFF: i64 = 60 * 5; // 5分钟时间差
+const MAX_TIME_DEVIATION: i64 = 60 * 5; // 5分钟时间差
 const MIN_NONCE_LENGTH: usize = 8;
 const MAX_NONCE_LENGTH: usize = 40;
 const SIGNATURE_LENGTH: usize = 40;
@@ -440,8 +440,8 @@ impl Payload {
         let timestamp_str = self.timestamp.as_ref().unwrap();
         let timestamp = timestamp_str.parse::<i64>().map_err(|_| Error::InvalidTimestamp(timestamp_str.clone()))?;
 
-        if timestamp < MAX_TIME_DIFF || (chrono::Utc::now().timestamp() - timestamp).abs() > MAX_TIME_DIFF {
-            return Err(Error::TimestampOutOfRange { timestamp, max_diff: MAX_TIME_DIFF });
+        if timestamp < MAX_TIME_DEVIATION || (chrono::Utc::now().timestamp() - timestamp).abs() > MAX_TIME_DEVIATION {
+            return Err(Error::TimestampOutOfRange { timestamp, max_diff: MAX_TIME_DEVIATION });
         }
 
         // 验证随机数长度
