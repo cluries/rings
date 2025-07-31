@@ -39,7 +39,7 @@ impl Except {
         use crate::erx::PreL4;
 
         let defined_wrapper = |c: define::HttpCode| Out::<T> {
-            code: Layouted::common(PreL4::COMM.into(), &format!("{:04}", c.code())).into(),
+            code: Layouted::common(PreL4::COMM.four(), &format!("{:04}", c.code())).into(),
             message: Some(c.message().into()),
             data: None,
             debug: None,
@@ -58,7 +58,7 @@ impl Except {
                     m
                 };
                 Out::<T> {
-                    code: Layouted::common(PreL4::COMM.into(), "9999").into(),
+                    code: Layouted::common(PreL4::COMM.four(), "9999").into(),
                     message: tos!(m),
                     data: None,
                     debug: None,
@@ -68,7 +68,7 @@ impl Except {
             Except::InvalidParam(m) => {
                 let m = if m.is_empty() { "invalid params" } else { m };
                 Out::<T> {
-                    code: Layouted::common(PreL4::COMM.into(), "1000").into(),
+                    code: Layouted::common(PreL4::COMM.four(), "1000").into(),
                     message: tos!(m),
                     data: None,
                     debug: None,
@@ -78,7 +78,7 @@ impl Except {
             Except::InvalidParams(m) => {
                 let m = if m.is_empty() { "invalid params".to_string() } else { m.join(", ") };
                 Out::<T> {
-                    code: Layouted::common(PreL4::COMM.into(), "1000").into(),
+                    code: Layouted::common(PreL4::COMM.four(), "1000").into(),
                     message: Some(m),
                     data: None,
                     debug: None,
@@ -86,28 +86,28 @@ impl Except {
                 }
             },
             Except::Fuzzy(detail, m) => Out::<T> {
-                code: Layouted::common(PreL4::FUZZ.into(), detail).into(),
+                code: Layouted::common(PreL4::FUZZ.four(), detail).into(),
                 message: tos!(m),
                 data: None,
                 debug: None,
                 profile: None,
             },
             Except::FuzzyService(detail, m) => Out::<T> {
-                code: Layouted::service(PreL4::FUZZ.into(), detail).into(),
+                code: Layouted::service(PreL4::FUZZ.four(), detail).into(),
                 message: tos!(m),
                 data: None,
                 debug: None,
                 profile: None,
             },
             Except::FuzzyModel(detail, m) => Out::<T> {
-                code: Layouted::model(PreL4::FUZZ.into(), detail).into(),
+                code: Layouted::model(PreL4::FUZZ.four(), detail).into(),
                 message: tos!(m),
                 data: None,
                 debug: None,
                 profile: None,
             },
             Except::FuzzyAction(detail, m) => Out::<T> {
-                code: Layouted::action(PreL4::FUZZ.into(), detail).into(),
+                code: Layouted::action(PreL4::FUZZ.four(), detail).into(),
                 message: tos!(m),
                 data: None,
                 debug: None,

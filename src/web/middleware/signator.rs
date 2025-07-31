@@ -26,33 +26,99 @@ pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<St
 
 #[derive(Debug)]
 pub enum Error {
-    /// 请求体解析错误
-    BodyParsing(String),
-    /// 签名格式错误
-    InvalidFormat(String),
-    /// Redis 随机数检查错误
-    NonceValidation(String),
-    /// 密钥加载错误
-    KeyLoading(Erx),
+    // === 请求体相关错误 ===
+    /// 请求体过大
+    BodyTooLarge(usize),
+    /// 请求体JSON格式错误
+    BodyJsonInvalid(String),
+    /// 请求体读取失败
+    BodyReadFailed(String),
+
+    // === 签名头部相关错误 ===
+    /// 缺少必需的签名头部
+    MissingHeaders(Vec<String>),
+    /// 用户ID格式错误
+    InvalidUserId(String),
+    /// 时间戳格式错误
+    InvalidTimestamp(String),
+    /// 时间戳超出允许范围
+    TimestampOutOfRange { timestamp: i64, max_diff: i64 },
+    /// 随机数长度不符合要求
+    InvalidNonceLength { length: usize, min: usize, max: usize },
+    /// 签名长度不符合要求
+    InvalidSignatureLength { length: usize, expected: usize },
+
+    // === 随机数验证相关错误 ===
+    /// Redis连接失败
+    RedisConnectionFailed(String),
+    /// 随机数重复使用
+    NonceReused(String),
+    /// Redis操作失败
+    RedisOperationFailed(String),
+
+    // === 密钥和签名验证相关错误 ===
+    /// 密钥加载失败
+    KeyLoadingFailed(Erx),
     /// 签名验证失败
-    SignatureInvalid(SignatureDebugInfo),
+    SignatureVerificationFailed(SignatureDebugInfo),
+
+    // === 系统级错误 ===
+    /// 内部服务器错误
+    InternalError(String),
 }
+
+// impl From<Error> for crate::web::api::Out<_> {
+//     fn from(err: Error) -> crate::web::api::Out {
+        
+//     }
+// }
+    
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::BodyParsing(msg) => write!(f, "Body parsing error: {}", msg),
-            Error::InvalidFormat(msg) => write!(f, "Invalid format: {}", msg),
-            Error::NonceValidation(msg) => write!(f, "Nonce validation error: {}", msg),
-            Error::KeyLoading(err) => write!(f, "Key loading error: {}", err.description()),
-            Error::SignatureInvalid(debug) => write!(f, "Signature validation failed: {}", debug),
+            // 请求体相关错误
+            Error::BodyTooLarge(size) => write!(f, "Request body too large: {} bytes (max: {} bytes)", size, MAX_BODY_SIZE),
+            Error::BodyJsonInvalid(msg) => write!(f, "Invalid JSON in request body: {}", msg),
+            Error::BodyReadFailed(msg) => write!(f, "Failed to read request body: {}", msg),
+
+            // 签名头部相关错误
+            Error::MissingHeaders(headers) => write!(f, "Missing required headers: {}", headers.join(", ")),
+            Error::InvalidUserId(user_id) => write!(f, "Invalid user ID format: {}", user_id),
+            Error::InvalidTimestamp(timestamp) => write!(f, "Invalid timestamp format: {}", timestamp),
+            Error::TimestampOutOfRange { timestamp, max_diff } => {
+                write!(f, "Timestamp {} is outside acceptable range (±{} seconds)", timestamp, max_diff)
+            },
+            Error::InvalidNonceLength { length, min, max } => {
+                write!(f, "Nonce length {} is invalid (must be between {} and {} characters)", length, min, max)
+            },
+            Error::InvalidSignatureLength { length, expected } => {
+                write!(f, "Signature length {} is invalid (expected {} characters)", length, expected)
+            },
+
+            // 随机数验证相关错误
+            Error::RedisConnectionFailed(msg) => write!(f, "Redis connection failed: {}", msg),
+            Error::NonceReused(nonce) => write!(f, "Nonce has been used recently: {}", nonce),
+            Error::RedisOperationFailed(msg) => write!(f, "Redis operation failed: {}", msg),
+
+            // 密钥和签名验证相关错误
+            Error::KeyLoadingFailed(err) => write!(f, "Failed to load signing key: {}", err.description()),
+            Error::SignatureVerificationFailed(debug) => write!(f, "Signature verification failed: {}", debug),
+
+            // 系统级错误
+            Error::InternalError(msg) => write!(f, "Internal server error: {}", msg),
         }
     }
 }
 
 impl From<redis::RedisError> for Error {
     fn from(err: redis::RedisError) -> Self {
-        Error::NonceValidation(err.to_string())
+        match err.kind() {
+            redis::ErrorKind::IoError => Error::RedisConnectionFailed(err.to_string()),
+            redis::ErrorKind::AuthenticationFailed => Error::RedisConnectionFailed(format!("Redis authentication failed: {}", err)),
+            redis::ErrorKind::TypeError => Error::RedisOperationFailed(format!("Redis type error: {}", err)),
+            _ => Error::RedisOperationFailed(err.to_string()),
+        }
     }
 }
 
@@ -84,42 +150,42 @@ impl Signator {
         let (payload_request, mut request) = clone_request(request).await;
 
         let payload = Payload::from_request(payload_request).await?;
-        payload.guard()?;
+        payload.validate_headers()?;
 
         let loader = Arc::clone(&self.key_loader);
-        let key = loader(payload.xget_u()).await.map_err(Error::KeyLoading)?;
+        let key = loader(payload.get_user_id()).await.map_err(Error::KeyLoadingFailed)?;
 
-        if let Err(invalid) = payload.valid(key) {
-            if self.backdoor.is_empty() || !self.backdoor.eq(&payload.xget_d()) {
+        if let Err(invalid) = payload.validate_signature(key) {
+            if self.backdoor.is_empty() || !self.backdoor.eq(&payload.get_dev_skip()) {
                 return Err(invalid);
             }
         }
 
-        self.rand_guard(&payload).await?;
+        self.validate_nonce(&payload).await?;
 
-        let context = crate::web::context::Context::new(payload.xget_u());
+        let context = crate::web::context::Context::new(payload.get_user_id());
         request.extensions_mut().insert(context);
 
         Ok(request)
     }
 
-    async fn rand_guard(&self, payload: &Payload) -> Result<(), Error> {
+    async fn validate_nonce(&self, payload: &Payload) -> Result<(), Error> {
         let mut conn: redis::aio::MultiplexedConnection = self.redis_client.get_multiplexed_tokio_connection().await?;
 
-        let name = format!("XR:{}", payload.xget_u());
-        let xr = payload.xget_r();
+        let name = format!("XR:{}", payload.get_user_id());
+        let nonce = payload.get_nonce();
 
-        let score: Option<i64> = conn.zscore(name.as_str(), &xr).await?;
+        let score: Option<i64> = conn.zscore(name.as_str(), &nonce).await?;
 
         let score = score.unwrap_or(0);
         let current: i64 = chrono::Local::now().timestamp();
 
         if (current - score).abs() < self.nonce_lifetime {
-            return Err(Error::NonceValidation("duplicate nonce value".into()));
+            return Err(Error::NonceReused(payload.get_nonce()));
         }
 
         let mut pipe = redis::pipe();
-        pipe.zadd(name.as_str(), &xr, current);
+        pipe.zadd(name.as_str(), &nonce, current);
         pipe.zrembyscore(name.as_str(), "-inf", current - self.nonce_lifetime);
         pipe.expire(name.as_str(), self.nonce_lifetime);
         let _r = pipe.query_async::<Vec<i64>>(&mut conn).await?;
@@ -164,10 +230,28 @@ impl Middleware for Signator {
                     let mut context = context;
 
                     let (status_code, error_message) = match &error {
-                        Error::BodyParsing(_) | Error::InvalidFormat(_) => (400, "Bad Request"),
-                        Error::SignatureInvalid(_) => (401, "Unauthorized"),
-                        Error::NonceValidation(_) => (409, "Conflict"),
-                        Error::KeyLoading(_) => (500, "Internal Server Error"),
+                        // 400 Bad Request - 客户端请求格式错误
+                        Error::BodyTooLarge(_)
+                        | Error::BodyJsonInvalid(_)
+                        | Error::BodyReadFailed(_)
+                        | Error::MissingHeaders(_)
+                        | Error::InvalidUserId(_)
+                        | Error::InvalidTimestamp(_)
+                        | Error::TimestampOutOfRange { .. }
+                        | Error::InvalidNonceLength { .. }
+                        | Error::InvalidSignatureLength { .. } => (400, "Bad Request"),
+
+                        // 401 Unauthorized - 认证失败
+                        Error::SignatureVerificationFailed(_) => (401, "Unauthorized"),
+
+                        // 409 Conflict - 随机数重复使用
+                        Error::NonceReused(_) => (409, "Conflict"),
+
+                        // 500 Internal Server Error - 服务器内部错误
+                        Error::RedisConnectionFailed(_)
+                        | Error::RedisOperationFailed(_)
+                        | Error::KeyLoadingFailed(_)
+                        | Error::InternalError(_) => (500, "Internal Server Error"),
                     };
 
                     let error_body = serde_json::json!({
@@ -222,11 +306,11 @@ struct Payload {
     method: String,
     path: String,
 
-    xu: Option<String>, // userid
-    xt: Option<String>, // timestamp
-    xr: Option<String>, // nonce
-    xs: Option<String>, // signature
-    ds: Option<String>, // X-DEVELOPMENT-SKIP
+    user_id: Option<String>,
+    timestamp: Option<String>,
+    nonce: Option<String>,
+    signature: Option<String>,
+    dev_skip: Option<String>,
 
     queries: HashMap<String, String>,
     body: Option<serde_json::Value>,
@@ -266,10 +350,10 @@ mod header_names {
 
 impl Payload {
     fn new(method: String, path: String, queries: HashMap<String, String>) -> Self {
-        Payload { method, path, xu: None, xt: None, xr: None, xs: None, ds: None, queries, body: None }
+        Payload { method, path, user_id: None, timestamp: None, nonce: None, signature: None, dev_skip: None, queries, body: None }
     }
 
-    fn body_guard(&self) -> bool {
+    fn should_read_body(&self) -> bool {
         HttpMethod::POST.is(&self.method)
             || HttpMethod::PUT.is(&self.method)
             || HttpMethod::DELETE.is(&self.method)
@@ -287,119 +371,150 @@ impl Payload {
 
         let mut payload = Payload::new(method, path, queries);
 
-        if payload.body_guard() {
-            let body: Result<serde_json::Value, String> = match axum::body::to_bytes(body, MAX_BODY_SIZE).await {
+        if payload.should_read_body() {
+            let body: Result<serde_json::Value, Error> = match axum::body::to_bytes(body, MAX_BODY_SIZE).await {
                 Ok(bytes) => {
                     if bytes.len() < 1 {
                         Ok(serde_json::Value::default())
                     } else {
                         match serde_json::from_slice::<serde_json::Value>(&bytes) {
                             Ok(json) => Ok(json),
-                            Err(err) => Err(err.to_string()),
+                            Err(err) => Err(Error::BodyJsonInvalid(err.to_string())),
                         }
                     }
                 },
-                Err(err) => Err(err.to_string()),
+                Err(err) => {
+                    // 检查是否是因为body过大导致的错误
+                    let err_str = err.to_string();
+                    if err_str.contains("body too large") || err_str.contains("payload too large") {
+                        Err(Error::BodyTooLarge(MAX_BODY_SIZE))
+                    } else {
+                        Err(Error::BodyReadFailed(err_str))
+                    }
+                },
             };
 
             if let Err(err) = body {
-                return Err(Error::BodyParsing(err));
+                return Err(err);
             }
 
             payload.body = body.ok();
         }
 
-        payload.load_header(parts.headers);
+        payload.extract_headers(parts.headers);
 
         Ok(payload)
     }
 
-    fn load_header(&mut self, headers: HeaderMap<HeaderValue>) {
+    fn extract_headers(&mut self, headers: HeaderMap<HeaderValue>) {
         let header = |n| -> Option<String> { headers.get(n).and_then(|value| value.to_str().ok()).map(String::from) };
 
-        self.xu = header(header_names::U);
-        self.xt = header(header_names::T);
-        self.xr = header(header_names::R);
-        self.xs = header(header_names::S);
-        self.ds = header(header_names::D);
+        self.user_id = header(header_names::U);
+        self.timestamp = header(header_names::T);
+        self.nonce = header(header_names::R);
+        self.signature = header(header_names::S);
+        self.dev_skip = header(header_names::D);
     }
 
-    pub fn xget_u(&self) -> String {
-        self.xu.clone().unwrap_or_default()
+    pub fn get_user_id(&self) -> String {
+        self.user_id.clone().unwrap_or_default()
     }
 
-    pub fn xget_r(&self) -> String {
-        self.xr.clone().unwrap_or_default()
+    pub fn get_nonce(&self) -> String {
+        self.nonce.clone().unwrap_or_default()
     }
 
-    pub fn xget_s(&self) -> String {
-        self.xs.clone().unwrap_or_default()
+    pub fn get_signature(&self) -> String {
+        self.signature.clone().unwrap_or_default()
     }
 
-    pub fn xget_d(&self) -> String {
-        self.ds.clone().unwrap_or_default()
+    pub fn get_dev_skip(&self) -> String {
+        self.dev_skip.clone().unwrap_or_default()
     }
 
-    fn valid(&self, key: String) -> Result<(), Error> {
+    fn validate_signature(&self, key: String) -> Result<(), Error> {
         let payload = self.payload();
         let server_signature = hash::hmac_sha1(&payload, &key);
-        let client_signature = self.xget_s();
+        let client_signature = self.get_signature();
 
         if server_signature != client_signature {
-            return Err(Error::SignatureInvalid(SignatureDebugInfo { payload, key: key.clone(), server_signature, client_signature }));
+            return Err(Error::SignatureVerificationFailed(SignatureDebugInfo {
+                payload,
+                key: key.clone(),
+                server_signature,
+                client_signature,
+            }));
         }
 
         Ok(())
     }
 
-    fn guard(&self) -> Result<(), Error> {
-        if self.xu.is_none() || self.xt.is_none() || self.xr.is_none() || self.xs.is_none() {
-            return Err(Error::InvalidFormat("missing required signature headers".to_string()));
+    fn validate_headers(&self) -> Result<(), Error> {
+        // 检查必需的头部字段
+        let mut missing_headers = Vec::new();
+        if self.user_id.is_none() {
+            missing_headers.push("X-U".to_string());
+        }
+        if self.timestamp.is_none() {
+            missing_headers.push("X-T".to_string());
+        }
+        if self.nonce.is_none() {
+            missing_headers.push("X-R".to_string());
+        }
+        if self.signature.is_none() {
+            missing_headers.push("X-S".to_string());
         }
 
-        let xti = self.xt.as_ref().unwrap().parse::<i64>().unwrap_or(0);
-        if xti < MAX_TIME_DIFF || (chrono::Utc::now().timestamp() - xti).abs() > MAX_TIME_DIFF {
-            return Err(Error::InvalidFormat("timestamp out of acceptable range".to_string()));
+        if !missing_headers.is_empty() {
+            return Err(Error::MissingHeaders(missing_headers));
         }
 
-        let nonce_length = self.xr.as_ref().unwrap().len();
+        // 验证时间戳格式和范围
+        let timestamp_str = self.timestamp.as_ref().unwrap();
+        let timestamp = timestamp_str.parse::<i64>().map_err(|_| Error::InvalidTimestamp(timestamp_str.clone()))?;
+
+        if timestamp < MAX_TIME_DIFF || (chrono::Utc::now().timestamp() - timestamp).abs() > MAX_TIME_DIFF {
+            return Err(Error::TimestampOutOfRange { timestamp, max_diff: MAX_TIME_DIFF });
+        }
+
+        // 验证随机数长度
+        let nonce_length = self.nonce.as_ref().unwrap().len();
         if nonce_length <= MIN_NONCE_LENGTH || nonce_length >= MAX_NONCE_LENGTH {
-            return Err(Error::InvalidFormat(format!(
-                "nonce length {} is not within valid range [{}, {}]",
-                nonce_length, MIN_NONCE_LENGTH, MAX_NONCE_LENGTH
-            )));
+            return Err(Error::InvalidNonceLength { length: nonce_length, min: MIN_NONCE_LENGTH, max: MAX_NONCE_LENGTH });
         }
 
-        if self.xs.as_ref().unwrap().len() != SIGNATURE_LENGTH {
-            return Err(Error::InvalidFormat(format!("signature length must be exactly {} characters", SIGNATURE_LENGTH)));
+        // 验证签名长度
+        let signature_length = self.signature.as_ref().unwrap().len();
+        if signature_length != SIGNATURE_LENGTH {
+            return Err(Error::InvalidSignatureLength { length: signature_length, expected: SIGNATURE_LENGTH });
         }
 
         Ok(())
     }
 
-    fn header_payload(&self) -> String {
+    fn build_header_payload(&self) -> String {
         let mut payload = String::new();
         payload.push_str(self.method.to_uppercase().as_str());
         payload.push_str(",");
         payload.push_str(self.path.as_str());
         payload.push_str(",{");
-        if let Some(xu) = &self.xu {
-            payload.push_str(xu);
+        if let Some(user_id) = &self.user_id {
+            payload.push_str(user_id);
             payload.push_str(",");
         }
-        if let Some(xt) = &self.xt {
-            payload.push_str(xt);
+        if let Some(timestamp) = &self.timestamp {
+            payload.push_str(timestamp);
             payload.push_str(",");
         }
-        if let Some(xr) = &self.xr {
-            payload.push_str(xr);
+        if let Some(nonce) = &self.nonce {
+            payload.push_str(nonce);
         }
 
         payload.push_str("}");
         payload
     }
 
-    fn queries_payload(&self, mut payload: String) -> String {
+    fn append_query_payload(&self, mut payload: String) -> String {
         let mut size = self.queries.len();
         if size < 1 {
             return payload;
@@ -426,25 +541,25 @@ impl Payload {
     }
 
     fn payload(&self) -> String {
-        let mut payload = self.queries_payload(self.header_payload());
+        let mut payload = self.append_query_payload(self.build_header_payload());
 
         if let Some(body) = &self.body {
             payload.push_str(",");
-            let body_payload = Self::json_payload(body);
+            let body_payload = Self::serialize_json_value(body);
             payload.push_str(body_payload.as_str());
         }
 
         payload
     }
 
-    fn array_formatter(array: &Vec<serde_json::Value>) -> String {
+    fn serialize_array(array: &Vec<serde_json::Value>) -> String {
         let mut payload = String::new();
         let mut array_len = array.len();
 
         payload.push_str("[");
 
         for item in array {
-            payload.push_str(Self::json_payload(item).as_str());
+            payload.push_str(Self::serialize_json_value(item).as_str());
             array_len -= 1;
             if array_len > 0 {
                 payload.push_str(",");
@@ -454,7 +569,7 @@ impl Payload {
         payload
     }
 
-    fn object_formatter(object: &serde_json::Map<String, serde_json::Value>) -> String {
+    fn serialize_object(object: &serde_json::Map<String, serde_json::Value>) -> String {
         let mut payload = String::new();
 
         let mut object_keys: Vec<String> = object.keys().cloned().collect();
@@ -466,7 +581,7 @@ impl Payload {
             let val = object.get(&key).unwrap();
             payload.push_str(key.as_str());
             payload.push_str("=");
-            payload.push_str(Self::json_payload(val).as_str());
+            payload.push_str(Self::serialize_json_value(val).as_str());
 
             object_size -= 1;
             if object_size > 0 {
@@ -478,14 +593,14 @@ impl Payload {
         payload
     }
 
-    fn json_payload(value: &serde_json::Value) -> String {
+    fn serialize_json_value(value: &serde_json::Value) -> String {
         match value {
             serde_json::Value::Null => "null".to_string(),
             serde_json::Value::Bool(b) => b.to_string(),
             serde_json::Value::Number(i) => i.to_string(),
             serde_json::Value::String(s) => s.to_string(),
-            serde_json::Value::Array(array) => Self::array_formatter(array),
-            serde_json::Value::Object(object) => Self::object_formatter(object),
+            serde_json::Value::Array(array) => Self::serialize_array(array),
+            serde_json::Value::Object(object) => Self::serialize_object(object),
         }
     }
 }

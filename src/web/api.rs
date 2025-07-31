@@ -7,6 +7,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+const ORIGIN_ERX_CODE: &'static str = "ORIGIN_ERX_CODE";
+
 pub type OutAny = Out<serde_json::Value>;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -34,7 +36,6 @@ pub struct Debug {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Profile {}
 
-const ORIGIN_ERX_CODE: &'static str = "ORIGIN_ERX_CODE";
 
 impl Debug {
     pub fn new() -> Debug {
