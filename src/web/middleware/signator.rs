@@ -1,4 +1,5 @@
-use crate::erx::{self, Erx};
+use crate::erx::{Erx, Layouted};
+use crate::web::api::Out;
 use crate::tools::hash;
 use crate::web::middleware::{ApplyKind, Context, Middleware, MiddlewareFuture, Pattern};
 use crate::web::{define::HttpMethod, request::clone_request, url::parse_query};
@@ -67,6 +68,15 @@ pub enum Error {
     InternalError(String),
 }
 
+impl Into<Out<()>> for Error {
+    fn into(self) -> Out<()> {
+        let message = self.to_string();
+        let c = Layouted::middleware("SIGN", "EROR");
+        Out::new(c, Some(message), None)
+    }
+}
+    
+ 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -221,18 +231,9 @@ impl Middleware for Signator {
                 Ok(req) => Ok((context, req)),
                 Err(error) => {
                     let mut context = context;
-
                     let message = &error.to_string();
-                    let erx = erx::Erx::new(&message);
-
-                    let out: crate::web::api::Out<bool> = crate::web::api::Out {
-                        code: "123".to_string(),
-                        message: Some(message.clone()),
-                        data: None,
-                        debug: None,
-                        profile: None,
-                    };
-
+                    let erx = Erx::new(&message);
+                    let out: Out<()> = error.into();
                     context.make_abort_with_response(Signator::middleware_name(), message, out.into_response());
                     Err((context, erx))
                 },
