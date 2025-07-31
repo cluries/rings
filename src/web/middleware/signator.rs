@@ -32,10 +32,10 @@ pub struct SignatorConfig {
     pub priority: i32,
     /// 自定义应用逻辑
     pub apply: Option<Arc<dyn Fn(&Parts) -> bool + Send + Sync>>,
-    /// HTTP 方法过滤
-    pub methods: Option<Vec<ApplyKind<HttpMethod>>>,
-    /// 路径匹配模式
-    pub patterns: Option<Vec<ApplyKind<Pattern>>>,
+    /// HTTP 方法过滤 - 使用 Arc 减少 clone 成本
+    pub methods: Option<Arc<Vec<ApplyKind<HttpMethod>>>>,
+    /// 路径匹配模式 - 使用 Arc 减少 clone 成本
+    pub patterns: Option<Arc<Vec<ApplyKind<Pattern>>>>,
     /// 随机数生命周期（秒）
     pub nonce_lifetime: i64,
 }
@@ -87,41 +87,45 @@ impl SignatorConfig {
 
     /// 设置 HTTP 方法过滤
     pub fn methods(mut self, methods: Vec<ApplyKind<HttpMethod>>) -> Self {
-        self.methods = Some(methods);
+        self.methods = Some(Arc::new(methods));
         self
     }
 
     /// 添加包含的 HTTP 方法
     pub fn include_method(mut self, method: HttpMethod) -> Self {
-        let methods = self.methods.get_or_insert_with(Vec::new);
+        let mut methods = self.methods.map(|arc| (*arc).clone()).unwrap_or_default();
         methods.push(ApplyKind::Include(method));
+        self.methods = Some(Arc::new(methods));
         self
     }
 
     /// 添加排除的 HTTP 方法
     pub fn exclude_method(mut self, method: HttpMethod) -> Self {
-        let methods = self.methods.get_or_insert_with(Vec::new);
+        let mut methods = self.methods.map(|arc| (*arc).clone()).unwrap_or_default();
         methods.push(ApplyKind::Exclude(method));
+        self.methods = Some(Arc::new(methods));
         self
     }
 
     /// 设置路径匹配模式
     pub fn patterns(mut self, patterns: Vec<ApplyKind<Pattern>>) -> Self {
-        self.patterns = Some(patterns);
+        self.patterns = Some(Arc::new(patterns));
         self
     }
 
     /// 添加包含的路径模式
     pub fn include_pattern(mut self, pattern: Pattern) -> Self {
-        let patterns = self.patterns.get_or_insert_with(Vec::new);
+        let mut patterns = self.patterns.map(|arc| (*arc).clone()).unwrap_or_default();
         patterns.push(ApplyKind::Include(pattern));
+        self.patterns = Some(Arc::new(patterns));
         self
     }
 
     /// 添加排除的路径模式
     pub fn exclude_pattern(mut self, pattern: Pattern) -> Self {
-        let patterns = self.patterns.get_or_insert_with(Vec::new);
+        let mut patterns = self.patterns.map(|arc| (*arc).clone()).unwrap_or_default();
         patterns.push(ApplyKind::Exclude(pattern));
+        self.patterns = Some(Arc::new(patterns));
         self
     }
 
@@ -421,12 +425,12 @@ impl Middleware for Signator {
 
     /// 可选：HTTP 方法过滤
     fn methods(&self) -> Option<Vec<ApplyKind<HttpMethod>>> {
-        self.config.methods.clone()
+        self.config.methods.as_ref().map(|arc| (**arc).clone())
     }
 
     /// 可选：路径匹配模式
     fn patterns(&self) -> Option<Vec<ApplyKind<Pattern>>> {
-        self.config.patterns.clone()
+        self.config.patterns.as_ref().map(|arc| (**arc).clone())
     }
 }
 
@@ -737,9 +741,7 @@ mod tests {
     use super::*;
     use crate::web::define::HttpMethod;
     use crate::web::middleware::{ApplyKind, Pattern};
-    use axum::http::{Method, Uri};
-    use axum::http::request::Parts;
-    use std::sync::Arc;
+
     use crate::web::middleware::ApplyTrait;
     
     #[test]
