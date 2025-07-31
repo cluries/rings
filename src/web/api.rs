@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 const ORIGIN_ERX_CODE: &'static str = "ORIGIN_ERX_CODE";
+const JSON_SERIAL_ERROR: &'static str = "JSON serialization error";
+const OPTION_NONE_MESSAGE: &'static str = "Sorry, some error occurred, but no message was provided";
 
 pub type OutAny = Out<serde_json::Value>;
 
@@ -35,7 +37,6 @@ pub struct Debug {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Profile {}
-
 
 impl Debug {
     pub fn new() -> Debug {
@@ -97,7 +98,6 @@ impl<T: Serialize> From<Erx> for Out<T> {
 
 impl<T: Serialize> From<Option<T>> for Out<T> {
     fn from(value: Option<T>) -> Self {
-        static OPTION_NONE_MESSAGE: &'static str = "sorry, some error occurred, but no message was provided";
         match value {
             Some(data) => Out::ok(data),
             None => Except::Unknown(OPTION_NONE_MESSAGE.to_string()).into(),
@@ -124,8 +124,7 @@ impl<T: Serialize> axum::response::IntoResponse for Out<T> {
         let (status, body) = match body {
             Ok(body) => (StatusCode::OK, body),
             Err(err) => {
-                static JSE: &'static str = "JSON Serialization Error";
-                let body = serde_json::to_string(&Except::Unknown(err.to_string()).out::<()>()).unwrap_or(JSE.to_string());
+                let body = serde_json::to_string(&Except::Unknown(err.to_string()).out::<()>()).unwrap_or(JSON_SERIAL_ERROR.to_string());
                 (StatusCode::INTERNAL_SERVER_ERROR, body)
             },
         };

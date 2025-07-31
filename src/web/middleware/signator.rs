@@ -67,12 +67,8 @@ pub enum Error {
     InternalError(String),
 }
 
-// impl From<Error> for crate::web::api::Out<_> {
-//     fn from(err: Error) -> crate::web::api::Out {
-        
-//     }
-// }
-    
+ 
+     
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -121,6 +117,7 @@ impl From<redis::RedisError> for Error {
         }
     }
 }
+
 
 pub struct Signator {
     backdoor: String, // 后门，开发时候方便用
@@ -229,45 +226,22 @@ impl Middleware for Signator {
                 Err(error) => {
                     let mut context = context;
 
-                    let (status_code, error_message) = match &error {
-                        // 400 Bad Request - 客户端请求格式错误
-                        Error::BodyTooLarge(_)
-                        | Error::BodyJsonInvalid(_)
-                        | Error::BodyReadFailed(_)
-                        | Error::MissingHeaders(_)
-                        | Error::InvalidUserId(_)
-                        | Error::InvalidTimestamp(_)
-                        | Error::TimestampOutOfRange { .. }
-                        | Error::InvalidNonceLength { .. }
-                        | Error::InvalidSignatureLength { .. } => (400, "Bad Request"),
-
-                        // 401 Unauthorized - 认证失败
-                        Error::SignatureVerificationFailed(_) => (401, "Unauthorized"),
-
-                        // 409 Conflict - 随机数重复使用
-                        Error::NonceReused(_) => (409, "Conflict"),
-
-                        // 500 Internal Server Error - 服务器内部错误
-                        Error::RedisConnectionFailed(_)
-                        | Error::RedisOperationFailed(_)
-                        | Error::KeyLoadingFailed(_)
-                        | Error::InternalError(_) => (500, "Internal Server Error"),
+                    let message = &error.to_string();
+                    let erx = erx::Erx::new(&message);
+                    
+                    let out:crate::web::api::Out<bool> = crate::web::api::Out {
+                        code: "123".to_string(),
+                        message: Some(message.clone()),
+                        data: None,
+                        debug: None,
+                        profile: None,
                     };
-
-                    let error_body = serde_json::json!({
-                        "error": error_message,
-                        "message": error.to_string(),
-                        "code": status_code
-                    });
-
-                    let res = Response::builder()
-                        .status(status_code)
-                        .header("content-type", "application/json")
-                        .body(axum::body::Body::from(error_body.to_string()))
-                        .unwrap_or_default();
-
-                    context.make_abort_with_response(Signator::middleware_name(), &error.to_string(), res);
-                    Err((context, erx::Erx::new("signator")))
+                    
+                    use axum::response::IntoResponse;
+                    context.make_abort_with_response(
+                        Signator::middleware_name(), message, out.into_response(),
+                    );
+                    Err((context, erx))
                 },
             }
         });
