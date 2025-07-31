@@ -5,7 +5,7 @@ use crate::web::{define::HttpMethod, request::clone_request, url::parse_query};
 use axum::{
     extract::Request,
     http::{request::Parts, HeaderMap, HeaderValue},
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use redis::AsyncCommands;
 use serde::Serialize;
@@ -67,9 +67,6 @@ pub enum Error {
     InternalError(String),
 }
 
- 
-     
-
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -117,7 +114,6 @@ impl From<redis::RedisError> for Error {
         }
     }
 }
-
 
 pub struct Signator {
     backdoor: String, // 后门，开发时候方便用
@@ -228,19 +224,16 @@ impl Middleware for Signator {
 
                     let message = &error.to_string();
                     let erx = erx::Erx::new(&message);
-                    
-                    let out:crate::web::api::Out<bool> = crate::web::api::Out {
+
+                    let out: crate::web::api::Out<bool> = crate::web::api::Out {
                         code: "123".to_string(),
                         message: Some(message.clone()),
                         data: None,
                         debug: None,
                         profile: None,
                     };
-                    
-                    use axum::response::IntoResponse;
-                    context.make_abort_with_response(
-                        Signator::middleware_name(), message, out.into_response(),
-                    );
+
+                    context.make_abort_with_response(Signator::middleware_name(), message, out.into_response());
                     Err((context, erx))
                 },
             }
