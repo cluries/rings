@@ -1,6 +1,5 @@
 edition = "2021"
- 
- 
+
 use_small_heuristics = "Max"
 max_width = 140
 chain_width = 120
@@ -9,8 +8,6 @@ reorder_imports = true
 merge_derives = false
 match_block_trailing_comma = true
 fn_params_layout = "Compressed"
-
- 
 
 # Reorder mod declarations alphabetically in group.
 reorder_modules = true

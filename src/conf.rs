@@ -124,7 +124,7 @@ fn init_config() -> Config {
     {
         use crate::tools::tests::tools::project_dir;
 
-        let tests_load = format!("{}/tests_load.yml", project_dir().to_string_lossy());
+        let tests_load = format!("{}/tests/using-test-config.yml", project_dir().to_string_lossy());
         tracing::info!("test mode, loading: {}", tests_load);
         println!("test mode, loading: {}", tests_load);
 
@@ -435,7 +435,7 @@ mod tests {
     /// test extends
     #[test]
     fn test_extends() {
-        let tests_load = format!("{}/tests_load.yml", project_dir().to_string_lossy());
+        let tests_load = format!("{}/tests/using-test-config.yml", project_dir().to_string_lossy());
         let c = extends(&tests_load);
         println!("{:?}", c);
     }

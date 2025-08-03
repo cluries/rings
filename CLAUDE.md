@@ -135,60 +135,12 @@ Key configuration sections:
 - `log`: Logging configuration
 - `extends`: Custom extension values
 
-## Development Patterns
-
-### Service Implementation
-```rust
-#[derive(Default)]
-struct MyService {}
-
-impl ServiceTrait for MyService {
-    fn name(&self) -> &'static str {
-        "my_service"
-    }
-    
-    fn initialize(&mut self) {
-        // Service initialization
-    }
-    
-    fn release(&mut self) {
-        // Cleanup resources
-    }
-    
-    fn ready(&self) -> bool {
-        true
-    }
-    
-    fn schedules(&self) -> Vec<Job> {
-        vec![] // Return scheduled jobs
-    }
-}
-```
-
-### Application Setup
-```rust
-let app = AppBuilder::new("my_app")
-    .use_model().await
-    .use_web(vec![
-        web_reconfig_simple("api", || { vec![my_routes()] })
-    ]).await
-    .use_scheduler().await
-    .build();
-```
-
-### Service Access
-```rust
-let shared = ServiceManager::shared().await;
-let result = with_service_read!(shared, MyService, service, {
-    service.do_something()
-});
-```
+## Development Patterns 
 
 ## Testing
 
 The framework includes comprehensive test support:
-- Test configuration loading via `tests_load.yml`
-- Integration tests in `tests/` directory
+- Test configuration loading via `tests/using-test-config.yml`
 - Service manager testing utilities
 - Mock configuration for test environments
 
