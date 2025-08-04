@@ -122,7 +122,11 @@ impl Web {
         Arc::clone(&self.middleware_manager)
     }
 
-  
+    // pub fn add_middleware(&mut self, middleware: Box<dyn crate::web::middleware::Middleware>) -> &mut Self {
+    //     self.middleware_manager.add(middleware);
+    //     self
+    // }
+
 }
 
 #[async_trait]
