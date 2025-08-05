@@ -111,7 +111,9 @@ impl AppBuilder {
                 Some(v) => v,
             };
 
-            let mut web = make_web(&v.name, wb.bind_addr().as_str(), v.router_maker, v.middlewares);
+            let c = &v.middlewares;
+            
+            let mut web = make_web(&v.name, wb.bind_addr().as_str(), v.router_maker, *c);
             (v.reconfigor)(&mut web);
 
             rings_app.register_mod(web).await;
