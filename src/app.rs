@@ -4,7 +4,6 @@ use crate::{
     web::make_web,
 };
 use std::sync::Arc;
-use axum::middleware;
 use tracing::warn;
 
 
@@ -112,7 +111,11 @@ impl AppBuilder {
                 Some(v) => v,
             };
 
-            let mut middlewares:Vec<Box<dyn crate::web::middleware::Middleware>> = v.middlewares.iter().map(|m| m).collect();
+            let mut middlewares:Vec<Box<dyn crate::web::middleware::Middleware>> = Vec::new();
+            for m in v.middlewares.iter() {
+                middlewares.push(*m);
+            }
+
             let mut web = make_web(&v.name, wb.bind_addr().as_str(), v.router_maker,  middlewares);
             (v.reconfigor)(&mut web);
 
