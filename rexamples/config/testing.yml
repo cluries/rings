@@ -1,0 +1,25 @@
+name: logos
+short: LOGO
+debug: false
+
+
+web:
+  front:
+    port: 8081
+  api:
+    port: 8080
+    middleware:
+      signator:
+        redis: "redis://127.0.0.1:6379/0"
+        rear: "LOGOS REAR"
+
+model:
+  backends:
+    postgre:
+      kind: Postgres
+      readonly: false
+      connect: postgresql://postgres:A1024MasterDMySQL@180.184.175.158:15432/logos?currentSchema=logos
+    redis:
+      kind: Redis
+      readonly: false
+      connect: redis://127.0.0.1:6379/0

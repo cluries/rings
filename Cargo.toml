@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["rexamples", "ringb", "ringm"]
+members = ["ringb", "ringm"]
 
 [workspace.dependencies]
 aes = { version = "0" }
@@ -73,7 +73,7 @@ cfb-mode = { workspace = true }
 chrono = { workspace = true }
 config = { workspace = true }
 ctr = { workspace = true }
-dashmap = {workspace = true}
+dashmap = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }
 hmac = { workspace = true }

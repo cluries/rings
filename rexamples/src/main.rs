@@ -1,54 +1,44 @@
-use rings::prelude::{tokio, tokio_cron_scheduler};
-use rings::service::ServiceTrait;
+use rings::{
+    app::{AppBuilder, AppBuilderWebReconfigor},
+    axum, rings::R, tokio,
+};
+use web::action::api::api_actions;
 
-#[allow(dead_code, unused)]
-mod mringm;
-
-#[ringm::service]
-#[ringm::default_any]
-struct ArgsService {}
-
-#[ringm::service]
-#[ringm::default_any]
-struct LanuchService {}
 
 #[tokio::main]
 async fn main() {
-    mringm::its_service().await;
+
+    let mut builder = AppBuilder::new("rexamples").await;
+    builder.use_model().await;
+
+    rings::hey_service!(service);
+
+    builder.use_scheduler().await;
+
+    let rc: Vec<AppBuilderWebReconfigor> = vec![
+        ("api".to_string(), api_actions, |x| {
+            fn extra(router: axum::Router) -> axum::Router {
+                // use web::middleware::api::signator::use_signator;
+                // use_signator(router)
+
+                router
+            }
+            x.set_router_reconfiger(extra)
+        }),
+
+        #[cfg(feature = "frontend")]
+        {
+            use rings::app::web_reconfig_simple;
+            use web::action::front::front_actions;
+            web_reconfig_simple("front", front_actions)
+        },
+        // ("front".to_string(), front_actions, |web: &mut Web| -> &mut Web { web })
+    ];
+
+    builder.use_web(rc).await;
+
+    let rings_app = builder.build();
+
+    R::perform(&rings_app).await;
 }
-
-impl ServiceTrait for ArgsService {
-    fn name(&self) -> &'static str {
-        ArgsService::service_name()
-    }
-
-    fn initialize(&mut self) {}
-
-    fn release(&mut self) {}
-
-    fn ready(&self) -> bool {
-        true
-    }
-
-    fn schedules(&self) -> Vec<tokio_cron_scheduler::Job> {
-        vec![]
-    }
-}
-
-impl ServiceTrait for LanuchService {
-    fn name(&self) -> &'static str {
-        LanuchService::service_name()
-    }
-
-    fn initialize(&mut self) {}
-
-    fn release(&mut self) {}
-
-    fn ready(&self) -> bool {
-        true
-    }
-
-    fn schedules(&self) -> Vec<tokio_cron_scheduler::Job> {
-        vec![]
-    }
-}
+ 

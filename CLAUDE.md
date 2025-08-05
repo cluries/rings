@@ -1,149 +1,38 @@
-# CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Overview
+## 黄金法则  
+当不确定实现细节时，始终询问开发者。
 
-**Rings** is a comprehensive Rust backend application framework built on Axum, SeaORM, and Redis. It provides a "batteries-included" foundation for building modern web services with a clean, modular architecture.
+## 关键架构决策  
 
-## Project Structure
 
-This is a Cargo workspace with four main crates:
+### 锚点注释  
+在代码库中适当位置添加特殊格式的注释，作为可以轻松 `grep` 的内联知识。  
 
-- **`rings`** (main): Core framework containing web, service, model, and configuration layers
-- **`ringm`** (macros): Procedural macros for reducing boilerplate code
-- **`ringb`** (build): CLI utility for project maintenance and dependency management
-- **`rexamples`**: Example applications and testing code
 
-## Common Commands
+### 指南：  
+- 使用 `AIDEV-NOTE:`、`AIDEV-TODO:` 或 `AIDEV-QUESTION:`（全大写前缀）作为针对 AI 和开发者的注释。  
+- **重要：** 在扫描文件之前，始终首先尝试**grep 现有锚点** `AIDEV-*` 在相关子目录中。  
+- **更新相关锚点**当修改相关代码时。  
+- **不要删除 `AIDEV-NOTE`s**除非有明确的人工指令。  
+- 确保在以下情况下添加相关锚点注释，每当文件或代码片段：  
+  * 太复杂，或  
+  * 非常重要，或  
+  * 令人困惑，或  
+  * 可能有错误  
+  
+## 领域词汇表（Claude，学习这些！）  
+- **代理**: 具有记忆、工具和定义行为的 AI 实体  
+- **任务**: 由步骤组成的工作流定义（不是 Celery 任务）  
+- **执行**: 任务的运行实例  
+- **工具**: 代理可以调用的函数（浏览器、API 等）  
+- **会话**: 具有记忆的对话上下文  
+- **条目**: 会话中的单个交互  
 
-### Building and Testing
-```bash
-# Build all workspace members
-cargo build
-
-# Build with release mode
-cargo build --release
-
-# Run tests
-cargo test
-
-# Run tests for specific crate
-cargo test -p rings
-cargo test -p ringm
-
-# Check code
-cargo check
-
-# Format code
-cargo fmt
-
-# Lint code
-cargo clippy
-```
-
-### Running Applications
-```bash
-# Run main rings application
-cargo run
-
-# Run ringb build tool
-cargo run -p ringb
-
-# Run examples
-cargo run -p rexamples
-```
-
-## Architecture
-
-### Core Framework (rings)
-
-The main framework follows a layered architecture:
-
-**Configuration System** (`src/conf.rs`):
-- Uses `config` crate with layered configuration (config.yml → {mode}.yml → local.yml → environment variables)
-- Supports multiple environments via `REBT_RUN_MODE` (development/production/testing)
-- Configuration accessed via `GetDefault::`, `GetOption::`, and `Has::` static methods
-- Main config structure: `Rebit` containing web, model, log, and extends sections
-
-**Web Layer** (`src/web/`):
-- Built on Axum with middleware support
-- `Web` struct manages HTTP servers with graceful shutdown
-- Route registration via `web_route_merge!` macro
-- Built-in middleware manager for JWT, rate limiting, etc.
-- Lua action support for dynamic route handling
-
-**Service Layer** (`src/service.rs`):
-- Sophisticated service manager with dependency injection
-- Services implement `ServiceTrait` with lifecycle methods
-- Thread-safe service access via `Arc<RwLock<Box<dyn ServiceTrait>>>`
-- Macros `with_service_read!` and `with_service_write!` for safe service access
-- Global shared service manager via `ServiceManager::shared()`
-
-**Model Layer** (`src/model/`):
-- Database abstraction supporting PostgreSQL and Redis
-- SeaORM integration with connection pooling
-- Shared database connections via `shared_must()` and `shared()`
-- Migration support with automatic schema management
-
-**Application Builder** (`src/app.rs`):
-- `AppBuilder` pattern for constructing applications
-- Fluent API: `new() → use_model() → use_web() → use_scheduler() → build()`
-- Automatic module registration and lifecycle management
-
-### Macros (ringm)
-
-Provides procedural macros to reduce boilerplate:
-
-- `#[service]`: Marks structs as services with automatic trait implementations
-- `seaorm_mo!`: Generates SeaORM entity definitions
-- `migrate_*!`: Database migration macros
-- `#[default_any]`: Automatic `AnyTrait` implementations
-
-### Key Framework Features
-
-**State Management**:
-- `RingsApplication` manages registered modules with lifecycle states
-- `RingState` enum tracks module states (Initializing → Ready → Terminating → Terminated)
-- Thread-safe state transitions via `Arc<RwLock<RingState>>`
-
-**Error Handling**:
-- Custom `Erx` error type with source tracking
-- Consistent error propagation using `?` operator
-- Error conversion utilities in `erx` module
-
-**Utilities** (`src/tools/`):
-- Comprehensive utility modules: AI, audio, captcha, crypto, file I/O, HTTP client, image processing, JSON, Lua scripting, random, validation, etc.
-- Lua scripting integration with `mlua` crate
-
-**Scheduler** (`src/scheduler.rs`):
-- Cron-based job scheduling with `tokio-cron-scheduler`
-- Integration with service layer for scheduled tasks
-
-## Configuration
-
-The framework uses YAML configuration files:
-
-1. `config/config.yml` - Base configuration
-2. `config/{mode}.yml` - Environment-specific overrides
-3. `config/local.yml` - Local development overrides
-4. Environment variables with `REBT_` prefix
-
-Key configuration sections:
-- `web`: HTTP server settings (port, bind, middleware)
-- `model`: Database backends (PostgreSQL, Redis)
-- `log`: Logging configuration
-- `extends`: Custom extension values
-
-## Development Patterns 
-
-## Testing
-
-The framework includes comprehensive test support:
-- Test configuration loading via `tests/using-test-config.yml`
-- Service manager testing utilities
-- Mock configuration for test environments
-
-## Build System
-
-The workspace uses shared dependencies in `Cargo.toml` workspace.dependencies section. The `ringb` utility helps manage workspace dependencies and can consolidate dependencies from member crates into the shared workspace configuration.
+## AI 绝不能做的事情  
+1. **永远不要修改测试文件** - 测试编码人类意图  
+2. **永远不要更改 API 合约** - 破坏真实应用  
+3. **永远不要更改迁移文件** - 数据丢失风险  
+4. **永远不要提交秘密** - 使用环境变量  
+5. **永远不要假设业务逻辑** - 始终询问  
+6. **永远不要删除 AIDEV- 注释** - 它们在那里是有原因的  

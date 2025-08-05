@@ -1,0 +1,19 @@
+name: logos
+short: LOGO
+debug: false
+
+web:
+  api:
+    port: 8080
+
+
+model:
+  backends:
+    postgre:
+      kind: postgres
+      readonly: false
+      connect: ""
+    redis:
+      kind: redis
+      readonly: false
+      connect: ""

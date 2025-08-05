@@ -3,7 +3,22 @@ name = "rexamples"
 version = "0.1.0"
 edition = "2021"
 
+
+[features]
+frontend = []
+
+
 [dependencies]
-rings = { path = "../." }
-ringm = { path = "../ringm" , features = []}
-ringb = { path = "../ringb" }
+rings = { workspace = true }
+ringm = {workspace = true}
+web = { path = "web" }
+model = { path = "model" }
+service = { path = "service" }
+
+
+[workspace]
+members = ["model",  "schedule", "service", "web"]
+
+[workspace.dependencies]
+rings = {path = "../."}
+ringm = {path = "../ringm"}

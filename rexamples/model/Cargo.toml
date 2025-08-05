@@ -1,0 +1,13 @@
+[package]
+name = "model"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rings = {workspace = true}
+ringm = {workspace = true}
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
+sea-orm = { version = "1", features = ["sqlx", "sqlx-postgres", "sqlx-sqlite", "postgres-array", "with-chrono", "with-json", "runtime-tokio", "macros", "with-bigdecimal"] }
+sea-orm-migration = { version = "1", features = ["sqlx-sqlite", "sqlx-postgres"] }

@@ -1,0 +1,9 @@
+[package]
+name = "service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rings = {workspace = true}
+ringm = {workspace = true, features = []}
+schedule = {path = "../schedule"}

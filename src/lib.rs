@@ -6,7 +6,6 @@ pub static VERSION: &'static str = "0.1.0 - Dev";
 
 pub mod any;
 pub mod app;
-pub mod balanced;
 pub mod conf;
 pub mod erx;
 pub mod fns;

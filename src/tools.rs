@@ -1,4 +1,5 @@
 pub mod audio;
+pub mod balanced;
 pub mod captcha;
 pub mod charset;
 pub mod datetime;
