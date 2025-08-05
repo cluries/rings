@@ -506,8 +506,8 @@ pub struct Manager {
 }
 
 impl Manager {
-    pub fn new() -> Self {
-        Self { middlewares: Vec::new(), metrics: Default::default() }
+    pub fn new(middlewares: Vec<Box<dyn Middleware>>) -> Self {
+        Self { middlewares, metrics: Default::default() }
     }
 
     pub fn add(&mut self, middleware: Box<dyn Middleware>) -> &mut Self {

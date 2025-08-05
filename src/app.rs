@@ -12,12 +12,28 @@ pub struct AppBuilder {
     rings_app: RingsApplication,
 }
 
-pub type AppBuilderWebReconfigor = (String, fn() -> Vec<axum::Router>, fn(web: &mut crate::web::Web) -> &mut crate::web::Web);
+// pub type AppBuilderWebReconfigor = (String, 
+//     fn() -> Vec<axum::Router>, 
+//     fn(web: &mut crate::web::Web) -> &mut crate::web::Web,
+//     Vec<Box<dyn crate::web::middleware::Middleware>>    
+// );
+
+pub struct AppBuilderWebReconfigor {
+    pub name: String,
+    pub router_maker: fn() -> Vec<axum::Router>,
+    pub reconfigor:  fn(web: &mut crate::web::Web) -> &mut crate::web::Web,
+    pub middlewares: Vec<Box<dyn crate::web::middleware::Middleware>>,
+}
 
 
 /// web_reconfig_simple
 pub fn web_reconfig_simple(name: &str, router_maker: fn() -> Vec<axum::Router>) -> AppBuilderWebReconfigor {
-    (name.to_string(), router_maker, app_builder_web_reconfigor_extra_default)
+    AppBuilderWebReconfigor{
+        name:name.to_string(), 
+        router_maker, 
+        reconfigor:app_builder_web_reconfigor_extra_default,
+        middlewares: Vec::new(),
+    }
 }
 
 fn app_builder_web_reconfigor_extra_default(web: &mut crate::web::Web) -> &mut crate::web::Web {
@@ -86,8 +102,8 @@ impl AppBuilder {
 
         let webs = rebit.web.clone();
         for (wb_name, wb) in webs {
-            let find = reconfigor.iter().find(|r| r.0.eq(&wb_name));
-            let (name, router_maker, reconf) = match find {
+            let find = reconfigor.iter().find(|r| r.name.eq(&wb_name));
+            let v= match find {
                 None => {
                     warn!("Reconfigor not found web iterm: {}", &wb_name);
                     continue;
@@ -95,8 +111,8 @@ impl AppBuilder {
                 Some(v) => v,
             };
 
-            let mut web = make_web(name, wb.bind_addr().as_str(), *router_maker);
-            reconf(&mut web);
+            let mut web = make_web(&v.name, wb.bind_addr().as_str(), v.router_maker, v.middlewares);
+            (v.reconfigor)(&mut web);
 
             rings_app.register_mod(web).await;
         }

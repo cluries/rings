@@ -58,7 +58,7 @@ pub struct Web {
     middleware_manager: Arc<crate::web::middleware::Manager>,
 }
 
-pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>) -> Web {
+pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>, middlewares:Vec<Box<dyn crate::web::middleware::Middleware>>) -> Web {
     Web {
         name: name.to_string(),
         bind: bind.to_string(),
@@ -66,7 +66,9 @@ pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>) -> We
         stage: RingState::srs_init(),
         luactions: Default::default(),
         router_maker,
-        middleware_manager: Arc::new(crate::web::middleware::Manager::new()),
+        middleware_manager: Arc::new(
+            crate::web::middleware::Manager::new(middlewares)
+        ),
         router_reconfiger: None,
     }
 }
@@ -122,10 +124,7 @@ impl Web {
         Arc::clone(&self.middleware_manager)
     }
 
-    // pub fn add_middleware(&mut self, middleware: Box<dyn crate::web::middleware::Middleware>) -> &mut Self {
-    //     self.middleware_manager.add(middleware);
-    //     self
-    // }
+   
 
 }
 
