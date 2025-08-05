@@ -4,6 +4,7 @@ use crate::{
     web::make_web,
 };
 use std::sync::Arc;
+use axum::middleware;
 use tracing::warn;
 
 
@@ -111,9 +112,8 @@ impl AppBuilder {
                 Some(v) => v,
             };
 
-            let c = &v.middlewares;
-            
-            let mut web = make_web(&v.name, wb.bind_addr().as_str(), v.router_maker, *c);
+            let mut middlewares:Vec<Box<dyn crate::web::middleware::Middleware>> = v.middlewares.iter().map(|m| m).collect();
+            let mut web = make_web(&v.name, wb.bind_addr().as_str(), v.router_maker,  middlewares);
             (v.reconfigor)(&mut web);
 
             rings_app.register_mod(web).await;
