@@ -29,6 +29,7 @@ pub use sea_orm_migration;
 pub use serde;
 pub use serde_json;
 pub use sha1;
+pub use sha2;
 pub use tokio;
 pub use tokio_cron_scheduler;
 pub use tower;
