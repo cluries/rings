@@ -131,6 +131,6 @@ mod tests {
         describe.insert(String::from("likes.name"), String::from("书名"));
         describe.insert(String::from("likes.tags.name"), String::from("标签"));
 
-        println!("{}", Desc::describe(&person, describe).unwrap());
+        println!("{}", Describe::describe(&person, describe).unwrap());
     }
 }
