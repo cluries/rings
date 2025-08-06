@@ -2,7 +2,6 @@
 /// format:
 use crate::erx;
 
-
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -108,14 +107,14 @@ impl ShorterMills {
     }
 }
 
+#[inline]
 fn current_millis() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
 impl Factory {
     pub fn new(name: &str, sharding: i64) -> Factory {
-        Factory { name: name.to_owned(), sharding: sharding % MAX_SHARDING, 
-            millis: AtomicI64::new(0),sequence: AtomicI64::new(0) }
+        Factory { name: name.to_owned(), sharding: sharding % MAX_SHARDING, millis: AtomicI64::new(0), sequence: AtomicI64::new(0) }
     }
 
     pub fn name(&self) -> &str {
@@ -131,24 +130,43 @@ impl Factory {
     }
 
     pub fn millis(&self) -> i64 {
-        self.sequence.load(Ordering::Relaxed)
+        self.millis.load(Ordering::Relaxed)
+    }
+
+    fn ensure_current_millis(&self) -> erx::ResultE<i64> {
+        let mut millis: i64;
+        let mut trys = 10;
+
+        loop {
+            if trys < 1 {
+                return Err("Exceeded the maximum number of attempts".into());
+            }
+            trys -= 1;
+
+            millis = current_millis();
+            let factory_millis = self.millis.load(Ordering::Acquire);
+
+            if millis != factory_millis {
+                match self.millis.compare_exchange(factory_millis, millis, Ordering::AcqRel, Ordering::Acquire) {
+                    Ok(_old) => {
+                        self.sequence.store(0, Ordering::Release);
+                        break;
+                    },
+                    Err(_current) => {
+                        // 其他线程已更新，重试
+                    },
+                }
+            } else {
+                // 时间戳相同，无需更新
+                break;
+            }
+        }
+
+        Ok(millis)
     }
 
     pub fn make(&self) -> erx::ResultE<Id> {
-        let millis = current_millis();
-        let old_millis = self.millis.load(Ordering::Relaxed);
-
-        if millis != old_millis {
-            match self.millis.compare_exchange(old_millis, millis, Ordering::AcqRel, Ordering::Relaxed) {
-                Ok(_old) => {
-                    self.sequence.store(0, Ordering::Release);
-                }
-                Err(_current) => {
-                    // Another thread updated millis, reload and continue
-                }
-            }
-        }
- 
+        let millis = self.ensure_current_millis()?;
         let seq = self.sequence.fetch_add(1, Ordering::Relaxed);
         if seq > MAX_SEQUENCE {
             return Err("beyond sequence limits".into());
@@ -165,33 +183,20 @@ impl Factory {
             return Ok(vec![]);
         }
 
-        let millis = current_millis();
-         
+        let millis = self.ensure_current_millis()?;
 
-        let old_millis = self.millis.load(Ordering::Relaxed);
-
-        if millis != old_millis {
-            match self.millis.compare_exchange(old_millis, millis, Ordering::AcqRel, Ordering::Relaxed) {
-                Ok(_old) => {
-                    self.sequence.store(0, Ordering::Release);
-                }
-                Err(_current) => {
-                    // Another thread updated millis, reload and continue
-                }
-            }
-        }
-
-        let seq = self.sequence.load(Ordering::Relaxed);
         let n = i64::from(n);
+        let seq = self.sequence.fetch_add(n, Ordering::AcqRel);
+
         if seq + n > MAX_SEQUENCE {
+            // rollback
+            self.sequence.fetch_sub(n, Ordering::AcqRel);
             return Err("beyond sequence limits".into());
         }
 
-        self.sequence.fetch_add(n, Ordering::AcqRel);
-
         let mut ids: Vec<Id> = Vec::new();
         let shorter = ShorterMills::with_mills(millis).shorter();
-        for i in seq..seq+n {
+        for i in seq..seq + n {
             let val = MILLIS_BASE * shorter + i * SEQUENCE_BASE + self.sharding;
             ids.push(Id { val });
         }
@@ -215,7 +220,11 @@ impl From<String> for Id {
 
 impl From<i64> for Id {
     fn from(value: i64) -> Self {
-        if value >= MIN_VALUE { Id { val: value } } else { panic!("less than min value") }
+        if value >= MIN_VALUE {
+            Id { val: value }
+        } else {
+            panic!("less than min value")
+        }
     }
 }
 
