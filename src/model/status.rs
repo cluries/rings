@@ -20,8 +20,8 @@ const BOUNDARY_ERROR: i32 = -11;
 
 const MARK_DELETED_STR: &'static str = "MarkDelete";
 const INITIALIZE_STR: &'static str = "Initialize";
-static OKP: &str = "OK(";
-static ERP: &str = "ERR(";
+const PREFIX_OK: &str = "OK(";
+const PREFIX_ERROR: &str = "ERR(";
 
 impl Status {
 
@@ -50,11 +50,11 @@ impl Status {
             INITIALIZE_STR => Ok(Status::Initialize),
             MARK_DELETED_STR => Ok(Status::MarkDeleted),
             formated => {
-                if formated.starts_with(OKP) {
-                    let parsed = inner_parse(formated[OKP.len()..].to_string())?;
+                if formated.starts_with(PREFIX_OK) {
+                    let parsed = inner_parse(formated[PREFIX_OK.len()..].to_string())?;
                     Self::ok(parsed.0, &parsed.1)
-                } else if formated.starts_with(ERP) {
-                    let parsed = inner_parse(formated[ERP.len()..].to_string())?;
+                } else if formated.starts_with(PREFIX_ERROR) {
+                    let parsed = inner_parse(formated[PREFIX_ERROR.len()..].to_string())?;
                     Self::error(parsed.0, &parsed.1)
                 } else {
                     Err(format!("Unknown status: {}", formated).into())
@@ -69,6 +69,33 @@ impl Status {
             Status::OK(c, _) => *c >= BOUNDARY_OK,
             Status::Error(c, _) => *c <= BOUNDARY_ERROR,
             Status::MarkDeleted => true,
+        }
+    }
+
+    /// 检查是否为成功状态
+    pub fn is_ok(&self) -> bool {
+        matches!(self, Status::OK(_, _))
+    }
+    
+    /// 检查是否为错误状态
+    pub fn is_error(&self) -> bool {
+        matches!(self, Status::Error(_, _))
+    }
+    
+    /// 获取状态码
+    pub fn code(&self) -> i32 {
+        match self {
+            Status::Initialize => INITIALIZE,
+            Status::OK(code, _) | Status::Error(code, _) => *code,
+            Status::MarkDeleted => MARK_DELETED,
+        }
+    }
+    
+    /// 获取消息
+    pub fn message(&self) -> &str {
+        match self {
+            Status::OK(_, msg) | Status::Error(_, msg) => msg,
+            _ => "",
         }
     }
 
