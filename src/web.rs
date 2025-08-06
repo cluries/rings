@@ -11,6 +11,7 @@ pub mod messages;
 pub mod middleware;
 pub mod request;
 pub mod route;
+pub mod validation;
 pub mod session;
 pub mod tools;
 pub mod types;

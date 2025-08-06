@@ -2,9 +2,15 @@ use crate::erx::{smp, ResultE};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json;
 
+
+/// Encoder
 pub struct Enc;
+
+///Decoder
 pub struct Dec;
-pub struct Desc;
+
+///Describer
+pub struct Describe;
 
 impl Enc {
     pub fn en<T: Serialize>(obj: &T) -> ResultE<String> {
@@ -29,9 +35,13 @@ impl Dec {
         let fc = crate::tools::fs::Content(filename.to_string());
         fc.json().await
     }
+
+    pub fn is_valid(s: &str) -> bool {
+        serde_json::from_str::<serde_json::Value>(s).is_ok()
+    }
 }
 
-impl Desc {
+impl Describe {
     pub fn describe<T: Serialize>(object: &T, cribe: std::collections::HashMap<String, String>) -> ResultE<String> {
         let mut value = serde_json::to_value(object).map_err(smp)?;
 
