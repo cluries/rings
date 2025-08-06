@@ -1,0 +1,34 @@
+[Unit]
+Description=Rings Service
+After=network.target postgresql.service redis.service
+Wants=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=rings
+Group=rings
+WorkingDirectory=/opt/rings
+ExecStart=/opt/rings/target/release/rings
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=RUST_LOG=info
+Environment=CONFIG_PATH=/opt/rings/config.yml
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/rings/logs
+ReadWritePaths=/var/log/rings
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target
