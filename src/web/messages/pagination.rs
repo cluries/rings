@@ -1,5 +1,44 @@
 use serde::{Deserialize, Serialize};
 
+
+/// 排序方向
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum SortDirection {
+    Asc,
+    Desc,
+}
+
+impl Default for SortDirection {
+    fn default() -> Self {
+        Self::Asc
+    }
+}
+
+/// 排序参数
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SortBy {
+    pub field: String,
+    pub direction: SortDirection,
+}
+
+impl SortBy {
+    pub fn new(field: impl Into<String>, direction: SortDirection) -> Self {
+        Self {
+            field: field.into(),
+            direction,
+        }
+    }
+
+    pub fn asc(field: impl Into<String>) -> Self {
+        Self::new(field, SortDirection::Asc)
+    }
+
+    pub fn desc(field: impl Into<String>) -> Self {
+        Self::new(field, SortDirection::Desc)
+    }
+}
+
+
 /// 分页查询参数
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PaginationQuery {
