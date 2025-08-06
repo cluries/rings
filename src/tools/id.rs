@@ -6,7 +6,7 @@ use crate::erx;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use std::sync::RwLock;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 /// id
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -18,7 +18,8 @@ pub struct Id {
 pub struct Factory {
     name: String,
     sharding: i64,
-    sequence: RwLock<(i64, i64)>, // milli, sequence at milli
+    millis: AtomicI64,
+    sequence: AtomicI64, // milli, sequence at milli
 }
 
 lazy_static! {
@@ -113,7 +114,8 @@ fn current_millis() -> i64 {
 
 impl Factory {
     pub fn new(name: &str, sharding: i64) -> Factory {
-        Factory { name: name.to_owned(), sharding: sharding % MAX_SHARDING, sequence: RwLock::new((0, 0)) }
+        Factory { name: name.to_owned(), sharding: sharding % MAX_SHARDING, 
+            millis: AtomicI64::new(0),sequence: AtomicI64::new(0) }
     }
 
     pub fn name(&self) -> &str {
@@ -125,25 +127,29 @@ impl Factory {
     }
 
     pub fn sequence(&self) -> i64 {
-        self.sequence.read().unwrap().1
+        self.sequence.load(Ordering::Relaxed)
     }
 
     pub fn millis(&self) -> i64 {
-        self.sequence.read().unwrap().0
+        self.sequence.load(Ordering::Relaxed)
     }
 
     pub fn make(&self) -> erx::ResultE<Id> {
         let millis = current_millis();
-        let mut seq: i64 = 0;
-        let mut sequence = self.sequence.try_write().map_err(erx::smp)?;
+        let old_millis = self.millis.load(Ordering::Relaxed);
 
-        if millis != sequence.0 {
-            *sequence = (millis, seq);
-        } else {
-            seq = sequence.1 + 1;
-            sequence.1 = seq;
+        if millis != old_millis {
+            match self.millis.compare_exchange(old_millis, millis, Ordering::AcqRel, Ordering::Relaxed) {
+                Ok(_old) => {
+                    self.sequence.store(0, Ordering::Release);
+                }
+                Err(_current) => {
+                    // Another thread updated millis, reload and continue
+                }
+            }
         }
-
+ 
+        let seq = self.sequence.fetch_add(1, Ordering::Relaxed);
         if seq > MAX_SEQUENCE {
             return Err("beyond sequence limits".into());
         }
@@ -160,25 +166,32 @@ impl Factory {
         }
 
         let millis = current_millis();
-        let mut seq: i64 = 0;
-        let mut sequence = self.sequence.try_write().map_err(erx::smp)?;
+         
 
-        if millis != sequence.0 {
-            *sequence = (millis, seq);
+        let old_millis = self.millis.load(Ordering::Relaxed);
+
+        if millis != old_millis {
+            match self.millis.compare_exchange(old_millis, millis, Ordering::AcqRel, Ordering::Relaxed) {
+                Ok(_old) => {
+                    self.sequence.store(0, Ordering::Release);
+                }
+                Err(_current) => {
+                    // Another thread updated millis, reload and continue
+                }
+            }
         }
 
+        let seq = self.sequence.load(Ordering::Relaxed);
         let n = i64::from(n);
-        if sequence.1 + n > MAX_SEQUENCE {
+        if seq + n > MAX_SEQUENCE {
             return Err("beyond sequence limits".into());
         }
 
-        let start_seq = sequence.1;
-        seq = sequence.1 + n;
-        sequence.1 = seq;
+        self.sequence.fetch_add(n, Ordering::AcqRel);
 
         let mut ids: Vec<Id> = Vec::new();
         let shorter = ShorterMills::with_mills(millis).shorter();
-        for i in start_seq..seq {
+        for i in seq..seq+n {
             let val = MILLIS_BASE * shorter + i * SEQUENCE_BASE + self.sharding;
             ids.push(Id { val });
         }
