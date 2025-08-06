@@ -560,7 +560,10 @@ impl Payload {
 
     fn validate_signature(&self, key: String) -> Result<(), Error> {
         let payload = self.payload();
-        let server_signature = hash::hmac_sha1(&payload, &key);
+        let server_signature = hash::hmac_sha1(&payload, &key).map_err(
+            |s| Error::InternalError(s)
+        )?;
+    
         let client_signature = self.get_signature();
 
         if server_signature != client_signature {
