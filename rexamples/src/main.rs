@@ -1,6 +1,6 @@
 use rings::{
     app::{AppBuilder, AppBuilderWebReconfigor},
-    axum, rings::R, tokio,
+    axum, rings::R, tokio
 };
 use web::action::api::api_actions;
 
@@ -15,30 +15,27 @@ async fn main() {
 
     builder.use_scheduler().await;
 
-    let rc: Vec<AppBuilderWebReconfigor> = vec![
-        ("api".to_string(), api_actions, |x| {
-            fn extra(router: axum::Router) -> axum::Router {
-                // use web::middleware::api::signator::use_signator;
-                // use_signator(router)
-
-                router
-            }
-            x.set_router_reconfiger(extra)
-        }),
-
-        #[cfg(feature = "frontend")]
-        {
-            use rings::app::web_reconfig_simple;
-            use web::action::front::front_actions;
-            web_reconfig_simple("front", front_actions)
-        },
-        // ("front".to_string(), front_actions, |web: &mut Web| -> &mut Web { web })
+    let mut rc: Vec<AppBuilderWebReconfigor> = vec![
+        AppBuilderWebReconfigor{
+            name: String::from("API"), 
+            router_maker: api_actions, 
+            reconfigor: |x| {
+                fn extra(router: axum::Router) -> axum::Router {
+                    router
+                }
+                x.set_router_reconfiger(extra)
+            },
+            middlewares: vec![
+                
+            ]
+        }
     ];
 
-    builder.use_web(rc).await;
+    builder.use_web(&mut rc).await;
 
     let rings_app = builder.build();
 
     R::perform(&rings_app).await;
 }
- 
+
+

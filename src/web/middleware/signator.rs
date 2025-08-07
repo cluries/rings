@@ -30,6 +30,13 @@ pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<St
 pub struct SignatorConfig {
     /// 中间件优先级，数值越大优先级越高
     pub priority: i32,
+
+    /// 密钥加载器（必填）
+    pub key_loader: KeyLoader,
+
+    /// Redis 连接 URL（必填）
+    pub redis_url: String,
+
     /// 自定义应用逻辑
     pub apply: Option<Arc<dyn Fn(&Parts) -> bool + Send + Sync>>,
     /// HTTP 方法过滤 - 使用 Arc 减少 clone 成本
@@ -38,30 +45,37 @@ pub struct SignatorConfig {
     pub patterns: Option<Arc<Vec<ApplyKind<Pattern>>>>,
     /// 随机数生命周期（秒）
     pub nonce_lifetime: i64,
+    /// 后门，开发时候方便用
+    pub backdoor: Option<String>,
 }
 
 impl std::fmt::Debug for SignatorConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SignatorConfig")
             .field("priority", &self.priority)
+            .field("key_loader", &"KeyLoader")
+            .field("redis_url", &self.redis_url)
             .field("apply", &self.apply.as_ref().map(|_| "Some(Fn)"))
             .field("methods", &self.methods)
             .field("patterns", &self.patterns)
             .field("nonce_lifetime", &self.nonce_lifetime)
+            .field("backdoor", &self.backdoor)
             .finish()
     }
 }
 
-impl Default for SignatorConfig {
-    fn default() -> Self {
-        Self { priority: 0, apply: None, methods: None, patterns: None, nonce_lifetime: DEFAULT_NONCE_LIFETIME }
-    }
-}
-
 impl SignatorConfig {
-    /// 创建新的配置
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(key_loader: KeyLoader, redis_url: String) -> Self {
+        Self {
+            priority: 0,
+            key_loader,
+            redis_url,
+            apply: None,
+            methods: None,
+            patterns: None,
+            nonce_lifetime: DEFAULT_NONCE_LIFETIME,
+            backdoor: None,
+        }
     }
 
     /// 设置优先级
@@ -168,10 +182,51 @@ impl SignatorConfig {
         self.nonce_lifetime = lifetime;
         self
     }
+
+    /// 设置密钥加载器
+    pub fn key_loader(mut self, key_loader: KeyLoader) -> Self {
+        self.key_loader = key_loader;
+        self
+    }
+
+    /// 设置后门
+    pub fn backdoor(mut self, backdoor: String) -> Self {
+        self.backdoor = Some(backdoor);
+        self
+    }
+
+    /// 设置 Redis 连接 URL
+    pub fn redis_url(mut self, redis_url: String) -> Self {
+        self.redis_url = redis_url;
+        self
+    }
+
+    /// 验证配置是否完整和有效
+    pub fn validate(&self) -> Result<(), Error> {
+        // 验证 nonce_lifetime 的合理性
+        if self.nonce_lifetime <= 0 {
+            return Err(Error::ConfigError("Nonce lifetime must be positive".to_string()));
+        }
+
+        if self.nonce_lifetime > 86400 {
+            // 24小时
+            return Err(Error::ConfigError("Nonce lifetime should not exceed 24 hours".to_string()));
+        }
+
+        // 验证 Redis URL 格式
+        if !self.redis_url.starts_with("redis://") && !self.redis_url.starts_with("rediss://") {
+            return Err(Error::ConfigError("Redis URL must start with 'redis://' or 'rediss://'".to_string()));
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
 pub enum Error {
+    /// 配置错误
+    ConfigError(String),
+
     /// 请求体过大
     BodyTooLarge(usize),
     /// 请求体JSON格式错误
@@ -228,6 +283,9 @@ impl Into<Out<()>> for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            // 配置相关错误
+            Error::ConfigError(msg) => write!(f, "Configuration error: {}", msg),
+
             // 请求体相关错误
             Error::BodyTooLarge(size) => write!(f, "Request body too large: {} bytes (max: {} bytes)", size, MAX_BODY_SIZE),
             Error::BodyJsonInvalid(msg) => write!(f, "Invalid JSON in request body: {}", msg),
@@ -273,51 +331,65 @@ impl From<redis::RedisError> for Error {
     }
 }
 
+/// Signator
 pub struct Signator {
-    backdoor: String, // 后门，开发时候方便用
-    config: SignatorConfig,
-    key_loader: KeyLoader,
+    config: Arc<SignatorConfig>,
     redis_client: redis::Client,
 }
 
 impl Signator {
-    pub fn new(redis_url: &str, key_loader: KeyLoader) -> Self {
-        Self::with_config(redis_url, key_loader, SignatorConfig::default())
+    pub fn new(config: SignatorConfig) -> Result<Self, Error> {
+        // 验证配置
+        config.validate()?;
+
+        let redis_client = redis::Client::open(config.redis_url.as_str()).map_err(|err| {
+            tracing::error!("Failed to create Redis client for URL {}: {}", config.redis_url, err);
+            Error::ConfigError(format!("Invalid Redis URL '{}': {}", config.redis_url, err))
+        })?;
+
+        let config = Arc::new(config);
+
+        Ok(Signator { config, redis_client })
     }
 
-    pub fn with_backdoor(redis_url: &str, key_loader: KeyLoader, backdoor: String) -> Self {
-        let config = SignatorConfig::default();
-        Self::with_config_and_backdoor(redis_url, key_loader, config, backdoor)
-    }
-
-    pub fn with_config(redis_url: &str, key_loader: KeyLoader, config: SignatorConfig) -> Self {
-        Self::with_config_and_backdoor(redis_url, key_loader, config, String::default())
-    }
-
-    pub fn with_config_and_backdoor(redis_url: &str, key_loader: KeyLoader, config: SignatorConfig, backdoor: String) -> Self {
-        Signator {
-            backdoor,
-            config,
-            key_loader,
-            redis_client: redis::Client::open(redis_url).unwrap_or_else(|err| {
-                tracing::error!("{} {}", redis_url, err);
-                panic!("failed to connect to redis: {}", err);
-            }),
-        }
-    }
-
-    pub async fn exec(&self, request: axum::extract::Request) -> Result<axum::extract::Request, Error> {
+    /// Authenticates an incoming HTTP request by validating its signature and preventing replay attacks.
+    ///
+    /// This method performs comprehensive request authentication through the following steps:
+    ///
+    /// 1. **Request Cloning**: Creates a clone of the request to preserve the original for downstream processing
+    /// 2. **Payload Extraction**: Extracts authentication headers (user ID, timestamp, nonce, signature) and request body
+    /// 3. **Header Validation**: Ensures all required headers are present and properly formatted
+    /// 4. **Key Loading**: Retrieves the user's signing key using the configured key loader
+    /// 5. **Signature Verification**: Validates the request signature against the expected signature computed from the payload
+    /// 6. **Backdoor Check**: If signature verification fails, checks for development backdoor bypass
+    /// 7. **Nonce Validation**: Prevents replay attacks by ensuring the nonce hasn't been used recently
+    /// 8. **Context Injection**: Injects user context into the request for downstream middleware and handlers
+    ///
+    /// The authentication process protects against:
+    /// - **Tampering**: Through HMAC-SHA1 signature verification
+    /// - **Replay attacks**: Through nonce validation with Redis-based deduplication
+    /// - **Time-based attacks**: Through timestamp validation within acceptable time windows
+    ///
+    /// Returns the authenticated request with user context injected, or an authentication error.
+    //
+    pub async fn authenticate(&self, request: axum::extract::Request) -> Result<axum::extract::Request, Error> {
         let (payload_request, mut request) = clone_request(request).await;
 
         let payload = Payload::from_request(payload_request).await?;
         payload.validate_headers()?;
 
-        let loader = Arc::clone(&self.key_loader);
-        let key = loader(payload.get_user_id()).await.map_err(Error::KeyLoadingFailed)?;
+        let key = (self.config.key_loader)(payload.get_user_id()).await.map_err(Error::KeyLoadingFailed)?;
 
         if let Err(invalid) = payload.validate_signature(key) {
-            if self.backdoor.is_empty() || !self.backdoor.eq(&payload.get_dev_skip()) {
-                return Err(invalid);
+            match self.config.backdoor.as_ref() {
+                None => {
+                    return Err(invalid);
+                },
+                Some(backdoor) => {
+                    if !backdoor.eq(&payload.get_dev_skip()) {
+                        return Err(invalid);
+                    }
+                },
             }
         }
 
@@ -329,26 +401,41 @@ impl Signator {
         Ok(request)
     }
 
+    /// Validates that a nonce (number used once) hasn't been used recently to prevent replay attacks.
+    ///
+    /// This method performs the following operations:
+    /// 1. Connects to Redis and checks if the nonce exists in a sorted set for the user
+    /// 2. If the nonce exists and was used within the configured lifetime, returns an error
+    /// 3. If the nonce is valid, adds it to Redis with current timestamp as score
+    /// 4. Cleans up expired nonces from the sorted set to prevent memory bloat
+    /// 5. Sets expiration on the Redis key to automatically clean up user data
+    ///
+    /// The nonce validation uses Redis sorted sets where:
+    /// - Key: "XR:{user_id}"
+    /// - Member: nonce value
+    /// - Score: timestamp when nonce was used
+    ///
+    /// This ensures each nonce can only be used once within the configured time window,
+    /// providing protection against replay attacks while automatically cleaning up old data.
     async fn validate_nonce(&self, payload: &Payload) -> Result<(), Error> {
-        let mut conn: redis::aio::MultiplexedConnection = self.redis_client.get_multiplexed_tokio_connection().await?;
+        let mut redis_conn = self.redis_client.get_multiplexed_tokio_connection().await?;
+        let redis_key = format!("XR:{}", payload.get_user_id());
+        let nonce_value = payload.get_nonce();
 
-        let name = format!("XR:{}", payload.get_user_id());
-        let nonce = payload.get_nonce();
+        let existing_score: Option<i64> = redis_conn.zscore(redis_key.as_str(), &nonce_value).await?;
+        let last_used_timestamp = existing_score.unwrap_or(0);
+        let current_timestamp: i64 = chrono::Local::now().timestamp();
 
-        let score: Option<i64> = conn.zscore(name.as_str(), &nonce).await?;
-
-        let score = score.unwrap_or(0);
-        let current: i64 = chrono::Local::now().timestamp();
-
-        if (current - score).abs() < self.config.nonce_lifetime {
+        if (current_timestamp - last_used_timestamp).abs() < self.config.nonce_lifetime {
             return Err(Error::NonceReused(payload.get_nonce()));
         }
 
-        let mut pipe = redis::pipe();
-        pipe.zadd(name.as_str(), &nonce, current);
-        pipe.zrembyscore(name.as_str(), "-inf", current - self.config.nonce_lifetime);
-        pipe.expire(name.as_str(), self.config.nonce_lifetime);
-        let _r = pipe.query_async::<Vec<i64>>(&mut conn).await?;
+        // 清理过期的 nonce 并添加新的
+        let mut pipeline = redis::pipe();
+        pipeline.zadd(redis_key.as_str(), &nonce_value, current_timestamp);
+        pipeline.zrembyscore(redis_key.as_str(), "-inf", current_timestamp - self.config.nonce_lifetime);
+        pipeline.expire(redis_key.as_str(), self.config.nonce_lifetime);
+        let _result = pipeline.query_async::<Vec<i64>>(&mut redis_conn).await?;
 
         Ok(())
     }
@@ -356,22 +443,13 @@ impl Signator {
 
 impl Clone for Signator {
     fn clone(&self) -> Self {
-        Signator {
-            backdoor: self.backdoor.clone(),
-            config: self.config.clone(),
-            key_loader: Arc::clone(&self.key_loader),
-            redis_client: self.redis_client.clone(),
-        }
+        Signator { config: self.config.clone(), redis_client: self.redis_client.clone() }
     }
 }
 
 impl std::fmt::Debug for Signator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Signator")
-            .field("backdoor", &self.backdoor)
-            .field("config", &self.config)
-            .field("redis_client", &self.redis_client)
-            .finish()
+        f.debug_struct("Signator").field("config", &self.config).field("redis_client", &self.redis_client).finish()
     }
 }
 
@@ -383,8 +461,28 @@ impl Middleware for Signator {
     fn on_request(&self, context: Context, request: Request) -> Option<MiddlewareFuture<Request>> {
         let signator = self.clone();
 
+        // Creates an asynchronous future that handles the authentication process for incoming requests.
+        //
+        // This future performs the complete authentication workflow:
+        // 1. **Request Authentication**: Calls the `authenticate` method to validate the request
+        // 2. **Success Path**: If authentication succeeds, returns the authenticated request with injected user context
+        // 3. **Error Path**: If authentication fails:
+        //    - Converts the authentication error into a user-friendly error message
+        //    - Creates an `Erx` error object for internal error tracking
+        //    - Converts the error into an `Out<()>` response format
+        //    - Modifies the middleware context to abort the request with the error response
+        //    - Returns the error context and `Erx` object for upstream error handling
+        //
+        // The future ensures that authentication failures are properly handled and converted
+        // into appropriate HTTP responses while maintaining the middleware chain's error handling contract.
+        //
+        // Returns:
+        // - `Ok((context, request))`: On successful authentication with user context injected
+        // - `Err((context, erx))`: On authentication failure with abort response set in context
+        //
+
         let future = Box::pin(async move {
-            match signator.exec(request).await {
+            match signator.authenticate(request).await {
                 Ok(req) => Ok((context, req)),
                 Err(error) => {
                     let message = &error.to_string();
@@ -488,6 +586,26 @@ impl Payload {
             || HttpMethod::PATCH.is(&self.method)
     }
 
+    /// Extracts and parses authentication payload from an incoming HTTP request.
+    ///
+    /// This method performs the following operations:
+    /// 1. **Request Decomposition**: Separates the request into parts (headers, URI, method) and body
+    /// 2. **Basic Information Extraction**: Extracts HTTP method, path, and query parameters
+    /// 3. **Conditional Body Reading**: Reads and parses JSON body for methods that typically carry payloads
+    /// 4. **Size Validation**: Ensures request body doesn't exceed the maximum allowed size (32MB)
+    /// 5. **JSON Parsing**: Attempts to parse the body as JSON, handling empty bodies gracefully
+    /// 6. **Header Extraction**: Extracts authentication headers (user ID, timestamp, nonce, signature)
+    ///
+    /// The method handles different HTTP methods appropriately:
+    /// - For GET/HEAD requests: Only processes headers and query parameters
+    /// - For POST/PUT/DELETE/PATCH/OPTIONS requests: Additionally reads and parses the request body
+    ///
+    /// Error handling covers:
+    /// - Body size exceeding limits
+    /// - Invalid JSON format in request body
+    /// - General body reading failures
+    ///
+    /// Returns a complete Payload struct containing all necessary information for signature verification.
     async fn from_request(req: axum::extract::Request) -> Result<Self, Error> {
         let (parts, body) = req.into_parts();
 
@@ -532,6 +650,27 @@ impl Payload {
         Ok(payload)
     }
 
+    /// 从 HTTP 请求头中提取认证相关的头部信息
+    ///
+    /// 该方法从请求头中提取以下认证字段：
+    /// - X-U: 用户ID
+    /// - X-T: 时间戳
+    /// - X-R: 随机数(nonce)
+    /// - X-S: 签名
+    /// - X-DEVELOPMENT-SKIP: 开发环境跳过验证的后门参数
+    ///
+    /// 所有提取的值都会被转换为 String 类型存储在 Payload 结构体中
+    ///
+    /// Extracts authentication headers from HTTP request headers.
+    ///
+    /// This method extracts the following authentication fields from request headers:
+    /// - X-U: User ID
+    /// - X-T: Timestamp
+    /// - X-R: Nonce (number used once)
+    /// - X-S: Signature
+    /// - X-DEVELOPMENT-SKIP: Development backdoor parameter for skipping verification
+    ///
+    /// All extracted values are converted to String type and stored in the Payload struct.
     fn extract_headers(&mut self, headers: HeaderMap<HeaderValue>) {
         let header = |n| -> Option<String> { headers.get(n).and_then(|value| value.to_str().ok()).map(String::from) };
 
@@ -560,10 +699,8 @@ impl Payload {
 
     fn validate_signature(&self, key: String) -> Result<(), Error> {
         let payload = self.payload();
-        let server_signature = hash::hmac_sha1(&payload, &key).map_err(
-            |s| Error::InternalError(s)
-        )?;
-    
+        let server_signature = hash::hmac_sha1(&payload, &key).map_err(|s| Error::InternalError(s))?;
+
         let client_signature = self.get_signature();
 
         if server_signature != client_signature {
@@ -578,6 +715,31 @@ impl Payload {
         Ok(())
     }
 
+    /// Validates the presence and format of required authentication headers.
+    ///
+    /// This method performs comprehensive validation of authentication headers extracted from the HTTP request:
+    ///
+    /// 1. **Required Headers Check**: Ensures all mandatory authentication headers are present:
+    ///    - X-U (User ID): Identifies the requesting user
+    ///    - X-T (Timestamp): Request creation time for preventing stale requests
+    ///    - X-R (Nonce): Random value for preventing replay attacks
+    ///    - X-S (Signature): HMAC signature for request integrity verification
+    ///
+    /// 2. **Timestamp Validation**: Validates the timestamp format and ensures it falls within acceptable time bounds:
+    ///    - Parses the timestamp string to i64 format
+    ///    - Checks that the timestamp is not too old or too far in the future (±5 minutes)
+    ///    - Prevents both stale request attacks and clock skew issues
+    ///
+    /// 3. **Nonce Format Validation**: Ensures the nonce meets security requirements:
+    ///    - Validates length is between 8-40 characters for sufficient entropy
+    ///    - Prevents both weak nonces (too short) and potential DoS attacks (too long)
+    ///
+    /// 4. **Signature Format Validation**: Verifies the signature format:
+    ///    - Ensures signature is exactly 40 characters (SHA1 hex digest length)
+    ///    - Prevents malformed signature attacks
+    ///
+    /// Returns an error if any validation fails, providing specific details about what went wrong.
+    /// This validation layer provides the first line of defense against malformed or malicious requests.
     fn validate_headers(&self) -> Result<(), Error> {
         // 检查必需的头部字段
         let mut missing_headers = Vec::new();
@@ -621,6 +783,74 @@ impl Payload {
         Ok(())
     }
 
+    /// Constructs the complete authentication payload string used for signature generation.
+    ///
+    /// This method builds the standardized payload format that combines all request components
+    /// into a single string for HMAC signature generation. The payload structure ensures
+    /// consistent signature verification across client and server implementations.
+    ///
+    /// The payload construction follows this format:
+    /// `{METHOD},{PATH},{user_id,timestamp,nonce}[,{query_params}][,{body_json}]`
+    ///
+    /// Components included:
+    /// 1. **Header Payload**: HTTP method, path, and authentication headers
+    /// 2. **Query Parameters**: Sorted key-value pairs (if present)
+    /// 3. **Request Body**: Serialized JSON content (if present)
+    ///
+    /// Example payloads:
+    ///
+    /// **GET request with query parameters:**
+    /// ```
+    /// GET,/api/users,{user123,1640995200,abc123def456},{limit=10,sort=name}
+    /// ```
+    ///
+    /// **POST request with JSON body:**
+    /// ```
+    /// POST,/api/users,{user123,1640995200,abc123def456},{name=John,age=30}
+    /// ```
+    ///
+    /// **Simple GET request:**
+    /// ```
+    /// GET,/api/status,{user123,1640995200,abc123def456}
+    /// ```
+    ///
+    /// This standardized format ensures that identical requests will always generate
+    /// the same payload string, enabling consistent signature verification and
+    /// preventing signature bypass attacks through payload manipulation.
+    ///
+    ///
+    fn payload(&self) -> String {
+        let mut payload = self.append_query_payload(self.build_header_payload());
+
+        if let Some(body) = &self.body {
+            payload.push_str(",");
+            let body_payload = Self::serialize_json_value(body);
+            payload.push_str(body_payload.as_str());
+        }
+
+        payload
+    }
+
+    ///
+    /// Builds the header portion of the authentication payload string.
+    ///
+    /// This method constructs the standardized header payload format used for signature generation:
+    /// `{METHOD},{PATH},{user_id,timestamp,nonce}`
+    ///
+    /// The format includes:
+    /// - HTTP method in uppercase (e.g., "GET", "POST")
+    /// - Request path (e.g., "/api/users")
+    /// - Authentication headers enclosed in braces, comma-separated:
+    ///   - User ID (X-U header value)
+    ///   - Timestamp (X-T header value)
+    ///   - Nonce (X-R header value)
+    ///
+    /// Example output: `POST,/api/users,{user123,1640995200,abc123def456}`
+    ///
+    /// This standardized format ensures consistent signature generation across
+    /// client and server implementations.
+    ///
+    ///
     fn build_header_payload(&self) -> String {
         let mut payload = String::new();
         payload.push_str(self.method.to_uppercase().as_str());
@@ -643,6 +873,30 @@ impl Payload {
         payload
     }
 
+    ///
+    /// Appends query parameters to the authentication payload string.
+    ///
+    /// This method extends the base payload with query parameters in a standardized format
+    /// for consistent signature generation. The query parameters are:
+    ///
+    /// 1. **Sorted by Key**: All query parameter keys are sorted alphabetically to ensure
+    ///    consistent ordering regardless of the original request parameter order
+    /// 2. **Formatted as Key-Value Pairs**: Each parameter is formatted as `key=value`
+    /// 3. **Comma-Separated**: Multiple parameters are separated by commas
+    /// 4. **Enclosed in Braces**: The entire query section is wrapped in `{}`
+    ///
+    /// Format: `{key1=value1,key2=value2,key3=value3}`
+    ///
+    /// If no query parameters exist, the original payload is returned unchanged.
+    ///
+    /// This standardization ensures that requests with identical query parameters
+    /// but different parameter ordering will generate the same signature.
+    ///
+    /// Example:
+    /// - Input payload: `POST,/api/users,{user123,1640995200,abc123def456}`
+    /// - Query params: `?sort=name&limit=10`
+    /// - Output: `POST,/api/users,{user123,1640995200,abc123def456},{limit=10,sort=name}`
+    ///
     fn append_query_payload(&self, mut payload: String) -> String {
         let mut size = self.queries.len();
         if size < 1 {
@@ -669,18 +923,28 @@ impl Payload {
         payload
     }
 
-    fn payload(&self) -> String {
-        let mut payload = self.append_query_payload(self.build_header_payload());
-
-        if let Some(body) = &self.body {
-            payload.push_str(",");
-            let body_payload = Self::serialize_json_value(body);
-            payload.push_str(body_payload.as_str());
-        }
-
-        payload
-    }
-
+    /// Serializes a JSON array into a standardized string format for signature generation.
+    ///
+    /// This method converts a JSON array into a deterministic string representation
+    /// that ensures consistent signature generation across different implementations.
+    ///
+    /// The serialization format:
+    /// - Arrays are enclosed in square brackets: `[...]`
+    /// - Elements are serialized recursively using `serialize_json_value`
+    /// - Elements are separated by commas with no spaces
+    /// - Empty arrays are represented as `[]`
+    ///
+    /// Examples:
+    /// - `[1, 2, 3]` becomes `[1,2,3]`
+    /// - `["a", "b"]` becomes `[a,b]`
+    /// - `[{"key": "value"}]` becomes `[{key=value}]`
+    /// - `[]` becomes `[]`
+    ///
+    /// This standardized format ensures that arrays with identical content
+    /// will always produce the same string representation, which is crucial
+    /// for consistent signature verification.
+    ///
+    ///
     fn serialize_array(array: &Vec<serde_json::Value>) -> String {
         let mut payload = String::new();
         let mut array_len = array.len();
@@ -698,6 +962,28 @@ impl Payload {
         payload
     }
 
+    /// Serializes a JSON object into a standardized string format for signature generation.
+    ///
+    /// This method converts a JSON object into a deterministic string representation
+    /// that ensures consistent signature generation across different implementations.
+    ///
+    /// The serialization process:
+    /// 1. **Key Sorting**: All object keys are sorted alphabetically to ensure
+    ///    consistent ordering regardless of the original JSON key order
+    /// 2. **Key-Value Formatting**: Each property is formatted as `key=value`
+    /// 3. **Recursive Serialization**: Values are serialized recursively using `serialize_json_value`
+    /// 4. **Comma Separation**: Multiple properties are separated by commas with no spaces
+    /// 5. **Brace Enclosure**: The entire object is wrapped in curly braces `{}`
+    ///
+    /// Examples:
+    /// - `{"name": "John", "age": 30}` becomes `{age=30,name=John}`
+    /// - `{"nested": {"key": "value"}}` becomes `{nested={key=value}}`
+    /// - `{}` becomes `{}`
+    ///
+    /// This standardized format ensures that objects with identical content
+    /// but different key ordering will always produce the same string representation,
+    /// which is crucial for consistent signature verification across client and server.
+    ///
     fn serialize_object(object: &serde_json::Map<String, serde_json::Value>) -> String {
         let mut payload = String::new();
 
@@ -722,6 +1008,34 @@ impl Payload {
         payload
     }
 
+    /// Serializes a JSON value into a standardized string format for signature generation.
+    ///
+    /// This method provides a deterministic serialization of JSON values that ensures
+    /// consistent signature generation across different implementations and platforms.
+    ///
+    /// The serialization handles all JSON value types:
+    /// - **Null**: Serialized as the string "null"
+    /// - **Boolean**: Serialized as "true" or "false"
+    /// - **Number**: Serialized using the number's string representation
+    /// - **String**: Serialized as the raw string value (without quotes)
+    /// - **Array**: Recursively serialized using `serialize_array`
+    /// - **Object**: Recursively serialized using `serialize_object`
+    ///
+    /// This standardized approach ensures that:
+    /// 1. Identical JSON structures always produce identical string representations
+    /// 2. The serialization is deterministic and reproducible
+    /// 3. Complex nested structures are handled consistently
+    /// 4. The output is suitable for cryptographic signature generation
+    ///
+    /// Examples:
+    /// - `null` → `"null"`
+    /// - `true` → `"true"`
+    /// - `42` → `"42"`
+    /// - `"hello"` → `"hello"`
+    /// - `[1, 2]` → `"[1,2]"`
+    /// - `{"key": "value"}` → `"{key=value}"`
+    ///
+    ///
     fn serialize_json_value(value: &serde_json::Value) -> String {
         match value {
             serde_json::Value::Null => "null".to_string(),
@@ -742,18 +1056,28 @@ mod tests {
     use crate::web::middleware::ApplyTrait;
 
     #[test]
-    fn test_signator_config_default() {
-        let config = SignatorConfig::default();
+    fn test_signator_config_new() {
+        let key_loader = Arc::new(|_: String| -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> {
+            Box::pin(async { Ok("test_key".to_string()) })
+        });
+
+        let config = SignatorConfig::new(key_loader, "redis://localhost:6379".to_string());
         assert_eq!(config.priority, 0);
         assert_eq!(config.nonce_lifetime, DEFAULT_NONCE_LIFETIME);
         assert!(config.apply.is_none());
         assert!(config.methods.is_none());
         assert!(config.patterns.is_none());
+        assert!(config.backdoor.is_none());
+        assert_eq!(config.redis_url, "redis://localhost:6379");
     }
 
     #[test]
     fn test_signator_config_builder() {
-        let config = SignatorConfig::new()
+        let key_loader = Arc::new(|_: String| -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> {
+            Box::pin(async { Ok("test_key".to_string()) })
+        });
+
+        let config = SignatorConfig::new(key_loader, "redis://localhost:6379".to_string())
             .priority(100)
             .nonce_lifetime(600)
             .include_method(HttpMethod::POST)
@@ -802,7 +1126,11 @@ mod tests {
 
     #[test]
     fn test_signator_config_debug() {
-        let config = SignatorConfig::new().priority(50).apply(|_| true);
+        let key_loader = Arc::new(|_: String| -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> {
+            Box::pin(async { Ok("test_key".to_string()) })
+        });
+
+        let config = SignatorConfig::new(key_loader, "redis://localhost:6379".to_string()).priority(50).apply(|_| true);
 
         let debug_str = format!("{:?}", config);
         assert!(debug_str.contains("SignatorConfig"));
@@ -846,5 +1174,24 @@ mod tests {
         let exclude_kind = ApplyKind::Exclude(method);
         assert!(!exclude_kind.apply("POST"));
         assert!(exclude_kind.apply("GET"));
+    }
+
+    #[test]
+    fn test_config_validation() {
+        let key_loader = Arc::new(|_: String| -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> {
+            Box::pin(async { Ok("test_key".to_string()) })
+        });
+
+        // 测试无效的 nonce_lifetime
+        let config = SignatorConfig::new(key_loader.clone(), "redis://localhost:6379".to_string()).nonce_lifetime(-1);
+        assert!(matches!(config.validate(), Err(Error::ConfigError(_))));
+
+        // 测试无效的 Redis URL
+        let config = SignatorConfig::new(key_loader.clone(), "invalid://localhost:6379".to_string());
+        assert!(matches!(config.validate(), Err(Error::ConfigError(_))));
+
+        // 测试有效的配置
+        let config = SignatorConfig::new(key_loader, "redis://localhost:6379".to_string());
+        assert!(config.validate().is_ok());
     }
 }
