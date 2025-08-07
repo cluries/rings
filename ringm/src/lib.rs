@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
 
 mod any;
-mod db;
 mod migrate;
 mod service;
 mod tools;
@@ -39,6 +38,7 @@ pub fn default_any(attr: TokenStream, item: TokenStream) -> TokenStream {
     any::default_any(attr, item)
 }
 
+//
 #[proc_macro]
 pub fn seaorm_mo(input: TokenStream) -> TokenStream {
     seaorm::define_normals(input)

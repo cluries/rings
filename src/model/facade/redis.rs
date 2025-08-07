@@ -64,7 +64,7 @@ pub mod rs {
                     let score: f64 = redis::from_redis_value(&items[1])?;
                     Ok(Zpoped { member, score })
                 },
-                _ => Err(redis::RedisError::from((redis::ErrorKind::TypeError, "Expected a bulk response with 3 elements for BZPOPMAX"))),
+                _ => Err(redis::RedisError::from((redis::ErrorKind::TypeError, "Expected a bulk response with 2 elements for BZPOPMAX"))),
             }
         }
     }
