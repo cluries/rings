@@ -31,3 +31,7 @@ A scaffold for a Rust project, the architectural blueprint that lays the groundw
 ## Configuration
  
 All configuration keys use consistent naming and MUST be documented.
+
+
+# IMPRTANT !!!!!
+- DON NOT READ FILES IN THOSE FOLDERS: `private`
