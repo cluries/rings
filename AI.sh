@@ -178,6 +178,17 @@ start_claude_with_provider() {
     
     echo "ANTHROPIC_BASE_URL: $ANTHROPIC_BASE_URL"
     echo "API key loaded successfully."
+    
+    # Check if claude command exists
+    if ! command -v claude &> /dev/null; then
+        echo "Error: Claude CLI is not installed!"
+        echo "Please install it with: npm install -g @anthropic-ai/claude-3-cli"
+        exit 1
+    fi
+    
+    # Start Claude with the configured environment
+    echo "Starting Claude..."
+    exec claude
 }
 
 start_claude() {
