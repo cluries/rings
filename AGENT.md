@@ -17,15 +17,11 @@ A scaffold for a Rust project, the architectural blueprint that lays the groundw
  
 
 ## Architecture
-
-- Frontend: React with TypeScript
 - Backend: Rust with Axum
 - Database: PostgreSQL with SeaORM 
+- Cache: Redis
 
-## Security
  
-
-## Git Workflow
  
 
 ## Configuration
