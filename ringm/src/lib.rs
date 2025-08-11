@@ -2,9 +2,9 @@ use proc_macro::TokenStream;
 
 mod any;
 mod migrate;
+mod seaorm;
 mod service;
 mod tools;
-mod seaorm;
 
 #[proc_macro]
 pub fn migrate_using_macros(input: TokenStream) -> TokenStream {
@@ -15,7 +15,6 @@ pub fn migrate_using_macros(input: TokenStream) -> TokenStream {
 pub fn migrate_make_migrator(input: TokenStream) -> TokenStream {
     migrate::make_migrator(input)
 }
-
 
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {

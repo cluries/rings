@@ -2,7 +2,6 @@ use crate::erx::{smp, ResultE};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json;
 
-
 /// Encoder
 pub struct Enc;
 

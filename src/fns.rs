@@ -2,11 +2,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 
 /// 重试执行函数
-pub async fn retry_async<F, Fut, T, E>(
-    mut f: F,
-    max_attempts: usize,
-    delay: std::time::Duration,
-) -> Result<T, E>
+pub async fn retry_async<F, Fut, T, E>(mut f: F, max_attempts: usize, delay: std::time::Duration) -> Result<T, E>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<T, E>>,
@@ -19,17 +15,13 @@ where
             Err(e) if attempts >= max_attempts => return Err(e),
             Err(_) => {
                 tokio::time::sleep(delay).await;
-            }
+            },
         }
     }
 }
 
 /// 同步重试执行函数
-pub fn retry_sync<F, T, E>(
-    mut f: F,
-    max_attempts: usize,
-    delay: std::time::Duration,
-) -> Result<T, E>
+pub fn retry_sync<F, T, E>(mut f: F, max_attempts: usize, delay: std::time::Duration) -> Result<T, E>
 where
     F: FnMut() -> Result<T, E>,
 {
@@ -41,7 +33,7 @@ where
             Err(e) if attempts >= max_attempts => return Err(e),
             Err(_) => {
                 std::thread::sleep(delay);
-            }
+            },
         }
     }
 }
@@ -58,10 +50,7 @@ where
     V: Clone,
 {
     pub fn new(max_size: usize) -> Self {
-        Self {
-            data: HashMap::new(),
-            max_size,
-        }
+        Self { data: HashMap::new(), max_size }
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
@@ -96,50 +85,42 @@ where
 }
 
 /// 批量处理函数
-pub async fn batch_process<T, R, F, Fut>(
-    items: Vec<T>,
-    batch_size: usize,
-    processor: F,
-) -> Vec<R>
+pub async fn batch_process<T, R, F, Fut>(items: Vec<T>, batch_size: usize, processor: F) -> Vec<R>
 where
     T: Clone,
     F: Fn(Vec<T>) -> Fut,
     Fut: std::future::Future<Output = Vec<R>>,
 {
     let mut results = Vec::new();
-    
+
     for chunk in items.chunks(batch_size) {
         let batch_results = processor(chunk.to_vec()).await;
         results.extend(batch_results);
     }
-    
+
     results
 }
 
 /// 并发处理函数
-pub async fn concurrent_process<T, R, F, Fut>(
-    items: Vec<T>,
-    max_concurrent: usize,
-    processor: F,
-) -> Vec<R>
+pub async fn concurrent_process<T, R, F, Fut>(items: Vec<T>, max_concurrent: usize, processor: F) -> Vec<R>
 where
     T: Send + 'static,
     R: Send + 'static,
     F: Fn(T) -> Fut + Send + Sync + Clone + 'static,
     Fut: std::future::Future<Output = R> + Send,
 {
-    use tokio::sync::Semaphore;
     use std::sync::Arc;
+    use tokio::sync::Semaphore;
 
     let semaphore = Arc::new(Semaphore::new(max_concurrent));
     let processor = Arc::new(processor);
-    
+
     let tasks: Vec<_> = items
         .into_iter()
         .map(|item| {
             let semaphore = semaphore.clone();
             let processor = processor.clone();
-            
+
             tokio::spawn(async move {
                 let _permit = semaphore.acquire().await.unwrap();
                 processor(item).await
@@ -153,7 +134,7 @@ where
             results.push(result);
         }
     }
-    
+
     results
 }
 
@@ -166,23 +147,19 @@ pub struct Debouncer<T> {
 
 impl<T> Debouncer<T> {
     pub fn new(delay: std::time::Duration) -> Self {
-        Self {
-            delay,
-            last_call: None,
-            pending_value: None,
-        }
+        Self { delay, last_call: None, pending_value: None }
     }
 
     pub fn call(&mut self, value: T) -> bool {
         let now = std::time::Instant::now();
-        
+
         if let Some(last) = self.last_call {
             if now.duration_since(last) < self.delay {
                 self.pending_value = Some(value);
                 return false;
             }
         }
-        
+
         self.last_call = Some(now);
         self.pending_value = Some(value);
         true
@@ -202,19 +179,15 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     pub fn new(max_requests: usize, window: std::time::Duration) -> Self {
-        Self {
-            max_requests,
-            window,
-            requests: Vec::new(),
-        }
+        Self { max_requests, window, requests: Vec::new() }
     }
 
     pub fn try_acquire(&mut self) -> bool {
         let now = std::time::Instant::now();
-        
+
         // 清理过期的请求
         self.requests.retain(|&time| now.duration_since(time) < self.window);
-        
+
         if self.requests.len() < self.max_requests {
             self.requests.push(now);
             true
@@ -227,4 +200,3 @@ impl RateLimiter {
         self.max_requests.saturating_sub(self.requests.len())
     }
 }
- 

@@ -1,5 +1,5 @@
+use super::{filter::QueryFilter, pagination::PaginationQuery};
 use serde::{Deserialize, Serialize};
-use super::{pagination::PaginationQuery, filter::QueryFilter};
 
 /// 通用查询参数
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -7,19 +7,13 @@ pub struct QueryParams {
     pub pagination: PaginationQuery,
     pub filter: QueryFilter,
     pub search: Option<String>,
-    pub fields: Option<Vec<String>>, // 指定返回字段
+    pub fields: Option<Vec<String>>,  // 指定返回字段
     pub include: Option<Vec<String>>, // 包含关联数据
 }
 
 impl QueryParams {
     pub fn new() -> Self {
-        Self {
-            pagination: PaginationQuery::default(),
-            filter: QueryFilter::default(),
-            search: None,
-            fields: None,
-            include: None,
-        }
+        Self { pagination: PaginationQuery::default(), filter: QueryFilter::default(), search: None, fields: None, include: None }
     }
 
     pub fn with_search(mut self, search: impl Into<String>) -> Self {
@@ -70,11 +64,7 @@ pub struct IdQuery {
 
 impl IdQuery {
     pub fn new(id: impl Into<String>) -> Self {
-        Self {
-            id: id.into(),
-            fields: None,
-            include: None,
-        }
+        Self { id: id.into(), fields: None, include: None }
     }
 
     pub fn with_fields(mut self, fields: Vec<String>) -> Self {
@@ -98,11 +88,7 @@ pub struct BatchIdQuery {
 
 impl BatchIdQuery {
     pub fn new(ids: Vec<String>) -> Self {
-        Self {
-            ids,
-            fields: None,
-            include: None,
-        }
+        Self { ids, fields: None, include: None }
     }
 
     pub fn with_fields(mut self, fields: Vec<String>) -> Self {

@@ -10,11 +10,9 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::Display;
 
-
 lazy_static! {
     static ref APP_SHORT: String = conf::rebit().read().expect("failed read rebit object").short.clone();
 }
-
 
 /// Zero
 pub static LAYOUTED_C_ZERO: &'static str = "0000";
@@ -25,11 +23,8 @@ pub type ResultE<T> = Result<T, Erx>;
 /// ResultEX = ResultE<()>;
 pub type ResultEX = ResultE<()>;
 
-
-
 /// Layouted: Some predefined Layouted methods
 pub struct Layouted;
-
 
 pub fn describe_error(e: &dyn std::error::Error) -> String {
     let mut description = e.to_string();
@@ -41,7 +36,6 @@ pub fn describe_error(e: &dyn std::error::Error) -> String {
     description
 }
 
-
 /// emp
 /// emp: error message processor - 将标准错误类型转换为Erx错误类型
 /// emp函数的作用是将任何实现了std::error::Error trait的错误转换为Erx错误类型：
@@ -52,7 +46,7 @@ pub fn describe_error(e: &dyn std::error::Error) -> String {
 /// - 在extra字段中添加"ORIGIN"键，值为完整的错误链描述
 /// 适用于需要保留原始错误完整信息的场景，特别是当错误具有复杂的因果链时
 /// 与smp函数的区别在于：emp专门处理Error类型并保留错误链信息，而smp只是简单的字符串转换
-/// 
+///
 /// # 示例
 /// ```
 /// let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "File not found");
@@ -85,7 +79,7 @@ pub fn smp<T: ToString>(error: T) -> Erx {
 /// - 使用默认的错误代码（LayoutedC::default()）
 /// - 不包含任何额外信息（extra字段为空）
 /// 适用于需要为一系列相关错误添加统一上下文信息的场景，比如在特定模块或函数中批量处理错误时
-/// 
+///
 /// # 示例
 /// ```
 /// let db_error_converter = amp("Database operation failed");
@@ -170,15 +164,12 @@ impl From<&str> for PreL4 {
         PreL4::from_str(s).unwrap_or(PreL4::OTHE)
     }
 }
-    
+
 impl From<PreL4> for String {
     fn from(value: PreL4) -> Self {
         value.four().to_string()
     }
 }
-
-
- 
 
 impl Layouted {
     /// fuzz_udf: 模糊未定义错误
@@ -241,7 +232,6 @@ pub struct LayoutedC {
     pub detail: String,
 }
 
-
 impl LayoutedC {
     pub fn okay() -> LayoutedC {
         LayoutedC {
@@ -279,14 +269,12 @@ impl LayoutedC {
         &self.detail
     }
 }
- 
+
 impl Default for LayoutedC {
     fn default() -> Self {
         LayoutedC { application: APP_SHORT.clone(), domain: PreL4::UNDF.into(), category: PreL4::UNDF.into(), detail: PreL4::UNDF.into() }
     }
 }
-
- 
 
 impl From<LayoutedC> for String {
     fn from(value: LayoutedC) -> Self {
@@ -299,7 +287,6 @@ impl From<LayoutedC> for bool {
         value.is_okc()
     }
 }
- 
 
 impl From<String> for LayoutedC {
     fn from(value: String) -> Self {
@@ -326,7 +313,6 @@ impl From<(String, String, String, String)> for LayoutedC {
         LayoutedC { application: value.0, domain: value.1, category: value.2, detail: value.3 }
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Erx {
@@ -436,21 +422,19 @@ impl Default for Erx {
         Erx { code: Default::default(), message: Default::default(), extra: Default::default() }
     }
 }
- 
+
 impl<T> Into<Result<T, Erx>> for Erx {
     fn into(self) -> Result<T, Erx> {
         Err(self)
     }
 }
 
- 
-
 impl From<Infallible> for Erx {
     fn from(_: Infallible) -> Self {
         Erx::default()
     }
 }
- 
+
 impl From<&str> for Erx {
     fn from(s: &str) -> Self {
         s.to_string().into()

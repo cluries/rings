@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
- 
+
 /// 验证错误
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidationError {
@@ -10,19 +10,11 @@ pub struct ValidationError {
 
 impl ValidationError {
     pub fn new(field: impl Into<String>, message: impl Into<String>) -> Self {
-        Self {
-            field: field.into(),
-            message: message.into(),
-            code: None,
-        }
+        Self { field: field.into(), message: message.into(), code: None }
     }
 
     pub fn with_code(field: impl Into<String>, message: impl Into<String>, code: impl Into<String>) -> Self {
-        Self {
-            field: field.into(),
-            message: message.into(),
-            code: Some(code.into()),
-        }
+        Self { field: field.into(), message: message.into(), code: Some(code.into()) }
     }
 }
 
@@ -35,17 +27,11 @@ pub struct ValidationResult {
 
 impl ValidationResult {
     pub fn valid() -> Self {
-        Self {
-            is_valid: true,
-            errors: Vec::new(),
-        }
+        Self { is_valid: true, errors: Vec::new() }
     }
 
     pub fn invalid(errors: Vec<ValidationError>) -> Self {
-        Self {
-            is_valid: false,
-            errors,
-        }
+        Self { is_valid: false, errors }
     }
 
     pub fn add_error(&mut self, error: ValidationError) {
@@ -73,4 +59,3 @@ impl ValidationResult {
 pub trait ValidationRule<T> {
     fn validate(&self, value: &T, field: &str) -> ValidationResult;
 }
- 

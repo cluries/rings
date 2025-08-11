@@ -20,7 +20,11 @@ impl Pagination {
     }
 
     pub fn offset(&self) -> usize {
-        if self.page == 0 { 0 } else { (self.page - 1) * self.size }
+        if self.page == 0 {
+            0
+        } else {
+            (self.page - 1) * self.size
+        }
     }
 
     pub fn raw_sql(&self) -> String {

@@ -2,9 +2,9 @@ pub mod dbms;
 pub mod facade;
 pub mod jsons;
 pub mod preset;
+pub mod rs;
 pub mod sql;
 pub mod status;
-pub mod rs;
 pub mod zero;
 
 use crate::erx;
@@ -26,7 +26,6 @@ use tracing::{info, span, warn};
 
 use crate::conf::{Backend, BackendKind, Dict};
 use crate::web::url;
-
 
 /// get shared DatabaseConnection
 /// panic if error

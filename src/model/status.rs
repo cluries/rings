@@ -24,7 +24,6 @@ const PREFIX_OK: &str = "OK(";
 const PREFIX_ERROR: &str = "ERR(";
 
 impl Status {
-
     /// parse from string
     pub fn parse(formated: &str) -> crate::erx::ResultE<Self> {
         let formated = formated.trim();
@@ -76,12 +75,12 @@ impl Status {
     pub fn is_ok(&self) -> bool {
         matches!(self, Status::OK(_, _))
     }
-    
+
     /// 检查是否为错误状态
     pub fn is_error(&self) -> bool {
         matches!(self, Status::Error(_, _))
     }
-    
+
     /// 获取状态码
     pub fn code(&self) -> i32 {
         match self {
@@ -90,7 +89,7 @@ impl Status {
             Status::MarkDeleted => MARK_DELETED,
         }
     }
-    
+
     /// 获取消息
     pub fn message(&self) -> &str {
         match self {

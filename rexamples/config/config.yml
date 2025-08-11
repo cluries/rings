@@ -5,7 +5,9 @@ debug: false
 web:
   api:
     port: 8080
-
+    middleware:
+      signator:
+        redis_url: "redis://127.0.0.1"
 
 model:
   backends:

@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod audio;
 pub mod balanced;
 pub mod captcha;
@@ -13,11 +14,10 @@ pub mod json;
 pub mod lua;
 pub mod mcp;
 pub mod number;
-pub mod ai;
+pub mod promptor;
 pub mod rand;
 pub mod strings;
 pub mod tests;
 pub mod validator;
 pub mod video;
 pub mod zip;
-pub mod promptor;

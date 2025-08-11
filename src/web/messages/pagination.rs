@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PagedList<T> {
     pub total: usize,
@@ -53,10 +52,7 @@ pub struct SortBy {
 
 impl SortBy {
     pub fn new(field: impl Into<String>, direction: SortDirection) -> Self {
-        Self {
-            field: field.into(),
-            direction,
-        }
+        Self { field: field.into(), direction }
     }
 
     pub fn asc(field: impl Into<String>) -> Self {
@@ -67,7 +63,6 @@ impl SortBy {
         Self::new(field, SortDirection::Desc)
     }
 }
-
 
 /// 分页查询参数
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -98,12 +93,7 @@ impl PaginationQuery {
 
 impl Default for PaginationQuery {
     fn default() -> Self {
-        Self {
-            page: Some(1),
-            page_size: Some(20),
-            sort_by: None,
-            sort_direction: None,
-        }
+        Self { page: Some(1), page_size: Some(20), sort_by: None, sort_direction: None }
     }
 }
 
@@ -120,19 +110,8 @@ pub struct PaginationMeta {
 
 impl PaginationMeta {
     pub fn new(current_page: usize, page_size: usize, total_items: usize) -> Self {
-        let total_pages = if page_size == 0 {
-            0
-        } else {
-            (total_items + page_size - 1) / page_size
-        };
+        let total_pages = if page_size == 0 { 0 } else { (total_items + page_size - 1) / page_size };
 
-        Self {
-            current_page,
-            page_size,
-            total_items,
-            total_pages,
-            has_next: current_page < total_pages,
-            has_prev: current_page > 1,
-        }
+        Self { current_page, page_size, total_items, total_pages, has_next: current_page < total_pages, has_prev: current_page > 1 }
     }
 }

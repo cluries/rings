@@ -22,7 +22,6 @@ pub struct Provider {
     pub key: String,
 }
 
-
 ///
 pub struct LLM {
     provider: Provider,

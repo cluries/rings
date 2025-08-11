@@ -460,7 +460,6 @@ impl Default for Context {
 
 /// if apply,methods,patterns all return None, this method is use for every request.
 pub trait Middleware: Send + Sync + std::fmt::Debug {
-
     fn middleware_name() -> &'static str
     where
         Self: Sized,
@@ -470,12 +469,12 @@ pub trait Middleware: Send + Sync + std::fmt::Debug {
 
     fn name(&self) -> &'static str;
 
-    fn on_request(&self, _context: Context, _request: Request) -> Option<MiddlewareFuture<Request>> {
-        None
+    fn on_request(&self, context: Context, request: Request) -> Result<MiddlewareFuture<Request>, (Context, Request)> {
+        Err((context, request))
     }
 
-    fn on_response(&self, _context: Context, _response: Response) -> Option<MiddlewareFuture<Response>> {
-        None
+    fn on_response(&self, context: Context, response: Response) -> Result<MiddlewareFuture<Response>, (Context, Response)> {
+        Err((context, response))
     }
 
     /// Optional: middleware priority, higher values have higher priority
@@ -572,7 +571,6 @@ impl Manager {
     pub fn integrated(manager: Arc<Manager>, router: axum::Router) -> axum::Router {
         router.layer(ManagerLayer { manager: Arc::clone(&manager) })
     }
-    
 }
 
 /// Convert ManagerLayer into a ServiceBuilder with Identity layer
@@ -646,8 +644,8 @@ where
                 let mut node = Node::new(name);
                 node.re_begin();
 
-                if let Some(f) = m.on_request(mictx, request.take().unwrap()) {
-                    match f.await {
+                match m.on_request(mictx, request.take().unwrap()) {
+                    Ok(f) => match f.await {
                         Ok(r) => {
                             context = Some(r.0);
                             request = Some(r.1);
@@ -657,7 +655,10 @@ where
                             context = Some(e.0);
                             tracing::error!("middleware '{}' on_request handle error: {}", name, e.1);
                         },
-                    }
+                    },
+                    Err((ctx, req)) => {
+                        //TODO
+                    },
                 }
 
                 node.re_end();
@@ -700,8 +701,8 @@ where
 
                 let mictx = context.take().unwrap();
 
-                if let Some(f) = m.on_response(mictx, response.take().unwrap()) {
-                    match f.await {
+                match m.on_response(mictx, response.take().unwrap()) {
+                    Ok(f) => match f.await {
                         Ok(r) => {
                             context = Some(r.0);
                             response = Some(r.1);
@@ -711,7 +712,8 @@ where
                             context = Some(e.0);
                             tracing::error!("middleware '{}' on_response handle error: {}", name, e.1);
                         },
-                    }
+                    },
+                    Err((ctx, res)) => {},
                 }
 
                 node.rs_end();
@@ -731,7 +733,7 @@ where
                 }
             }
 
-            Ok(response.unwrap())
+            Ok(response.unwrap_or_else(|| internal_server_error_response()))
         };
 
         Box::pin(implement)

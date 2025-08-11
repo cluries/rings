@@ -15,10 +15,7 @@ pub struct CreateOptions {
 
 impl Default for CreateOptions {
     fn default() -> Self {
-        Self {
-            return_created: true,
-            validate_only: false,
-        }
+        Self { return_created: true, validate_only: false }
     }
 }
 
@@ -40,12 +37,7 @@ pub struct UpdateOptions {
 
 impl Default for UpdateOptions {
     fn default() -> Self {
-        Self {
-            partial: true,
-            return_updated: true,
-            validate_only: false,
-            version: None,
-        }
+        Self { partial: true, return_updated: true, validate_only: false, version: None }
     }
 }
 
@@ -65,11 +57,7 @@ pub struct DeleteOptions {
 
 impl Default for DeleteOptions {
     fn default() -> Self {
-        Self {
-            soft_delete: false,
-            cascade: false,
-            return_deleted: false,
-        }
+        Self { soft_delete: false, cascade: false, return_deleted: false }
     }
 }
 
@@ -90,12 +78,7 @@ pub struct BatchCreateOptions {
 
 impl Default for BatchCreateOptions {
     fn default() -> Self {
-        Self {
-            continue_on_error: true,
-            return_created: false,
-            validate_only: false,
-            batch_size: Some(100),
-        }
+        Self { continue_on_error: true, return_created: false, validate_only: false, batch_size: Some(100) }
     }
 }
 
@@ -123,12 +106,7 @@ pub struct BatchUpdateOptions {
 
 impl Default for BatchUpdateOptions {
     fn default() -> Self {
-        Self {
-            continue_on_error: true,
-            partial: true,
-            return_updated: false,
-            validate_only: false,
-        }
+        Self { continue_on_error: true, partial: true, return_updated: false, validate_only: false }
     }
 }
 
@@ -149,12 +127,7 @@ pub struct BatchDeleteOptions {
 
 impl Default for BatchDeleteOptions {
     fn default() -> Self {
-        Self {
-            continue_on_error: true,
-            soft_delete: false,
-            cascade: false,
-            return_deleted: false,
-        }
+        Self { continue_on_error: true, soft_delete: false, cascade: false, return_deleted: false }
     }
 }
 
@@ -169,29 +142,14 @@ pub struct CrudResult<T> {
 
 impl<T> CrudResult<T> {
     pub fn success(data: T, affected_rows: usize) -> Self {
-        Self {
-            success: true,
-            data: Some(data),
-            affected_rows,
-            message: None,
-        }
+        Self { success: true, data: Some(data), affected_rows, message: None }
     }
 
     pub fn success_with_message(data: T, affected_rows: usize, message: impl Into<String>) -> Self {
-        Self {
-            success: true,
-            data: Some(data),
-            affected_rows,
-            message: Some(message.into()),
-        }
+        Self { success: true, data: Some(data), affected_rows, message: Some(message.into()) }
     }
 
     pub fn error(message: impl Into<String>) -> Self {
-        Self {
-            success: false,
-            data: None,
-            affected_rows: 0,
-            message: Some(message.into()),
-        }
+        Self { success: false, data: None, affected_rows: 0, message: Some(message.into()) }
     }
 }

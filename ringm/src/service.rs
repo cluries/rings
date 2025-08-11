@@ -10,7 +10,11 @@ static SERVICE_MACRO_RESOLVES: std::sync::RwLock<Vec<(String, String)>> = std::s
 
 fn join_crate(parts: &Vec<String>) -> String {
     let parts: Vec<String> = parts.iter().filter(|s| s.trim().len() > 0).map(|x| x.clone()).collect();
-    if parts.len() > 0 { parts.join("::").to_string() } else { String::new() }
+    if parts.len() > 0 {
+        parts.join("::").to_string()
+    } else {
+        String::new()
+    }
 }
 
 #[cfg(feature = "serivce_macro_use_func")]

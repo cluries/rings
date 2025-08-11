@@ -23,7 +23,7 @@ pub async fn clone_request(req: axum::extract::Request) -> (axum::extract::Reque
         axum::extract::Request::from_parts(parts.clone(), axum::body::Body::from(bytes.clone())),
     )
 }
- 
+
 /// 可重用的请求克隆器 - 适合需要多次克隆的场景
 pub struct RequestCloner {
     parts: Arc<axum::http::request::Parts>,
@@ -56,4 +56,3 @@ impl RequestCloner {
         self.body_bytes.is_empty()
     }
 }
-  

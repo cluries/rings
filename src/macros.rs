@@ -12,7 +12,6 @@ macro_rules! s {
     };
 }
 
-
 /// 将标识符转换为字符串字面量的宏
 ///
 /// # 示例
@@ -26,7 +25,6 @@ macro_rules! ms {
         stringify!($x)
     };
 }
-
 
 /// 将标识符转换为 String 对象的宏
 ///
@@ -142,7 +140,11 @@ macro_rules! result_message {
 #[macro_export]
 macro_rules! ternary {
     ($condition:expr, $true_value:expr, $false_value:expr) => {
-        if $condition { $true_value } else { $false_value }
+        if $condition {
+            $true_value
+        } else {
+            $false_value
+        }
     };
 }
 
@@ -203,7 +205,9 @@ macro_rules! its_service {
 /// ```
 #[macro_export]
 macro_rules! hey_service {
-    ($e:ident) => {{ $e::its_service().await }};
+    ($e:ident) => {{
+        $e::its_service().await
+    }};
 }
 
 /// 导入 SeaORM 常用类型和 trait 的宏

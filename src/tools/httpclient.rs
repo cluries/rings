@@ -303,5 +303,3 @@ impl Client {
         }
     }
 }
-
-

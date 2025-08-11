@@ -14,12 +14,10 @@ static RINGS: RwLock<Vec<RingsApplication>> = RwLock::new(Vec::new());
 
 static RINGS_INVOKE_MACRO: RwLock<Vec<(String, fn())>> = RwLock::new(Vec::new());
 
-
 /// name: ringsapp name
 pub fn add_rings_invoke_macro(name: &str, func: fn()) {
     RINGS_INVOKE_MACRO.write().unwrap().push((name.to_string(), func));
 }
-
 
 /// Rings Application
 pub struct Rings {
@@ -191,16 +189,18 @@ impl R {
                 // the support for multiple RingApps in other components
                 // like ServiceManager, SchedulerManager, and Model.
                 if rings.len() > 1 {
-                    panic!("Sorry, you've already registered an app. \
+                    panic!(
+                        "Sorry, you've already registered an app. \
                     The current version only supports registering one app. \
-                    We'll support multiple apps as soon as possible.");
+                    We'll support multiple apps as soon as possible."
+                    );
                 }
 
                 rings.push(Arc::clone(&arc));
-            }
+            },
             Err(ex) => {
                 error!("make rings push RINGS: {}", ex);
-            }
+            },
         }
 
         info!("rings application:{} made", name);
@@ -219,10 +219,10 @@ impl R {
         match rings_app.try_write() {
             Ok(mut guard) => {
                 guard.fire().await;
-            }
+            },
             Err(ex) => {
                 error!("{}", ex);
-            }
+            },
         };
 
         Rings::serve(&rings_app).await;
@@ -276,10 +276,10 @@ impl Rings {
             match md.shutdown().await {
                 Ok(_) => {
                     info!("rings mod:[ {} ] shutdown accepted", md.name());
-                }
+                },
                 Err(ex) => {
                     error!("failed to signal shutdown: {} error: {}", md.name(), ex.message());
-                }
+                },
             }
         }
     }
@@ -419,10 +419,10 @@ impl Rings {
         match app.write() {
             Ok(mut write_app) => {
                 write_app.shutdown().await;
-            }
+            },
             Err(er) => {
                 error!("failed to listen_signal_kill: {}", er);
-            }
+            },
         };
     }
 
@@ -455,10 +455,10 @@ impl Rings {
 
                     let mod_stages = ring.mods_stages();
                     info!("mod stages: {:?}", mod_stages);
-                }
+                },
                 Err(_) => {
                     consecutive_failures += 1;
-                }
+                },
             }
         }
 
@@ -477,9 +477,8 @@ impl Rings {
     }
 }
 
-
 #[cfg(test)]
-mod tests{
+mod tests {
 
     #[tokio::test]
     async fn test_rings() {

@@ -458,7 +458,7 @@ impl Middleware for Signator {
         Signator::middleware_name()
     }
 
-    fn on_request(&self, context: Context, request: Request) -> Option<MiddlewareFuture<Request>> {
+    fn on_request(&self, context: Context, request: Request) -> Result<MiddlewareFuture<Request>, (Context, Request)> {
         let signator = self.clone();
 
         // Creates an asynchronous future that handles the authentication process for incoming requests.
@@ -496,12 +496,10 @@ impl Middleware for Signator {
             }
         });
 
-        Some(future)
+        Ok(future)
     }
 
-    fn on_response(&self, _context: Context, _response: Response) -> Option<MiddlewareFuture<Response>> {
-        None
-    }
+
 
     /// 可选：中间件优先级，数值越大优先级越高
     fn priority(&self) -> i32 {

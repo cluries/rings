@@ -39,4 +39,3 @@ pub use tracing_appender;
 pub use tracing_serde;
 pub use tracing_subscriber;
 pub use url;
-

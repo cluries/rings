@@ -5,18 +5,18 @@ pub mod context;
 pub mod cookie;
 pub mod define;
 pub mod except;
+pub mod input;
 pub mod javascript;
 pub mod luaction;
 pub mod messages;
 pub mod middleware;
 pub mod request;
 pub mod route;
-pub mod validation;
 pub mod session;
 pub mod tools;
 pub mod types;
 pub mod url;
-pub mod input;
+pub mod validation;
 
 use crate::rings::{RingState, RingsMod, SafeRS};
 use crate::web::luaction::LuaAction;
@@ -45,8 +45,6 @@ macro_rules! web_route_merge {
 
 // #[derive(Clone)]
 // pub struct WebState {}
- 
- 
 
 pub struct Web {
     name: String,
@@ -59,7 +57,9 @@ pub struct Web {
     middleware_manager: Arc<crate::web::middleware::Manager>,
 }
 
-pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>, middlewares:Vec<Box<dyn crate::web::middleware::Middleware>>) -> Web {
+pub fn make_web(
+    name: &str, bind: &str, router_maker: fn() -> Vec<Router>, middlewares: Vec<Box<dyn crate::web::middleware::Middleware>>,
+) -> Web {
     Web {
         name: name.to_string(),
         bind: bind.to_string(),
@@ -67,9 +67,7 @@ pub fn make_web(name: &str, bind: &str, router_maker: fn() -> Vec<Router>, middl
         stage: RingState::srs_init(),
         luactions: Default::default(),
         router_maker,
-        middleware_manager: Arc::new(
-            crate::web::middleware::Manager::new(middlewares)
-        ),
+        middleware_manager: Arc::new(crate::web::middleware::Manager::new(middlewares)),
         router_reconfiger: None,
     }
 }
@@ -89,8 +87,6 @@ impl Web {
             router = router.merge(route);
         }
 
-
-      
         let luactions = self.luactions.read().expect("luactions lock poisoned");
         if luactions.len() > 0 {
             info!("lua action found. adding lua [{}] actions", luactions.len());
@@ -124,9 +120,6 @@ impl Web {
     pub fn middleware_manager(&mut self) -> Arc<crate::web::middleware::Manager> {
         Arc::clone(&self.middleware_manager)
     }
-
-   
-
 }
 
 #[async_trait]
@@ -193,7 +186,6 @@ impl RingsMod for Web {
     // }
 
     async fn fire(&mut self) -> Result<(), crate::erx::Erx> {
-
         let web_listen = |name: String, bind: String, router: Router, stage: Arc<RwLock<RingState>>| async move {
             let listen = tokio::net::TcpListener::bind(bind.as_str()).await;
             if listen.is_err() {
@@ -220,10 +212,8 @@ impl RingsMod for Web {
             // *stage.write().unwrap() = RingState::Terminated;
             let _ = RingState::srs_set_must(&stage, RingState::Terminated);
         };
-         
-        let integrated_router = crate::web::middleware::Manager::integrated(
-            self.middleware_manager.clone(), self.router.clone()
-        );
+
+        let integrated_router = crate::web::middleware::Manager::integrated(self.middleware_manager.clone(), self.router.clone());
 
         tokio::spawn(web_listen(self.name.clone(), self.bind.clone(), integrated_router, Arc::clone(&self.stage)));
 

@@ -3,18 +3,18 @@ use serde::{Deserialize, Serialize};
 /// 过滤操作符
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum FilterOperator {
-    Eq,      // 等于
-    Ne,      // 不等于
-    Gt,      // 大于
-    Gte,     // 大于等于
-    Lt,      // 小于
-    Lte,     // 小于等于
-    Like,    // 模糊匹配
-    In,      // 在列表中
-    NotIn,   // 不在列表中
-    IsNull,  // 为空
+    Eq,        // 等于
+    Ne,        // 不等于
+    Gt,        // 大于
+    Gte,       // 大于等于
+    Lt,        // 小于
+    Lte,       // 小于等于
+    Like,      // 模糊匹配
+    In,        // 在列表中
+    NotIn,     // 不在列表中
+    IsNull,    // 为空
     IsNotNull, // 不为空
-    Between, // 在范围内
+    Between,   // 在范围内
 }
 
 /// 过滤条件
@@ -27,43 +27,23 @@ pub struct FilterCondition {
 
 impl FilterCondition {
     pub fn eq(field: impl Into<String>, value: impl Into<serde_json::Value>) -> Self {
-        Self {
-            field: field.into(),
-            operator: FilterOperator::Eq,
-            value: value.into(),
-        }
+        Self { field: field.into(), operator: FilterOperator::Eq, value: value.into() }
     }
 
     pub fn ne(field: impl Into<String>, value: impl Into<serde_json::Value>) -> Self {
-        Self {
-            field: field.into(),
-            operator: FilterOperator::Ne,
-            value: value.into(),
-        }
+        Self { field: field.into(), operator: FilterOperator::Ne, value: value.into() }
     }
 
     pub fn gt(field: impl Into<String>, value: impl Into<serde_json::Value>) -> Self {
-        Self {
-            field: field.into(),
-            operator: FilterOperator::Gt,
-            value: value.into(),
-        }
+        Self { field: field.into(), operator: FilterOperator::Gt, value: value.into() }
     }
 
     pub fn like(field: impl Into<String>, pattern: impl Into<String>) -> Self {
-        Self {
-            field: field.into(),
-            operator: FilterOperator::Like,
-            value: serde_json::Value::String(pattern.into()),
-        }
+        Self { field: field.into(), operator: FilterOperator::Like, value: serde_json::Value::String(pattern.into()) }
     }
 
     pub fn is_null(field: impl Into<String>) -> Self {
-        Self {
-            field: field.into(),
-            operator: FilterOperator::IsNull,
-            value: serde_json::Value::Null,
-        }
+        Self { field: field.into(), operator: FilterOperator::IsNull, value: serde_json::Value::Null }
     }
 }
 
@@ -82,10 +62,7 @@ pub enum LogicOperator {
 
 impl QueryFilter {
     pub fn new() -> Self {
-        Self {
-            conditions: Vec::new(),
-            logic: LogicOperator::And,
-        }
+        Self { conditions: Vec::new(), logic: LogicOperator::And }
     }
 
     pub fn and(mut self, condition: FilterCondition) -> Self {
@@ -125,11 +102,7 @@ pub struct SearchQuery {
 
 impl SearchQuery {
     pub fn new() -> Self {
-        Self {
-            keyword: None,
-            filters: QueryFilter::new(),
-            fields: None,
-        }
+        Self { keyword: None, filters: QueryFilter::new(), fields: None }
     }
 
     pub fn with_keyword(mut self, keyword: impl Into<String>) -> Self {

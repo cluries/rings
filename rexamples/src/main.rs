@@ -17,7 +17,7 @@ async fn main() {
 
     let mut rc: Vec<AppBuilderWebReconfigor> = vec![
         AppBuilderWebReconfigor{
-            name: String::from("API"), 
+            name: String::from("api"),
             router_maker: api_actions, 
             reconfigor: |x| {
                 fn extra(router: axum::Router) -> axum::Router {

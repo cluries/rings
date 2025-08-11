@@ -9,7 +9,7 @@ impl CookieJar {
     /// 从请求头创建 CookieJar
     pub fn from_headers(headers: &HeaderMap) -> Self {
         let mut cookies = std::collections::HashMap::new();
-        
+
         if let Some(cookie_header) = headers.get("cookie") {
             if let Ok(cookie_str) = cookie_header.to_str() {
                 for cookie in cookie_str.split(';') {
@@ -20,16 +20,13 @@ impl CookieJar {
                 }
             }
         }
-        
+
         Self { cookies }
     }
-    
+
     /// 获取指定名称的 cookie
     pub fn get(&self, name: &str) -> Option<Cookie> {
-        self.cookies.get(name).map(|value| Cookie {
-            name: name.to_string(),
-            value: value.clone(),
-        })
+        self.cookies.get(name).map(|value| Cookie { name: name.to_string(), value: value.clone() })
     }
 }
 
@@ -44,7 +41,7 @@ impl Cookie {
     pub fn value(&self) -> &str {
         &self.value
     }
-    
+
     /// 获取 cookie 名称
     pub fn name(&self) -> &str {
         &self.name

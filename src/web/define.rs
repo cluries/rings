@@ -10,7 +10,6 @@ pub enum HttpMethod {
     PATCH,
 }
 
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum HttpCode {
     // 1xx: 信息响应
