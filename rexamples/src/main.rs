@@ -2,7 +2,7 @@ use rings::{
     app::{AppBuilder, AppBuilderWebReconfigor},
     axum, rings::R, tokio
 };
-use web::action::api::api_actions;
+use web::{action::api::api_actions, middleware::api::signator::use_signator};
 
 
 #[tokio::main]
@@ -26,7 +26,7 @@ async fn main() {
                 x.set_router_reconfiger(extra)
             },
             middlewares: vec![
-                
+                Box::new(use_signator())
             ]
         }
     ];
