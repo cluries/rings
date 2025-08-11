@@ -3,6 +3,7 @@ use rings::axum::Router;
 use std::sync::Arc;
 use std::pin::Pin;
 use std::future::Future;
+use rings::tools::rand::rand_i64;
 use rings::web::middleware::signator::{
     Signator,
     SignatorConfig
@@ -30,5 +31,5 @@ fn signator_conf() -> std::collections::HashMap<String, String> {
 
 async fn sig_key_loader(u: String) -> Result<String, rings::erx::Erx> {
     println!("API:loading key from {}", u);
-    Ok(u)
+    Ok(format!("{}-{}", u, rand_i64(1,10000000)))
 }
