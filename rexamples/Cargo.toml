@@ -17,7 +17,7 @@ service = { path = "service" }
 
 
 [workspace]
-members = ["model",  "schedule", "service", "web"]
+members = ["model", "schedule", "service", "web"]
 
 [workspace.dependencies]
 rings = {path = "../."}
