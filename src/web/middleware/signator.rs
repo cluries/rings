@@ -496,7 +496,7 @@ impl Middleware for Signator {
             }
         });
 
-        MiddlewareImpl::Impled(future)
+        MiddlewareImpl::Implemented(future)
     }
 
     /// 可选：中间件优先级，数值越大优先级越高

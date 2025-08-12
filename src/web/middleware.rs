@@ -29,8 +29,8 @@ pub type MiddlewareEventErr<T> = (Context, Option<T>, Option<erx::Erx>);
 pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<(Context, T), MiddlewareEventErr<T>>> + Send>>;
 
 pub enum MiddlewareImpl<T, E> {
-    Impled(T),
-    UnImpled(E),
+    Implemented(T),
+    Unimplemented(E),
 }
 
 pub trait ApplyTrait {
@@ -478,13 +478,13 @@ pub trait Middleware: Send + Sync + std::fmt::Debug {
     fn name(&self) -> &'static str;
 
     fn on_request(&self, context: Context, request: Request) -> MiddlewareImpl<MiddlewareFuture<Request>, MiddlewareEventErr<Request>> {
-        MiddlewareImpl::UnImpled((context, Some(request), None))
+        MiddlewareImpl::Unimplemented((context, Some(request), None))
     }
 
     fn on_response(
         &self, context: Context, response: Response,
     ) -> MiddlewareImpl<MiddlewareFuture<Response>, MiddlewareEventErr<Response>> {
-        MiddlewareImpl::UnImpled((context, Some(response), None))
+        MiddlewareImpl::Unimplemented((context, Some(response), None))
     }
 
     /// Optional: middleware priority, higher values have higher priority
@@ -655,7 +655,7 @@ where
                 node.re_begin();
 
                 match m.on_request(mictx, request.take().unwrap()) {
-                    MiddlewareImpl::Impled(f) => match f.await {
+                    MiddlewareImpl::Implemented(f) => match f.await {
                         Ok((ctx, req)) => {
                             context = Some(ctx);
                             request = Some(req);
@@ -670,7 +670,7 @@ where
                             tracing::error!("middleware '{}' on_request handle error: {}", name, em);
                         },
                     },
-                    MiddlewareImpl::UnImpled((ctx, req, _ex)) => {
+                    MiddlewareImpl::Unimplemented((ctx, req, _ex)) => {
                         context = Some(ctx);
                         match req {
                             Some(req) => {
@@ -722,7 +722,7 @@ where
                 let mictx = context.take().unwrap();
 
                 match m.on_response(mictx, response.take().unwrap()) {
-                    MiddlewareImpl::Impled(f) => match f.await {
+                    MiddlewareImpl::Implemented(f) => match f.await {
                         Ok((ctx, res)) => {
                             context = Some(ctx);
                             response = Some(res);
@@ -737,7 +737,7 @@ where
                             tracing::error!("middleware '{}' on_response handle error: {}", name, em);
                         },
                     },
-                    MiddlewareImpl::UnImpled((ctx, res, _e)) => {
+                    MiddlewareImpl::Unimplemented((ctx, res, _e)) => {
                         context = Some(ctx);
                         match res {
                             Some(res) => {
@@ -749,7 +749,7 @@ where
                 }
 
                 node.rs_end();
-                
+
                 let _ = manager.metrics_update(name, |m| {
                     m.add_response(node.response.errored, node.response.elapsed);
                     Ok(())
