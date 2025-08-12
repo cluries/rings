@@ -59,3 +59,4 @@ pub fn get_query_value(query:&str, name:&str) -> Option<String> {
     let query = parse_query(query);
     query.get(name).cloned()
 }
+
