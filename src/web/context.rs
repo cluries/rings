@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Ident {
     pub ident: String,
@@ -10,6 +9,7 @@ pub struct Ident {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Context {
     ident: Option<Ident>,
+    ident_history: Vec<Ident>,
     born_micros: i64,
     vals: HashMap<String, String>,
 }
@@ -23,7 +23,11 @@ impl Context {
         self.born_micros
     }
 
-    pub fn set_ident(&mut self, ident: String, by:String) -> &mut Self {
+    pub fn set_ident(&mut self, ident: String, by: String) -> &mut Self {
+        if let Some(ident) = self.ident.take() {
+            self.ident_history.push(ident);
+        }
+
         self.ident = Some(Ident { ident: ident, by: by });
         self
     }
@@ -35,7 +39,7 @@ impl Context {
     pub fn ident_must(&self) -> String {
         self.ident.as_ref().map(|ident| ident.ident.clone()).unwrap_or_default()
     }
- 
+
     pub fn get_str(&self, key: &str) -> Option<String> {
         self.vals.get(key).cloned()
     }
@@ -47,10 +51,11 @@ impl Context {
     pub fn set_str(&mut self, key: &str, val: &str) {
         self.vals.insert(key.to_string(), val.to_string());
     }
+    
 }
 
 impl Default for Context {
     fn default() -> Self {
-        Self { ident: None, born_micros: chrono::Utc::now().timestamp_micros(), vals: HashMap::new() }
+        Self { ident: None, ident_history: vec![], born_micros: chrono::Utc::now().timestamp_micros(), vals: HashMap::new() }
     }
 }
