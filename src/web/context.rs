@@ -1,33 +1,41 @@
 use std::collections::HashMap;
 
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Ident {
+    pub ident: String,
+    pub by: String,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Context {
-    ident: String,
-    born: i64,
+    ident: Option<Ident>,
+    born_micros: i64,
     vals: HashMap<String, String>,
 }
 
 impl Context {
-    pub fn new(ident: String) -> Context {
-        Context { ident, born: chrono::Utc::now().timestamp_micros(), vals: HashMap::new() }
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn get_born(&self) -> i64 {
-        self.born
+    pub fn get_born_micros(&self) -> i64 {
+        self.born_micros
     }
 
-    pub fn set_ident(&mut self, ident: String) {
-        self.ident = ident;
+    pub fn set_ident(&mut self, ident: String, by:String) -> &mut Self {
+        self.ident = Some(Ident { ident: ident, by: by });
+        self
     }
 
-    pub fn get_ident_ref(&self) -> &str {
-        &self.ident
+    pub fn ident_direct(&self) -> Option<String> {
+        self.ident.as_ref().map(|ident| ident.ident.clone())
     }
 
-    pub fn get_ident(&self) -> String {
-        self.ident.clone()
+    pub fn ident_must(&self) -> String {
+        self.ident.as_ref().map(|ident| ident.ident.clone()).unwrap_or_default()
     }
-
+ 
     pub fn get_str(&self, key: &str) -> Option<String> {
         self.vals.get(key).cloned()
     }
@@ -43,6 +51,6 @@ impl Context {
 
 impl Default for Context {
     fn default() -> Self {
-        Self::new(String::new())
+        Self { ident: None, born_micros: chrono::Utc::now().timestamp_micros(), vals: HashMap::new() }
     }
 }

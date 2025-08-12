@@ -640,7 +640,11 @@ where
             let mut middles = manager.applies(&parts);
 
             let mut context = Some(Context::new());
-            let mut request = Some(Request::from_parts(parts, body));
+            let mut request = Request::from_parts(parts, body);
+
+            request.extensions_mut().insert(crate::web::context::Context::new());
+
+            let mut request = Some(request);
             let mut counter: usize = 0;
 
             for m in middles.iter_mut() {
@@ -664,7 +668,9 @@ where
                             node.re_errored();
                             context = Some(ctx);
 
-                            if let Some(_req) = req {}
+                            if let Some(req) = req {
+                                request = Some(req);
+                            }
 
                             let em = ex.map_or_else(|| "None".to_string(), |e| e.to_string());
                             tracing::error!("middleware '{}' on_request handle error: {}", name, em);
@@ -731,20 +737,22 @@ where
                             node.rs_errored();
                             context = Some(ctx);
 
-                            if let Some(_res) = res {}
+                            if let Some(res) = res {
+                                response = Some(res);
+                            }
 
                             let em = ex.map_or_else(|| "None".to_string(), |e| e.to_string());
                             tracing::error!("middleware '{}' on_response handle error: {}", name, em);
                         },
                     },
-                    MiddlewareImpl::Unimplemented((ctx, res, _e)) => {
+                    MiddlewareImpl::Unimplemented((ctx, res, _ex)) => {
                         context = Some(ctx);
                         match res {
                             Some(res) => {
                                 response = Some(res);
                             },
                             None => {},
-                        }
+                        };
                     },
                 }
 
@@ -766,7 +774,7 @@ where
                 }
             }
 
-            Ok(response.unwrap_or_else(|| internal_server_error_response()))
+            Ok(response.unwrap_or_else(internal_server_error_response))
         };
 
         Box::pin(implement)

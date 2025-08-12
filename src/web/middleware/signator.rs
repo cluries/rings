@@ -395,8 +395,10 @@ impl Signator {
 
         self.validate_nonce(&payload).await?;
 
-        let context = crate::web::context::Context::new(payload.get_user_id());
-        request.extensions_mut().insert(context);
+        request
+            .extensions_mut()
+            .get_or_insert_default::<crate::web::context::Context>()
+            .set_ident(payload.get_user_id(), self.name().to_string());
 
         Ok(request)
     }

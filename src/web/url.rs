@@ -53,3 +53,9 @@ pub fn parse_query(query: &str) -> HashMap<String, String> {
 
     url::form_urlencoded::parse(query.as_bytes()).into_owned().collect()
 }
+
+
+pub fn get_query_value(query:&str, name:&str) -> Option<String> {
+    let query = parse_query(query);
+    query.get(name).cloned()
+}
