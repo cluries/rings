@@ -23,7 +23,15 @@ use tower::{
 static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(|| Default::default());
 
 ///
-pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<(Context, T), (Context, erx::Erx)>> + Send>>;
+pub type MiddlewareEventErr<T> = (Context, Option<T>, Option<erx::Erx>);
+
+///
+pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<(Context, T), MiddlewareEventErr<T>>> + Send>>;
+
+pub enum MiddlewareImpl<T, E> {
+    Impled(T),
+    UnImpled(E),
+}
 
 pub trait ApplyTrait {
     fn apply(&self, value: &str) -> bool;
@@ -469,12 +477,14 @@ pub trait Middleware: Send + Sync + std::fmt::Debug {
 
     fn name(&self) -> &'static str;
 
-    fn on_request(&self, context: Context, request: Request) -> Result<MiddlewareFuture<Request>, (Context, Request)> {
-        Err((context, request))
+    fn on_request(&self, context: Context, request: Request) -> MiddlewareImpl<MiddlewareFuture<Request>, MiddlewareEventErr<Request>> {
+        MiddlewareImpl::UnImpled((context, Some(request), None))
     }
 
-    fn on_response(&self, context: Context, response: Response) -> Result<MiddlewareFuture<Response>, (Context, Response)> {
-        Err((context, response))
+    fn on_response(
+        &self, context: Context, response: Response,
+    ) -> MiddlewareImpl<MiddlewareFuture<Response>, MiddlewareEventErr<Response>> {
+        MiddlewareImpl::UnImpled((context, Some(response), None))
     }
 
     /// Optional: middleware priority, higher values have higher priority
@@ -645,19 +655,27 @@ where
                 node.re_begin();
 
                 match m.on_request(mictx, request.take().unwrap()) {
-                    Ok(f) => match f.await {
-                        Ok(r) => {
-                            context = Some(r.0);
-                            request = Some(r.1);
+                    MiddlewareImpl::Impled(f) => match f.await {
+                        Ok((ctx, req)) => {
+                            context = Some(ctx);
+                            request = Some(req);
                         },
-                        Err(e) => {
+                        Err((ctx, _req, ex)) => {
                             node.re_errored();
-                            context = Some(e.0);
-                            tracing::error!("middleware '{}' on_request handle error: {}", name, e.1);
+                            context = Some(ctx);
+
+                            let em = ex.map_or_else(|| "None".to_string(), |e| e.to_string());
+                            tracing::error!("middleware '{}' on_request handle error: {}", name, em);
                         },
                     },
-                    Err((ctx, req)) => {
-                        //TODO
+                    MiddlewareImpl::UnImpled((ctx, req, _ex)) => {
+                        context = Some(ctx);
+                        match req {
+                            Some(req) => {
+                                request = Some(req);
+                            },
+                            None => {},
+                        }
                     },
                 }
 
@@ -702,19 +720,27 @@ where
                 let mictx = context.take().unwrap();
 
                 match m.on_response(mictx, response.take().unwrap()) {
-                    Ok(f) => match f.await {
-                        Ok(r) => {
-                            context = Some(r.0);
-                            response = Some(r.1);
+                    MiddlewareImpl::Impled(f) => match f.await {
+                        Ok((ctx, res)) => {
+                            context = Some(ctx);
+                            response = Some(res);
                         },
-                        Err(e) => {
+                        Err((ctx, _res, ex)) => {
                             node.rs_errored();
-                            context = Some(e.0);
-                            tracing::error!("middleware '{}' on_response handle error: {}", name, e.1);
+                            context = Some(ctx);
+
+                            let em = ex.map_or_else(|| "None".to_string(), |e| e.to_string());
+                            tracing::error!("middleware '{}' on_response handle error: {}", name, em);
                         },
                     },
-                    Err((ctx, res)) => {
-                        //TODO
+                    MiddlewareImpl::UnImpled((ctx, res, _e)) => {
+                        context = Some(ctx);
+                        match res {
+                            Some(res) => {
+                                response = Some(res);
+                            },
+                            None => {},
+                        }
                     },
                 }
 

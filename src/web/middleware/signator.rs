@@ -1,12 +1,12 @@
 use crate::erx::{Erx, Layouted};
 use crate::tools::hash;
 use crate::web::api::Out;
-use crate::web::middleware::{ApplyKind, Context, Middleware, MiddlewareFuture, Pattern};
+use crate::web::middleware::{ApplyKind, Context, Middleware, MiddlewareEventErr, MiddlewareFuture, MiddlewareImpl, Pattern};
 use crate::web::{define::HttpMethod, request::clone_request, url::parse_query};
 use axum::{
     extract::Request,
     http::{request::Parts, HeaderMap, HeaderValue},
-    response::{IntoResponse, Response},
+    response::IntoResponse,
 };
 use redis::AsyncCommands;
 use serde::Serialize;
@@ -458,7 +458,7 @@ impl Middleware for Signator {
         Signator::middleware_name()
     }
 
-    fn on_request(&self, context: Context, request: Request) -> Result<MiddlewareFuture<Request>, (Context, Request)> {
+    fn on_request(&self, context: Context, request: Request) -> MiddlewareImpl<MiddlewareFuture<Request>, MiddlewareEventErr<Request>> {
         let signator = self.clone();
 
         // Creates an asynchronous future that handles the authentication process for incoming requests.
@@ -491,15 +491,13 @@ impl Middleware for Signator {
 
                     let mut context = context;
                     context.make_abort_with_response(Signator::middleware_name(), message, out.into_response());
-                    Err((context, erx))
+                    Err((context, None, Some(erx)))
                 },
             }
         });
 
-        Ok(future)
+        MiddlewareImpl::Impled(future)
     }
-
-
 
     /// 可选：中间件优先级，数值越大优先级越高
     fn priority(&self) -> i32 {
