@@ -660,9 +660,11 @@ where
                             context = Some(ctx);
                             request = Some(req);
                         },
-                        Err((ctx, _req, ex)) => {
+                        Err((ctx, req, ex)) => {
                             node.re_errored();
                             context = Some(ctx);
+
+                            if let Some(_req) = req {}
 
                             let em = ex.map_or_else(|| "None".to_string(), |e| e.to_string());
                             tracing::error!("middleware '{}' on_request handle error: {}", name, em);
@@ -725,9 +727,11 @@ where
                             context = Some(ctx);
                             response = Some(res);
                         },
-                        Err((ctx, _res, ex)) => {
+                        Err((ctx, res, ex)) => {
                             node.rs_errored();
                             context = Some(ctx);
+
+                            if let Some(_res) = res {}
 
                             let em = ex.map_or_else(|| "None".to_string(), |e| e.to_string());
                             tracing::error!("middleware '{}' on_response handle error: {}", name, em);
@@ -745,6 +749,7 @@ where
                 }
 
                 node.rs_end();
+                
                 let _ = manager.metrics_update(name, |m| {
                     m.add_response(node.response.errored, node.response.elapsed);
                     Ok(())
