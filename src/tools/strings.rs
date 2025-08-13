@@ -5,11 +5,7 @@ pub enum IgnoreCase {
     Suffix(String),
 }
 
-/// Sub string tools.
-pub struct Sub;
-
-/// Word tools.
-pub struct Word;
+ 
 
 impl IgnoreCase {
     pub fn matches(&self, s: &str) -> bool {
@@ -55,7 +51,7 @@ impl IgnoreCase {
     }
 }
 
-impl Sub {
+pub mod suber {
     pub fn head(s: &str, size: usize) -> String {
         s.chars().take(size).collect::<String>()
     }
@@ -98,7 +94,7 @@ impl Sub {
     }
 }
 
-impl Word {
+pub mod word {
     pub fn count(s: &str) -> usize {
         s.split_whitespace().count()
     }
@@ -192,7 +188,7 @@ mod tests {
         let s = "china is huge and strong";
         let start = "is";
         let end = "and";
-        let result = Sub::extract(s, start, end);
+        let result = suber::extract(s, start, end);
         println!("{:?}", result);
     }
 }

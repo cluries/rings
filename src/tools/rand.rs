@@ -2,6 +2,7 @@ use chrono::Datelike;
 use rand::prelude::ThreadRng;
 use rand::Rng;
 
+
 pub fn rand_bool() -> bool {
     use rand::Rng;
     let mut rng = rand::rng();
@@ -30,21 +31,6 @@ pub fn rand_str(len: usize) -> String {
     s
 }
 
-fn _rand_date_numbers(rng: &mut ThreadRng) -> (i32, i32, i32) {
-    let year_end = chrono::Utc::now().year();
-    let year = rng.random_range(1970..year_end);
-    let month = rng.random_range(1..13);
-    let day = if month == 2 {
-        rng.random_range(1..29)
-    } else if month == 4 || month == 6 || month == 9 || month == 11 {
-        rng.random_range(1..31)
-    } else {
-        rng.random_range(1..32)
-    };
-
-    (year, month, day)
-}
-
 pub fn rand_date() -> String {
     let mut rng = rand::rng();
     let (year, month, day) = _rand_date_numbers(&mut rng);
@@ -58,6 +44,21 @@ pub fn rand_datetime() -> String {
     let minute = rng.random_range(0..60);
     let second = rng.random_range(0..60);
     format!("{}-{}-{} {}:{}:{}", year, month, day, hour, minute, second)
+}
+
+fn _rand_date_numbers(rng: &mut ThreadRng) -> (i32, i32, i32) {
+    let year_end = chrono::Utc::now().year();
+    let year = rng.random_range(1970..year_end);
+    let month = rng.random_range(1..13);
+    let day = if month == 2 {
+        rng.random_range(1..29)
+    } else if month == 4 || month == 6 || month == 9 || month == 11 {
+        rng.random_range(1..31)
+    } else {
+        rng.random_range(1..32)
+    };
+
+    (year, month, day)
 }
 
 #[allow(unused)]
