@@ -79,11 +79,11 @@ impl ChatResponse {
         const PREFIX: &str = "```json";
         const SUFFIX: &str = "```";
 
-        if suber::is_prefix_ingore_case(c, PREFIX) {
+        if suber::is_prefix_ignore_case(c, PREFIX) {
             c = &c[PREFIX.len()..];
         }
-        
-        if suber::is_suffix_ingore_case(c, SUFFIX) {
+
+        if suber::is_suffix_ignore_case(c, SUFFIX) {
             c = &c[..c.len() - SUFFIX.len()];
         }
 

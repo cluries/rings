@@ -1,10 +1,10 @@
 pub mod suber {
 
-    pub fn contains_ingore_case(s: &str, val: &str) -> bool {
-        s.to_lowercase().contains(&val.to_lowercase())
+    pub fn contains_ignore_case(s: &str, val: &str) -> bool {
+        s.to_ascii_lowercase().contains(&val.to_ascii_lowercase())
     }
 
-    pub fn is_prefix_ingore_case(s: &str, prefix: &str) -> bool {
+    pub fn is_prefix_ignore_case(s: &str, prefix: &str) -> bool {
         fn cmi<T: Iterator<Item = char>>(sources: &mut T, prefixs: &mut T) -> bool {
             loop {
                 match (sources.next(), prefixs.next()) {
@@ -24,7 +24,7 @@ pub mod suber {
         cmi(&mut sources, &mut prefixs)
     }
 
-    pub fn is_suffix_ingore_case(s: &str, suffix: &str) -> bool {
+    pub fn is_suffix_ignore_case(s: &str, suffix: &str) -> bool {
         fn cmi<T: Iterator<Item = char>>(sources: &mut T, prefixs: &mut T) -> bool {
             loop {
                 match (sources.next(), prefixs.next()) {
