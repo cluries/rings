@@ -7,24 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::sync::atomic::{AtomicI64, Ordering};
 
-/// id
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct Id {
-    val: i64,
-}
-
-/// id factory
-pub struct Factory {
-    name: String,
-    sharding: i64,
-    millis: AtomicI64,
-    sequence: AtomicI64, // milli, sequence at milli
-}
-
-lazy_static! {
-    static ref _shared_factory: Factory = Factory::new("SHARED", 0);
-}
-
 /// generate id
 /// actually, it is call shared().make()
 #[macro_export]
@@ -63,6 +45,26 @@ const SEQUENCE_BASE: i64 = 100;
 
 /// maybe min id value
 const MIN_VALUE: i64 = 1_000_000_000_000_000_000;
+
+const BASE62: i64 = 62;
+
+lazy_static! {
+    static ref _shared_factory: Factory = Factory::new("SHARED", 0);
+}
+
+/// id
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct Id {
+    val: i64,
+}
+
+/// id factory
+pub struct Factory {
+    name: String,
+    sharding: i64,
+    millis: AtomicI64,
+    sequence: AtomicI64, // milli, sequence at milli
+}
 
 /// gets shared id factory
 pub fn shared() -> &'static Factory {
@@ -109,7 +111,9 @@ impl ShorterMills {
 
 #[inline]
 fn current_millis() -> i64 {
-    chrono::Utc::now().timestamp_millis()
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time went backwards").as_millis() as i64
+
+    //chrono::Utc::now().timestamp_millis()
 }
 
 impl Factory {
@@ -205,43 +209,8 @@ impl Factory {
     }
 }
 
-impl Display for Id {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.val)
-    }
-}
-
-impl From<String> for Id {
-    fn from(value: String) -> Self {
-        let val: i64 = value.parse().unwrap_or(0);
-        val.into()
-    }
-}
-
-impl From<i64> for Id {
-    fn from(value: i64) -> Self {
-        if value >= MIN_VALUE {
-            Id { val: value }
-        } else {
-            panic!("less than min value")
-        }
-    }
-}
-
-impl Into<i64> for Id {
-    fn into(self) -> i64 {
-        self.val
-    }
-}
-
-impl Into<String> for Id {
-    fn into(self) -> String {
-        self.val.to_string()
-    }
-}
-
 impl Id {
-    pub fn new(val: i64) -> Option<Self> {
+    pub fn from_val(val: i64) -> Option<Self> {
         if val < MIN_VALUE {
             return None;
         }
@@ -293,7 +262,40 @@ impl Id {
     }
 }
 
-const BASE62: i64 = 62;
+impl Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.val)
+    }
+}
+
+impl From<String> for Id {
+    fn from(value: String) -> Self {
+        let val: i64 = value.parse().unwrap_or(0);
+        val.into()
+    }
+}
+
+impl From<i64> for Id {
+    fn from(value: i64) -> Self {
+        if value >= MIN_VALUE {
+            Id { val: value }
+        } else {
+            panic!("less than min value")
+        }
+    }
+}
+
+impl Into<i64> for Id {
+    fn into(self) -> i64 {
+        self.val
+    }
+}
+
+impl Into<String> for Id {
+    fn into(self) -> String {
+        self.val.to_string()
+    }
+}
 
 const BASE62_CHARS: [u8; 62] = [
     b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd', b'e', b'f', b'g', b'h', b'i', b'j', b'k', b'l',
@@ -301,7 +303,7 @@ const BASE62_CHARS: [u8; 62] = [
     b'I', b'J', b'K', b'L', b'M', b'N', b'O', b'P', b'Q', b'R', b'S', b'T', b'U', b'V', b'W', b'X', b'Y', b'Z',
 ];
 
-const BASE62_MAP: [u8; 128] = {
+const BASE62_CHARS_INDEXS: [u8; 128] = {
     let mut map = [255; 128];
     let mut i = 0;
     while i < BASE62_CHARS.len() {
@@ -327,13 +329,44 @@ fn decimal_to_base62(val: i64) -> String {
 }
 
 fn base62_to_decimal(base62: &str) -> i64 {
-    let mut decimal = 0;
-    let mut i = 0;
-    for c in base62.chars().rev() {
-        decimal += (BASE62_MAP[c as usize] as i64) * BASE62.pow(i);
-        i += 1;
+    if base62.is_empty() {
+        return 0;
     }
 
+    let bytes = base62.as_bytes();
+    let mut decimal = 0i64;
+    let mut power = 1i64;
+
+    for &byte in bytes.iter().rev() {
+        if byte >= 128 {
+            continue; // Skip invalid characters
+        }
+        let index = BASE62_CHARS_INDEXS[byte as usize];
+        if index == 255 {
+            continue; // Skip invalid characters
+        }
+
+        // Check for overflow before multiplication
+        if let Some(term) = (index as i64).checked_mul(power) {
+            if let Some(new_decimal) = decimal.checked_add(term) {
+                decimal = new_decimal;
+            } else {
+                // Overflow in addition, return current value
+                break;
+            }
+        } else {
+            // Overflow in multiplication, return current value
+            break;
+        }
+
+        // Check for overflow before updating power
+        if let Some(new_power) = power.checked_mul(BASE62) {
+            power = new_power;
+        } else {
+            // Power overflow, but we can still continue with current calculation
+            break;
+        }
+    }
     decimal
 }
 
@@ -341,6 +374,47 @@ fn base62_to_decimal(base62: &str) -> i64 {
 #[allow(unused)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_base62_conversion() {
+        // Test basic conversions
+        assert_eq!(base62_to_decimal("0"), 0);
+        assert_eq!(base62_to_decimal("1"), 1);
+        assert_eq!(base62_to_decimal("z"), 35);
+        assert_eq!(base62_to_decimal("Z"), 61);
+
+        // Test round-trip conversion
+        let test_values = vec![0, 1, 61, 62, 123, 3844, 238328, 1000000000000000000];
+        for val in test_values {
+            let base62_str = decimal_to_base62(val);
+            let converted_back = base62_to_decimal(&base62_str);
+            assert_eq!(val, converted_back, "Failed for value: {}, base62: {}", val, base62_str);
+        }
+
+        // Test empty string
+        assert_eq!(base62_to_decimal(""), 0);
+
+        // Test invalid characters (should be skipped)
+        assert_eq!(base62_to_decimal("1@2"), base62_to_decimal("12"));
+    }
+
+    #[test]
+    fn test_id_short_format() {
+        // Test ID short format conversion
+        let id = shared().make().unwrap();
+        let short = id.short();
+        let id_from_short = Id::from_short(short.clone()).unwrap();
+
+        assert_eq!(id.value(), id_from_short.value(), "ID short format conversion failed: {} -> {}", id.value(), short);
+
+        // Test multiple IDs
+        for _ in 0..100 {
+            let id = shared().make().unwrap();
+            let short = id.short();
+            let id_from_short = Id::from_short(short.clone()).unwrap();
+            assert_eq!(id.value(), id_from_short.value());
+        }
+    }
 
     #[test]
     fn test_id() {
