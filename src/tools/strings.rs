@@ -1,14 +1,10 @@
-/// IgnoreCase::Prefix("prefix").matches("content")
-pub enum IgnoreCase {
-    Contain(String),
-    Prefix(String),
-    Suffix(String),
-}
+pub mod suber {
 
- 
+    pub fn contains_ingore_case(s: &str, val: &str) -> bool {
+        s.to_lowercase().contains(&val.to_lowercase())
+    }
 
-impl IgnoreCase {
-    pub fn matches(&self, s: &str) -> bool {
+    pub fn is_prefix_ingore_case(s: &str, prefix: &str) -> bool {
         fn cmi<T: Iterator<Item = char>>(sources: &mut T, prefixs: &mut T) -> bool {
             loop {
                 match (sources.next(), prefixs.next()) {
@@ -23,35 +19,31 @@ impl IgnoreCase {
             }
         }
 
-        match self {
-            IgnoreCase::Contain(val) => s.to_lowercase().contains(&val.to_lowercase()),
-            IgnoreCase::Prefix(prefix) => {
-                let mut sources = s.chars();
-                let mut prefixs = prefix.chars();
-                cmi(&mut sources, &mut prefixs)
-            },
-            IgnoreCase::Suffix(suffix) => {
-                let mut sources = s.chars().rev();
-                let mut suffixs = suffix.chars().rev();
-                cmi(&mut sources, &mut suffixs)
-            },
+        let mut sources = s.chars();
+        let mut prefixs = prefix.chars();
+        cmi(&mut sources, &mut prefixs)
+    }
+
+    pub fn is_suffix_ingore_case(s: &str, suffix: &str) -> bool {
+        fn cmi<T: Iterator<Item = char>>(sources: &mut T, prefixs: &mut T) -> bool {
+            loop {
+                match (sources.next(), prefixs.next()) {
+                    (Some(s), Some(p)) => {
+                        if !s.eq_ignore_ascii_case(&p) {
+                            return false;
+                        }
+                    },
+                    (_, None) => return true,        // 所有 prefix 字符已匹配
+                    (None, Some(_)) => return false, // source 比 prefix 短
+                }
+            }
         }
+
+        let mut sources = s.chars().rev();
+        let mut suffixs = suffix.chars().rev();
+        cmi(&mut sources, &mut suffixs)
     }
 
-    pub fn is_contains(s: &str, val: &str) -> bool {
-        IgnoreCase::Contain(s.to_string()).matches(val)
-    }
-
-    pub fn is_prefix(s: &str, prefix: &str) -> bool {
-        IgnoreCase::Prefix(s.to_string()).matches(prefix)
-    }
-
-    pub fn is_suffix(s: &str, suffix: &str) -> bool {
-        IgnoreCase::Suffix(s.to_string()).matches(suffix)
-    }
-}
-
-pub mod suber {
     pub fn head(s: &str, size: usize) -> String {
         s.chars().take(size).collect::<String>()
     }

@@ -1,7 +1,7 @@
 // https://github.com/64bit/async-openai
 
 use crate::erx;
-use crate::tools::strings::IgnoreCase;
+use crate::tools::strings::suber;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::{
     ChatCompletionRequestMessage, ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
@@ -79,10 +79,11 @@ impl ChatResponse {
         const PREFIX: &str = "```json";
         const SUFFIX: &str = "```";
 
-        if IgnoreCase::Prefix(PREFIX.into()).matches(c) {
+        if suber::is_prefix_ingore_case(c, PREFIX) {
             c = &c[PREFIX.len()..];
         }
-        if IgnoreCase::Suffix(c.into()).matches(c) {
+        
+        if suber::is_suffix_ingore_case(c, SUFFIX) {
             c = &c[..c.len() - SUFFIX.len()];
         }
 
