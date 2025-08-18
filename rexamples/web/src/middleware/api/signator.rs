@@ -1,5 +1,5 @@
 use rings::tools::rand::rand_i64;
-use rings::web::middleware::signator::{Signator, SignatorConfig};
+use rings::web::middleware::signator::{debug_level, Signator, SignatorConfig};
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -25,8 +25,8 @@ pub fn use_signator() -> Signator {
         }) as Pin<Box<dyn Future<Output = Result<String, rings::erx::Erx>> + Send>>
     };
 
-    let config = SignatorConfig::new(Arc::new(loader), redis_url);
-
+    let mut config = SignatorConfig::new(Arc::new(loader), redis_url);
+    config.set_debug_level(debug_level::LOG_AND_RESPONSE);
     Signator::new(config).expect("Failed to create Signator")
 }
 
