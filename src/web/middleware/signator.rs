@@ -276,7 +276,13 @@ impl Into<Out<()>> for Error {
     fn into(self) -> Out<()> {
         let message = self.to_string();
         let c = Layouted::middleware("SIGN", "EROR");
-        Out::new(c, Some(message), None)
+
+        let mut o = Out::new(c, Some(message), None);
+        if let Error::SignatureVerificationFailed(debug) = self {
+            o.add_debug_items(debug.to_maps());
+        }
+
+        o
     }
 }
 
@@ -312,7 +318,7 @@ impl std::fmt::Display for Error {
 
             // 密钥和签名验证相关错误
             Error::KeyLoadingFailed(err) => write!(f, "Failed to load signing key: {}", err.description()),
-            Error::SignatureVerificationFailed(debug) => write!(f, "Signature verification failed: {}", debug),
+            Error::SignatureVerificationFailed(_debug) => write!(f, "Signature verification failed"),
 
             // 系统级错误
             Error::InternalError(msg) => write!(f, "Internal server error: {}", msg),
@@ -544,6 +550,17 @@ pub struct SignatureDebugInfo {
     key: String,
     server_signature: String,
     client_signature: String,
+}
+
+impl SignatureDebugInfo {
+    pub fn to_maps(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([
+            ("payload".to_string(), self.payload.clone()),
+            // ("key".to_string(), self.key.clone()),
+            ("server".to_string(), self.server_signature.clone()),
+            ("client".to_string(), self.client_signature.clone()),
+        ])
+    }
 }
 
 impl std::fmt::Display for SignatureDebugInfo {

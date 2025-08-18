@@ -168,7 +168,7 @@ impl ExceptGrow {
         if !self.grows.is_empty() {
             let mut debug = out.debug.unwrap_or(Debug::new());
             for (key, value) in &self.grows {
-                debug.add_other(key, value);
+                debug.add_item(key, value);
             }
             out.debug = Some(debug);
         }

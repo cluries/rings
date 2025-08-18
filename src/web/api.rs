@@ -32,7 +32,7 @@ pub struct Out<T: Serialize> {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Debug {
-    others: HashMap<String, String>,
+    kvs: HashMap<String, String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -40,11 +40,33 @@ pub struct Profile {}
 
 impl Debug {
     pub fn new() -> Debug {
-        Debug { others: HashMap::new() }
+        Debug { kvs: HashMap::new() }
     }
 
-    pub fn add_other(&mut self, key: &str, value: &str) -> &mut Debug {
-        self.others.insert(key.to_string(), value.to_string());
+    pub fn add_item(&mut self, key: &str, value: &str) -> &mut Debug {
+        self.kvs.insert(key.to_string(), value.to_string());
+        self
+    }
+
+    pub fn remove_item(&mut self, key: &str) -> &mut Debug {
+        self.kvs.remove(key);
+        self
+    }
+
+    pub fn add_items(&mut self, kvs: HashMap<String, String>) -> &mut Debug {
+        self.kvs.extend(kvs);
+        self
+    }
+
+    pub fn remove_items(&mut self, keys: Vec<String>) -> &mut Debug {
+        for key in keys {
+            self.kvs.remove(&key);
+        }
+        self
+    }
+
+    pub fn clear(&mut self) -> &mut Debug {
+        self.kvs.clear();
         self
     }
 }
@@ -72,12 +94,44 @@ impl<T: Serialize> Out<T> {
         Out { code: LayoutedC::okay().into(), message: None, data: Some(data), debug: None, profile: None }
     }
 
-    pub fn set_debug(&mut self, debug: Debug) {
+    pub fn set_debug(&mut self, debug: Debug) -> &mut Self {
         self.debug = Some(debug);
+        self
     }
 
-    pub fn set_profile(&mut self, profile: Profile) {
+    pub fn add_debug_item(&mut self, key: &str, value: &str) -> &mut Self {
+        if self.debug.is_none() {
+            self.debug = Some(Debug::new());
+        }
+        self.debug.as_mut().unwrap().add_item(key, value);
+        self
+    }
+
+    pub fn add_debug_items(&mut self, kvs: HashMap<String, String>) -> &mut Self {
+        if self.debug.is_none() {
+            self.debug = Some(Debug::new());
+        }
+        self.debug.as_mut().unwrap().add_items(kvs);
+        self
+    }
+
+    pub fn remove_debug_item(&mut self, key: &str) -> &mut Self {
+        if self.debug.is_some() {
+            self.debug.as_mut().unwrap().remove_item(key);
+        }
+        self
+    }
+
+    pub fn remove_debug_items(&mut self, keys: Vec<String>) -> &mut Self {
+        if self.debug.is_some() {
+            self.debug.as_mut().unwrap().remove_items(keys);
+        }
+        self
+    }
+
+    pub fn set_profile(&mut self, profile: Profile) -> &mut Self {
         self.profile = Some(profile);
+        self
     }
 }
 
