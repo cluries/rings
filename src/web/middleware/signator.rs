@@ -25,9 +25,26 @@ const SIGNATURE_LENGTH: usize = 40;
 
 pub type KeyLoader = Arc<dyn Fn(String) -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> + Send + Sync>;
 
+pub mod debug_level {
+    pub const DISABLE: i8 = 0;
+    pub const LOG_ONLY: i8 = 1 << 0;
+    pub const RESPONSE_ONLY: i8 = 1 << 1;
+    pub const LOG_AND_RESPONSE: i8 = LOG_ONLY | RESPONSE_ONLY;
+
+    pub fn enable_response(v: i8) -> bool {
+        v & RESPONSE_ONLY != 0
+    }
+
+    pub fn enable_log(v: i8) -> bool {
+        v & LOG_ONLY != 0
+    }
+}
+
 /// Signator 中间件配置
 #[derive(Clone)]
 pub struct SignatorConfig {
+    pub debug_level: i8,
+
     /// 中间件优先级，数值越大优先级越高
     pub priority: i32,
 
@@ -52,6 +69,7 @@ pub struct SignatorConfig {
 impl std::fmt::Debug for SignatorConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SignatorConfig")
+            .field("debug_level", &self.debug_level.to_string())
             .field("priority", &self.priority)
             .field("key_loader", &"KeyLoader")
             .field("redis_url", &self.redis_url)
@@ -67,6 +85,7 @@ impl std::fmt::Debug for SignatorConfig {
 impl SignatorConfig {
     pub fn new(key_loader: KeyLoader, redis_url: String) -> Self {
         Self {
+            debug_level: debug_level::DISABLE,
             priority: 0,
             key_loader,
             redis_url,
@@ -76,6 +95,11 @@ impl SignatorConfig {
             nonce_lifetime: DEFAULT_NONCE_LIFETIME,
             backdoor: None,
         }
+    }
+
+    pub fn set_debug_level(mut self, level: i8) -> Self {
+        self.debug_level = level;
+        self
     }
 
     /// 设置优先级
@@ -272,17 +296,20 @@ pub enum Error {
     InternalError(String),
 }
 
-impl Into<Out<()>> for Error {
-    fn into(self) -> Out<()> {
+impl Error {
+    fn make_out(&self, debug: bool) -> Out<()> {
         let message = self.to_string();
         let c = Layouted::middleware("SIGN", "EROR");
 
-        let mut o = Out::new(c, Some(message), None);
-        if let Error::SignatureVerificationFailed(debug) = self {
-            o.add_debug_items(debug.to_maps());
+        let mut out = Out::new(c, Some(message), None);
+
+        if debug {
+            if let Error::SignatureVerificationFailed(debug) = self {
+                out.add_debug_items(debug.make_map(false));
+            }
         }
 
-        o
+        out
     }
 }
 
@@ -493,9 +520,15 @@ impl Middleware for Signator {
             match signator.authenticate(request).await {
                 Ok(req) => Ok((context, req)),
                 Err(error) => {
+                    if debug_level::enable_log(signator.config.debug_level) {
+                        if let Error::SignatureVerificationFailed(d) = &error {
+                            tracing::error!("Signature verification failed: {:#?}", d.make_map(false));
+                        }
+                    }
+
                     let message = &error.to_string();
                     let erx = Erx::new(&message);
-                    let out: Out<()> = error.into();
+                    let out: Out<()> = error.make_out(debug_level::enable_response(signator.config.debug_level));
 
                     let mut context = context;
                     context.make_abort_with_response(Signator::middleware_name(), message, out.into_response());
@@ -553,13 +586,18 @@ pub struct SignatureDebugInfo {
 }
 
 impl SignatureDebugInfo {
-    pub fn to_maps(&self) -> std::collections::HashMap<String, String> {
-        std::collections::HashMap::from([
+    pub fn make_map(&self, include_server_key: bool) -> std::collections::HashMap<String, String> {
+        let mut m = std::collections::HashMap::from([
             ("payload".to_string(), self.payload.clone()),
-            // ("key".to_string(), self.key.clone()),
             ("server".to_string(), self.server_signature.clone()),
             ("client".to_string(), self.client_signature.clone()),
-        ])
+        ]);
+
+        if include_server_key {
+            m.insert("key".to_string(), self.key.clone());
+        }
+
+        m
     }
 }
 
