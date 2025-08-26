@@ -1,8 +1,7 @@
 /// https://crates.io/crates/rust_decimal
-/// 
+///
 
-
-// #[derive(Debug)]
+// #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 // pub enum Number {
 //     I8(i8),
 //     I16(i16),
@@ -17,8 +16,6 @@
 //     F32(f32),
 //     F64(f64),
 // }
-
- 
 
 pub mod conv {
 

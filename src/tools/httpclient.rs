@@ -1,4 +1,5 @@
 use crate::erx::{smp, Erx, ResultE};
+use crate::rings::R;
 use crate::web::url::join as url_join;
 use reqwest;
 use reqwest::Response;
@@ -180,30 +181,40 @@ impl ClientBuilder {
 }
 
 impl Client {
+    /// Sends a GET request to the specified path.
+    /// Returns the response body as a string.
     pub async fn get(&self, path: &str) -> ResultE<String> {
         let url = url_join(&self.base, path);
         let response = self.cli.get(url).send().await.map_err(smp)?;
         Self::_response_untyped(response).await
     }
 
+    /// Sends a POST request to the specified path.
+    /// Returns the response body as a string.
     pub async fn post(&self, path: &str, body: String) -> ResultE<String> {
         let url = url_join(&self.base, path);
         let response = self.cli.post(url).body(body).send().await.map_err(smp)?;
         Self::_response_untyped(response).await
     }
 
+    /// Sends a PUT request to the specified path.
+    /// Returns the response body as a string.
     pub async fn put(&self, path: &str, body: String) -> ResultE<String> {
         let url = url_join(&self.base, path);
         let response = self.cli.put(url).body(body).send().await.map_err(smp)?;
         Self::_response_untyped(response).await
     }
 
+    /// Sends a DELETE request to the specified path.
+    /// Returns the response body as a string.
     pub async fn delete(&self, path: &str) -> ResultE<String> {
         let url = url_join(&self.base, path);
         let response = self.cli.delete(url).send().await.map_err(smp)?;
         Self::_response_untyped(response).await
     }
 
+    /// Sends a HEAD request to the specified path.
+    /// Returns the response body as a string.
     pub async fn head(&self, path: &str) -> ResultE<String> {
         let url = url_join(&self.base, path);
         let response = self.cli.head(url).send().await.map_err(smp)?;
@@ -303,3 +314,7 @@ impl Client {
         }
     }
 }
+
+#[cfg(test)]
+#[allow(dead_code)]
+mod tests {}

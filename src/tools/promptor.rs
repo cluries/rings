@@ -15,6 +15,7 @@ pub struct PromptBuilder {
     fewshots: Option<Vec<Fewshot>>,
 }
 
+/// Fewshot is example for the prompt.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Fewshot {
     input: String,
@@ -27,14 +28,14 @@ pub const CONSTRAINT_GROUP_GLOBAL: &'static str = "Global";
 pub const CONSTRAINT_GROUP_OUTPUT: &'static str = "Output Format";
 
 pub const CONSTRAINT_ONLY_RESULTS_NO_FORMATS: [&'static str; 2] = [
-    "Strictly output only the result, without any prefixes, suffixes, explanations, or formatting. Provide the answer directly.",
-    "严格只输出结果，无需任何前缀、后缀、解释或格式化,直接给出答案即可。",
+    "Provide only the final answer, without additional explanation, embellishment, or formatting.",
+    "只提供最终答案，无需额外说明、修饰或格式化",
 ];
 
 /// Return JSON in this exact structure
 pub const CONSTRAINT_ONLY_RESULTS_USE_JSON_PREFIX: [&'static str; 2] = [
     "Strictly return the result in JSON format only, without any extra explanations, notes, or text. Output valid JSON exclusively, like",
-    "请严格以JSON格式返回结果，不要包含任何额外的解释、说明或文本。仅输出有效的JSON内容，格式如下",
+    "请以JSON格式返回结果，仅包含有效JSON内容，不包含任何解释、说明或多余文本，格式如下：",
 ];
 
 pub const CCONSTRAINT_ACCURACY_OVER_CREATIVITY: [&'static str; 2] =
@@ -179,6 +180,7 @@ impl PromptBuilder {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod tests {
     use super::*;
 
