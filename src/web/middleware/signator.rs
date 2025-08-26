@@ -97,13 +97,13 @@ impl SignatorConfig {
         }
     }
 
-    pub fn set_debug_level(&mut self, level: i8) -> &mut Self {
+    pub fn set_debug_level(mut self, level: i8) -> Self {
         self.debug_level = level;
         self
     }
 
     /// 设置优先级
-    pub fn priority(&mut self, priority: i32) -> &mut Self {
+    pub fn priority(mut self, priority: i32) -> Self {
         self.priority = priority;
         self
     }
