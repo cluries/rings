@@ -25,8 +25,8 @@ pub fn use_signator() -> Signator {
         }) as Pin<Box<dyn Future<Output = Result<String, rings::erx::Erx>> + Send>>
     };
 
-    let mut config = SignatorConfig::new(Arc::new(loader), redis_url);
-    config.set_debug_level(debug_level::LOG_AND_RESPONSE);
+    // let config = SignatorConfig::new(Arc::new(loader), redis_url);
+    let config = SignatorConfig::new(Arc::new(loader), redis_url).set_debug_level(debug_level::LOG_AND_RESPONSE);
     Signator::new(config).expect("Failed to create Signator")
 }
 

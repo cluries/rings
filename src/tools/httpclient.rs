@@ -1,5 +1,4 @@
 use crate::erx::{smp, Erx, ResultE};
-use crate::rings::R;
 use crate::web::url::join as url_join;
 use reqwest;
 use reqwest::Response;
