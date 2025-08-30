@@ -1,3 +1,14 @@
+/*
+在不同时区，同一时刻获取的 Unix 时间戳（timestamp）是相同的。
+Unix 时间戳是以 UTC（协调世界时）为基准，记录从 1970 年 1 月 1 日 00:00:00 UTC 开始的秒数（或毫秒数）。
+它与时区无关，表示的是一个绝对的时刻。
+
+时间戳的本质：时间戳是一个整数，表示某个具体时刻与 Unix 纪元（1970-01-01 00:00:00 UTC）的时间差。
+它不包含时区信息。例如，2025 年 8 月 30 日 04:04:00 PDT（太平洋夏令时）与同一时刻的北京时间（CST，2025-08-30 20:04:00）对应的时间戳是相同的。
+
+时区只影响时间的显示格式，例如在不同时区下，同一时间戳会被转换为当地时间（如 PDT 显示为 04:04，CST 显示为 20:04）。但底层时间戳值保持一致。
+*/
+
 use chrono::TimeZone;
 
 use crate::erx;
@@ -7,20 +18,23 @@ pub struct Is;
 
 /// Yearmonth
 ///  
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Yearmonth {
     pub year: i32,
     pub month: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Timestamp {
     pub nanos: i64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
-    Date,
-    Time,
-    DateTime,
-    DatetimeWithTimeZone,
+    Date,                 // %Y-%m-%d
+    Time,                 // %H:%M:%S
+    DateTime,             // %Y-%m-%d %H:%M:%S
+    DatetimeWithTimeZone, // %Y-%m-%d %H:%M:%S %Z
 }
 
 pub const FORMAT_DATE: &'static str = "%Y-%m-%d";
@@ -85,18 +99,26 @@ impl Format {
 }
 
 impl Now {
+    /// current timestamp
     pub fn timestamp() -> Timestamp {
         Timestamp { nanos: chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default() }
     }
 
+    /// utc datetime
     pub fn utc() -> chrono::DateTime<chrono::Utc> {
         chrono::Utc::now()
     }
 
+    /// local datetime
     pub fn local() -> chrono::DateTime<chrono::Local> {
         chrono::Local::now()
     }
 
+    /// fixed timezone datetime
+    ///# Arguments
+    ///* `z` - The timezone offset, range -12 to 12
+    ///# Returns
+    ///* `chrono::DateTime<chrono::FixedOffset>` - The fixed timezone datetime
     pub fn fixed(z: i32) -> chrono::DateTime<chrono::FixedOffset> {
         let offset_seconds = z.clamp(-12, 12) * 3600; // 将时区转换为秒数，并限制在-12到12之间
         let zone = if offset_seconds >= 0 {
