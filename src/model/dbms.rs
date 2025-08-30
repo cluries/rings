@@ -6,8 +6,11 @@ pub trait Connectable {
     fn connection_string(&self, conf: ConnectBasic, options: Option<HashMap<String, String>>) -> String;
 }
 
-pub trait ConnectProtocol {
-    fn protocol(&self) -> &'static str;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RDBMS {
+    Postgres,
+    MySQL,
+    SQLite,
 }
 
 /// 数据库连接信息
@@ -21,157 +24,6 @@ pub struct ConnectBasic {
     pass: String,                     // 密码
     charset: Option<String>,          // 字符集
     options: HashMap<String, String>, // 其他选项
-}
-
-/// 数据库管理系统类型枚举
-#[derive(Debug, Clone, PartialEq)]
-pub enum DBMS {
-    /// 关系型数据库
-    Relational(Relational),
-    /// 时序数据库
-    TimeSeries(TimeSeries),
-    /// 文档数据库
-    Document(Document),
-    /// 键值数据库
-    KeyValue(KeyValue),
-    /// 图数据库
-    Graph(Graph),
-    /// 列式数据库
-    Column(Column),
-    /// 搜索引擎
-    Search(Search),
-    /// 多模型数据库
-    /// - 文档+图+键值: MongoDB
-    /// - 图+文档: Neo4j
-    /// - 键值+列族: Redis
-    MultiModel(MultiModel),
-}
-
-/// 关系型数据库
-#[derive(Debug, Clone, PartialEq)]
-pub enum Relational {
-    Oracle,
-    Postgres,
-    MySQL,
-    SQLite,
-    SQLServer,
-}
-
-/// 时序数据库
-#[derive(Debug, Clone, PartialEq)]
-pub enum TimeSeries {
-    InfluxDB,
-    Prometheus,
-    Graphite,
-    OpenTSDB,
-}
-
-/// 文档数据库
-#[derive(Debug, Clone, PartialEq)]
-pub enum Document {
-    MongoDB,
-    CouchDB,
-    Elasticsearch,
-    RethinkDB,
-}
-
-/// 键值数据库
-#[derive(Debug, Clone, PartialEq)]
-pub enum KeyValue {
-    Redis,
-    Memcached,
-    HBase,
-    Cassandra,
-}
-
-/// 图数据库
-#[derive(Debug, Clone, PartialEq)]
-pub enum Graph {
-    Neo4j,
-    Dgraph,
-    Titan,
-    ArangoDB,
-}
-
-/// 列式数据库
-#[derive(Debug, Clone, PartialEq)]
-pub enum Column {
-    ClickHouse,
-    Druid,
-    Kudu,
-    Hive,
-}
-
-/// 搜索引擎
-#[derive(Debug, Clone, PartialEq)]
-pub enum Search {
-    Elasticsearch,
-    Solr,
-    Lucene,
-    Xapian,
-}
-
-/// 多模型数据库
-#[derive(Debug, Clone, PartialEq)]
-pub enum MultiModel {
-    MongoDB,
-    Neo4j,
-    Redis,
-}
-
-impl ConnectProtocol for DBMS {
-    fn protocol(&self) -> &'static str {
-        match self {
-            DBMS::Relational(r) => match r {
-                Relational::Oracle => "oracle",
-                Relational::Postgres => "postgres",
-                Relational::MySQL => "mysql",
-                Relational::SQLite => "sqlite",
-                Relational::SQLServer => "sqlserver",
-            },
-            DBMS::TimeSeries(ts) => match ts {
-                TimeSeries::InfluxDB => "influxdb",
-                TimeSeries::Prometheus => "prometheus",
-                TimeSeries::Graphite => "graphite",
-                TimeSeries::OpenTSDB => "opentsdb",
-            },
-            DBMS::Document(doc) => match doc {
-                Document::MongoDB => "mongodb",
-                Document::CouchDB => "couchdb",
-                Document::Elasticsearch => "elasticsearch",
-                Document::RethinkDB => "rethinkdb",
-            },
-            DBMS::KeyValue(kv) => match kv {
-                KeyValue::Redis => "redis",
-                KeyValue::Memcached => "memcached",
-                KeyValue::HBase => "hbase",
-                KeyValue::Cassandra => "cassandra",
-            },
-            DBMS::Graph(g) => match g {
-                Graph::Neo4j => "neo4j",
-                Graph::Dgraph => "dgraph",
-                Graph::Titan => "titan",
-                Graph::ArangoDB => "arangodb",
-            },
-            DBMS::Column(c) => match c {
-                Column::ClickHouse => "clickhouse",
-                Column::Druid => "druid",
-                Column::Kudu => "kudu",
-                Column::Hive => "hive",
-            },
-            DBMS::Search(s) => match s {
-                Search::Elasticsearch => "elasticsearch",
-                Search::Solr => "solr",
-                Search::Lucene => "lucene",
-                Search::Xapian => "xapian",
-            },
-            DBMS::MultiModel(mm) => match mm {
-                MultiModel::MongoDB => "mongodb",
-                MultiModel::Neo4j => "neo4j",
-                MultiModel::Redis => "redis",
-            },
-        }
-    }
 }
 
 impl Default for ConnectBasic {

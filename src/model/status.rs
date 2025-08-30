@@ -204,7 +204,7 @@ mod tests {
 
         println!("{}", crate::tools::json::Enc::en(&Status::initialize()).unwrap());
 
-        let s = crate::tools::json::Enc::en(&Status::ok(1000, "waiting")).unwrap();
+        let s = crate::tools::json::Enc::en(&Status::ok(1000, "waiting").unwrap()).unwrap();
         println!("{}", s);
         println!("{:?}", crate::tools::json::Dec::de::<Status>(s.as_str()).unwrap());
     }

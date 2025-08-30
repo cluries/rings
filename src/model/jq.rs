@@ -1,10 +1,4 @@
-#[allow(unused)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RDBMS {
-    Postgres,
-    MySQL,
-    SQLite,
-}
+use crate::model::dbms::RDBMS;
 
 pub trait JsonInquirer {
     /// Extract a JSON field value

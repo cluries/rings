@@ -1,9 +1,9 @@
 pub mod dbms;
 pub mod facade;
-pub mod jsons;
-pub mod preset;
+pub mod jq;
+pub mod prefoundation;
 pub mod rs;
-pub mod sql;
+pub mod sqlgen;
 pub mod status;
 pub mod zero;
 
