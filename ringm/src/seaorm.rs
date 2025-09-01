@@ -23,22 +23,29 @@ pub(crate) fn define_normals(input: TokenStream) -> TokenStream {
     let name = input.name;
     let predications = input.predications;
 
-    let retrieve = format_ident!("{}Retriever", name);
-    let persist = format_ident!("{}Repository", name);
+    // Retriever
+    // Repository
 
-    let m_alias = format_ident!("{}Mde", name);
-    let e_alias = format_ident!("{}Ent", name);
-    let c_alias = format_ident!("{}Col", name);
-    let a_alias = format_ident!("{}Amd", name);
+    let retrieve = format_ident!("{}Finder", name);
+    let persist = format_ident!("{}Mutator", name);
+
+    let model_alias = format_ident!("{}Mod", name);
+    let entity_alias = format_ident!("{}Ent", name);
+    let column_alias = format_ident!("{}Col", name);
+    let active_model_alias = format_ident!("{}Act", name);
 
     let expanded = quote! {
+
+        #[doc = "Finder struct for handling data queries."]
         pub struct #retrieve;
+
+        #[doc = "Mutator struct for handling data persistence and CRUD operations."]
         pub struct #persist;
 
-        pub type #m_alias = crate::entity::#predications::Model;
-        pub type #e_alias = crate::entity::#predications::Entity;
-        pub type #c_alias = crate::entity::#predications::Column;
-        pub type #a_alias = crate::entity::#predications::ActiveModel;
+        pub type #model_alias = crate::entity::#predications::Model;
+        pub type #entity_alias = crate::entity::#predications::Entity;
+        pub type #column_alias = crate::entity::#predications::Column;
+        pub type #active_model_alias = crate::entity::#predications::ActiveModel;
 
     };
 

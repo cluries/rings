@@ -43,9 +43,7 @@ macro_rules! web_route_merge {
     };
 }
 
-// #[derive(Clone)]
-// pub struct WebState {}
-
+#[derive(Clone)]
 pub struct Web {
     name: String,
     bind: String,
@@ -57,6 +55,7 @@ pub struct Web {
     middleware_manager: Arc<crate::web::middleware::Manager>,
 }
 
+///
 pub fn make_web(
     name: &str, bind: &str, router_maker: fn() -> Vec<Router>, middlewares: Vec<Box<dyn crate::web::middleware::Middleware>>,
 ) -> Web {
