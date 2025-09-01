@@ -135,6 +135,7 @@ impl Yearmonth {
         Self { year, month }
     }
 
+    /// get days of month
     pub fn month_days(&self) -> i32 {
         let year = self.year;
         let month = self.month;
@@ -158,10 +159,15 @@ impl Yearmonth {
         days
     }
 
+    /// get days of year
     pub fn year_days(&self) -> i32 {
         let year = self.year;
         let days = if Is::leap(year) { 366 } else { 365 };
         days
+    }
+
+    pub fn to_string(&self) -> String {
+        format!("{:04}-{:02}", self.year, self.month)
     }
 }
 
@@ -254,12 +260,12 @@ impl Timestamp {
 
     /// to millis
     pub fn millis(&self) -> i64 {
-        self.nanos / 1000 / 1000
+        self.nanos / (1000 * 1000)
     }
 
     /// to seconds
     pub fn seconds(&self) -> i64 {
-        self.nanos / 1000 / 1000 / 1000
+        self.nanos / (1000 * 1000 * 1000)
     }
 
     /// to utc datetime
@@ -280,6 +286,22 @@ impl Is {
         // 1. 能被4整除但不能被100整除
         // 2. 能被400整除
         (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+    }
+
+    pub fn valid_date(year: i32, month: u32, day: u32) -> bool {
+        chrono::NaiveDate::from_ymd_opt(year, month, day).is_some()
+    }
+
+    pub fn valid_time(hour: u32, minute: u32, second: u32) -> bool {
+        chrono::NaiveTime::from_hms_opt(hour, minute, second).is_some()
+    }
+
+    pub fn valid_datetime(year: i32, month: u32, day: u32, hour: u32, minute: u32, second: u32) -> bool {
+        chrono::NaiveDate::from_ymd_opt(year, month, day).and_then(|date| date.and_hms_opt(hour, minute, second)).is_some()
+    }
+
+    pub fn valid_yearmonth(year: i32, month: i32) -> bool {
+        year >= 0 && (1..=12).contains(&month)
     }
 }
 
