@@ -199,7 +199,7 @@ impl RingsMod for Web {
                         info!("WebMod[ {} ] terminating, current state:{:?}", name, stage);
                         break;
                     }
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 }
             };
 
