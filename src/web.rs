@@ -228,12 +228,14 @@ impl RingsMod for Web {
     }
 }
 
-impl crate::any::AnyTrait for Web {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
+// impl crate::any::AnyTrait for Web {
+//     fn as_any(&self) -> &dyn std::any::Any {
+//         self
+//     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
+//     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+//         self
+//     }
+// }
+
+crate::impl_any_trait!(Web);
