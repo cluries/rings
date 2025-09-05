@@ -23,3 +23,17 @@ pub mod web;
 /// re export
 pub mod prelude;
 pub use prelude::*;
+
+#[macro_export]
+macro_rules! impl_any_trait {
+    ($t:ty) => {
+        impl $crate::any::AnyTrait for $t {
+            fn as_any(&self) -> &dyn std::any::Any {
+                self
+            }
+            fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+                self
+            }
+        }
+    };
+}

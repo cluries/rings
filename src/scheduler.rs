@@ -10,6 +10,7 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 /// scheduler manager
+///
 pub struct SchedulerManager {
     stage: Arc<RwLock<RingState>>,
     count: u64,
@@ -201,12 +202,14 @@ impl crate::rings::RingsMod for SchedulerManager {
     }
 }
 
-impl crate::any::AnyTrait for SchedulerManager {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
+// impl crate::any::AnyTrait for SchedulerManager {
+//     fn as_any(&self) -> &dyn std::any::Any {
+//         self
+//     }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
-}
+//     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+//         self
+//     }
+// }
+
+crate::impl_any_trait!(SchedulerManager);
