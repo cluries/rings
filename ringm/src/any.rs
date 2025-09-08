@@ -12,7 +12,7 @@ pub fn default_any(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // let struct_name = struct_obj.ident.to_string();
 
     let any_impl = quote! {
-        impl $crate::any::AnyTrait for #struct_ident {
+        impl rings::any::AnyTrait for #struct_ident {
             fn as_any(&self) -> &dyn std::any::Any {
                 self
             }
