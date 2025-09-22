@@ -20,7 +20,7 @@ Ensure the document structure is clear (using consistent heading levels and list
   2) Execution Steps, detailing each operation in chronological or logical order;
   3) Issues Encountered, documenting technical, logical, or other obstacles, and briefly outlining potential solutions;
   4) Conclusion, summarizing based on specific data, facts, or measurable results, clearly stating whether the objectives have been met.
-
+  5) Record Task start\finish or other keypoint time.
 
 # Project 
 
