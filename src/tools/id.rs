@@ -2,7 +2,6 @@
 /// format:
 use crate::erx;
 
-// use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -48,10 +47,6 @@ const SEQUENCE_BASE: i64 = 100;
 const MIN_VALUE: i64 = 1_000_000_000_000_000_000;
 
 const BASE62: i64 = 62;
-
-// lazy_static! {
-// static ref _shared_factory: Factory = Factory::new("SHARED", 0);
-// }
 
 static SHARED_FACTORY: OnceLock<Factory> = OnceLock::new();
 

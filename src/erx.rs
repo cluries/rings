@@ -4,16 +4,11 @@
 /// fn smp<T: ToString>(error: T) -> Erx
 /// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
 use crate::conf;
-// use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::Display;
 use std::sync::OnceLock;
-
-// lazy_static! {
-//     static ref APP_SHORT: String = conf::rebit().read().expect("failed read rebit object").short.clone();
-// }
 
 static APP_SHORT: OnceLock<String> = OnceLock::new();
 
