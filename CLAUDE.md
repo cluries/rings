@@ -14,12 +14,13 @@
 # Workflow
 
 ## Document the process
-Please generate a Markdown formatted document to record the execution process of a specific task and report the final conclusions. 
+Please generate a Markdown formatted document (save to `aithinking` folder) to record the execution process of a specific task and report the final conclusions. 
 Ensure the document structure is clear (using consistent heading levels and list formats), the content is concise, and the conclusions are objective and verifiable, including the following sections:
   1) Task Overview, clarifying the task objective and background;
   2) Execution Steps, detailing each operation in chronological or logical order;
   3) Issues Encountered, documenting technical, logical, or other obstacles, and briefly outlining potential solutions;
   4) Conclusion, summarizing based on specific data, facts, or measurable results, clearly stating whether the objectives have been met.
+  5) Task start and finish time.
 
 
 # Project 

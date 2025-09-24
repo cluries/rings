@@ -13,15 +13,13 @@ pub mod log;
 pub mod macros;
 pub mod migrate;
 pub mod model;
-pub mod object;
+pub mod prelude;
 pub mod rings;
 pub mod scheduler;
 pub mod service;
 pub mod tools;
-pub mod web;
 
-/// re export
-pub mod prelude;
+pub mod web;
 pub use prelude::*;
 
 #[macro_export]
