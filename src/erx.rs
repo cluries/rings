@@ -4,14 +4,21 @@
 /// fn smp<T: ToString>(error: T) -> Erx
 /// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
 use crate::conf;
-use lazy_static::lazy_static;
+// use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::Display;
+use std::sync::OnceLock;
 
-lazy_static! {
-    static ref APP_SHORT: String = conf::rebit().read().expect("failed read rebit object").short.clone();
+// lazy_static! {
+//     static ref APP_SHORT: String = conf::rebit().read().expect("failed read rebit object").short.clone();
+// }
+
+static APP_SHORT: OnceLock<String> = OnceLock::new();
+
+pub fn app_short() -> String {
+    APP_SHORT.get_or_init(|| conf::rebit().read().expect("failed read rebit object").short.clone()).clone()
 }
 
 /// Zero
@@ -235,7 +242,7 @@ pub struct LayoutedC {
 impl LayoutedC {
     pub fn okay() -> LayoutedC {
         LayoutedC {
-            application: APP_SHORT.clone(),
+            application: app_short(),
             domain: LAYOUTED_C_ZERO.into(),
             category: LAYOUTED_C_ZERO.into(),
             detail: LAYOUTED_C_ZERO.into(),
@@ -243,7 +250,7 @@ impl LayoutedC {
     }
 
     pub fn new(domain: &str, category: &str, detail: &str) -> LayoutedC {
-        LayoutedC { application: APP_SHORT.clone(), domain: domain.into(), category: category.into(), detail: detail.into() }
+        LayoutedC { application: app_short(), domain: domain.into(), category: category.into(), detail: detail.into() }
     }
 
     pub fn is_okc(&self) -> bool {
@@ -272,7 +279,7 @@ impl LayoutedC {
 
 impl Default for LayoutedC {
     fn default() -> Self {
-        LayoutedC { application: APP_SHORT.clone(), domain: PreL4::UNDF.into(), category: PreL4::UNDF.into(), detail: PreL4::UNDF.into() }
+        LayoutedC { application: app_short(), domain: PreL4::UNDF.into(), category: PreL4::UNDF.into(), detail: PreL4::UNDF.into() }
     }
 }
 

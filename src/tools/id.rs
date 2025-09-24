@@ -2,10 +2,11 @@
 /// format:
 use crate::erx;
 
-use lazy_static::lazy_static;
+// use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::OnceLock;
 
 /// generate id
 /// actually, it is call shared().make()
@@ -48,9 +49,11 @@ const MIN_VALUE: i64 = 1_000_000_000_000_000_000;
 
 const BASE62: i64 = 62;
 
-lazy_static! {
-    static ref _shared_factory: Factory = Factory::new("SHARED", 0);
-}
+// lazy_static! {
+// static ref _shared_factory: Factory = Factory::new("SHARED", 0);
+// }
+
+static SHARED_FACTORY: OnceLock<Factory> = OnceLock::new();
 
 /// id
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -68,7 +71,7 @@ pub struct Factory {
 
 /// gets shared id factory
 pub fn shared() -> &'static Factory {
-    &_shared_factory
+    SHARED_FACTORY.get_or_init(|| Factory::new("SHARED", 0))
 }
 
 struct ShorterMills {
