@@ -2,7 +2,6 @@
 
 pub mod api;
 pub mod context;
-pub mod cookie;
 pub mod define;
 pub mod except;
 pub mod input;

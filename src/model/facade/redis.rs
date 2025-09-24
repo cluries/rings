@@ -4,7 +4,7 @@ use std::fmt::Display;
 
 #[allow(dead_code)]
 pub struct Redis {
-    logit: bool,
+    trace: bool,
     client: redis::Client,
 }
 
@@ -14,7 +14,7 @@ macro_rules! conn_mut {
         match $i.client.get_connection() {
             Ok(c) => c,
             Err(e) => {
-                if $i.logit {
+                if $i.trace {
                     tracing::error!("RedisClient::get_connection {}", e);
                 }
                 return $s;
@@ -24,12 +24,12 @@ macro_rules! conn_mut {
 }
 
 #[allow(unused)]
-fn unwra<T, E>(logit: bool, value: T) -> impl FnOnce(E) -> T
+fn unwra<T, E>(trace: bool, value: T) -> impl FnOnce(E) -> T
 where
     E: Display,
 {
     move |e: E| {
-        if logit {
+        if trace {
             tracing::error!("Redis error: {}", e);
         }
         value
@@ -149,11 +149,11 @@ macro_rules! redis_b {
 
 impl Redis {
     pub fn shared() -> Self {
-        Redis { logit: true, client: crate::model::make_redis_client().unwrap() }
+        Redis { trace: true, client: crate::model::make_redis_client().unwrap() }
     }
 
     pub fn new(c: redis::Client) -> Self {
-        Redis { logit: true, client: c }
+        Redis { trace: true, client: c }
     }
 
     pub fn get_connection(&self) -> erx::ResultE<redis::Connection> {
