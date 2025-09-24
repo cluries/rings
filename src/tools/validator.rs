@@ -140,10 +140,6 @@ impl Num {
 }
 
 impl Enc {
-    pub fn ascii(s: &str) -> bool {
-        s.chars().all(|c| c.is_ascii())
-    }
-
     pub fn alpha(s: &str) -> bool {
         const R: &str = r"^[a-zA-Z]+$";
         regex_match(R, s)

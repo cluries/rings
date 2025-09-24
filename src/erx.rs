@@ -25,6 +25,12 @@ pub type ResultE<T> = Result<T, Erx>;
 /// ResultEX = ResultE<()>;
 pub type ResultEX = ResultE<()>;
 
+/// ResultBoxedE<T> = Result<T, Box<Erx>>;
+pub type ResultBoxedE<T> = Result<T, Box<Erx>>;
+
+/// ResultBoxedEX = ResultBoxedE<()>;
+pub type ResultBoxedEX = ResultBoxedE<()>;
+
 /// Layouted: Some predefined Layouted methods
 pub struct Layouted;
 
@@ -61,6 +67,11 @@ pub fn emp<T: std::error::Error>(error: T) -> Erx {
     Erx { code: Default::default(), message, extra }
 }
 
+/// emp_boxed: emp but return Box<Erx>
+pub fn emp_boxed<T: std::error::Error>(error: T) -> Box<Erx> {
+    Box::new(emp(error))
+}
+
 /// smp: simple convert T: ToString to Erx
 /// smp函数的作用是将任何实现了ToString trait的类型简单转换为Erx错误类型
 /// 这是一个便捷函数，用于快速创建基本的错误对象：
@@ -70,6 +81,11 @@ pub fn emp<T: std::error::Error>(error: T) -> Erx {
 /// 适用于需要快速创建简单错误的场景，不需要复杂的错误分类或额外上下文信息
 pub fn smp<T: ToString>(error: T) -> Erx {
     Erx { code: Default::default(), message: error.to_string(), extra: Vec::new() }
+}
+
+/// smp_boxed: smp but return Box<Erx>
+pub fn smp_boxed<T: ToString>(error: T) -> Box<Erx> {
+    Box::new(smp(error))
 }
 
 /// amp: return a function that convert T: ToString to Erx
@@ -91,6 +107,12 @@ pub fn smp<T: ToString>(error: T) -> Erx {
 pub fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
     let additional = additional.to_string();
     move |err: T| Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() }
+}
+
+/// amp_boxed: amp but return Box<Erx>
+pub fn amp_boxed<T: ToString>(additional: &str) -> impl Fn(T) -> Box<Erx> {
+    let additional = additional.to_string();
+    move |err: T| Box::new(Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() })
 }
 
 /// Predefined Layouted Code with length 4
@@ -326,6 +348,10 @@ pub struct Erx {
 impl Erx {
     pub fn new(message: &str) -> Erx {
         Erx { code: Default::default(), message: message.to_string(), extra: Vec::new() }
+    }
+
+    pub fn to_boxed(self) -> Box<Erx> {
+        Box::new(self)
     }
 
     pub fn code(&self) -> LayoutedC {

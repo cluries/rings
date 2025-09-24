@@ -22,10 +22,12 @@ pub mod conv {
     use std::str::FromStr;
 
     pub fn bool(value: &str) -> bool {
-        match value.to_lowercase().as_str() {
-            "true" | "1" | "yes" | "on" => true,
-            _ => false,
-        }
+        // match value.to_lowercase().as_str() {
+        //     "true" | "1" | "yes" | "on" => true,
+        //     _ => false,
+        // }
+
+        matches!(value.to_lowercase().as_str(), "true" | "1" | "yes" | "on")
     }
 
     pub fn boold(value: &str, d: bool) -> bool {
@@ -37,11 +39,13 @@ pub mod conv {
     }
 
     pub fn int(value: &str) -> i64 {
-        i64::from_str_radix(value, 10).unwrap_or_default()
+        // i64::from_str_radix(value, 10).unwrap_or_default()
+        value.parse::<i64>().unwrap_or_default()
     }
 
     pub fn intd(value: &str, d: i64) -> i64 {
-        i64::from_str_radix(value, 10).unwrap_or(d)
+        // i64::from_str_radix(value, 10).unwrap_or(d)
+        value.parse::<i64>().unwrap_or(d)
     }
 
     pub fn float(value: &str) -> f64 {

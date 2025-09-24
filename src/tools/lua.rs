@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 pub struct LuaBridge {
     code: String,
     lua: Arc<Mutex<LuaLua>>,
-    rust_functions: Arc<Mutex<HashMap<String, Box<dyn Fn(&LuaLua) -> mlua::Result<LuaFunction> + Send + Sync>>>>,
+    rust_functions: Arc<Mutex<HashMap<String, Box<dyn Fn(&LuaLua) -> mlua::Result<LuaFunction>>>>>,
 }
 
 fn re<T: ToString>(e: T) -> LuaError {

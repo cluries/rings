@@ -36,7 +36,6 @@ join_path() - 拼接多个路径段
 working_dir() - 获取当前工作目录
 
 */
- 
 use serde::de::DeserializeOwned;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
@@ -233,7 +232,7 @@ impl Is {
     /// }
     /// ```
     pub async fn dir(&self) -> bool {
-        tokio::fs::metadata(&self.0).await.ok().map_or(false, |m| m.is_dir())
+        tokio::fs::metadata(&self.0).await.ok().is_some_and(|m| m.is_dir())
     }
 
     /// 检查路径是否为文件
@@ -254,7 +253,7 @@ impl Is {
     /// }
     /// ```
     pub async fn file(&self) -> bool {
-        tokio::fs::metadata(&self.0).await.ok().map_or(false, |m| m.is_file())
+        tokio::fs::metadata(&self.0).await.ok().is_some_and(|m| m.is_file())
     }
 
     /// 检查路径是否为符号链接
@@ -275,7 +274,7 @@ impl Is {
     /// }
     /// ```
     pub async fn symlink(&self) -> bool {
-        tokio::fs::metadata(&self.0).await.ok().map_or(false, |m| m.is_symlink())
+        tokio::fs::metadata(&self.0).await.ok().is_some_and(|m| m.is_symlink())
     }
 }
 
@@ -948,22 +947,9 @@ impl Content {
     }
 }
 
-/// 类型转换实现：Is -> Directory
-///
-/// 允许将 `Is` 结构体转换为 `Directory` 结构体，
-/// 用于在检查路径存在性后进行目录操作。
-///
-/// # 使用示例
-/// ```rust
-/// let is = Is("/path/to/dir".to_string());
-/// if is.dir().await {
-///     let dir: Directory = is.into();
-///     let files = dir.files().await?;
-/// }
-/// ```
-impl Into<Directory> for Is {
-    fn into(self) -> Directory {
-        Directory(self.0)
+impl From<Is> for Directory {
+    fn from(is: Is) -> Self {
+        Directory(is.0)
     }
 }
 

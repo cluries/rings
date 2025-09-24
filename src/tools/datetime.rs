@@ -53,15 +53,15 @@ impl Format {
     }
 }
 
-impl Into<&'static str> for Format {
-    fn into(self) -> &'static str {
-        self.layout()
-    }
-}
+// impl Into<&'static str> for Format {
+//     fn into(self) -> &'static str {
+//         self.layout()
+//     }
+// }
 
-impl Into<String> for Format {
-    fn into(self) -> String {
-        self.layout().to_string()
+impl From<Format> for &'static str {
+    fn from(f: Format) -> Self {
+        f.layout()
     }
 }
 
@@ -139,7 +139,7 @@ impl Yearmonth {
     pub fn month_days(&self) -> i32 {
         let year = self.year;
         let month = self.month;
-        let days = if Is::leap(year) {
+        if Is::leap(year) {
             if month == 2 {
                 29
             } else if month == 4 || month == 6 || month == 9 || month == 11 {
@@ -155,19 +155,23 @@ impl Yearmonth {
             } else {
                 31
             }
-        };
-        days
+        }
     }
 
     /// get days of year
     pub fn year_days(&self) -> i32 {
         let year = self.year;
-        let days = if Is::leap(year) { 366 } else { 365 };
-        days
+        if Is::leap(year) {
+            366
+        } else {
+            365
+        }
     }
+}
 
-    pub fn to_string(&self) -> String {
-        format!("{:04}-{:02}", self.year, self.month)
+impl std::fmt::Display for Yearmonth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04}-{:02}", self.year, self.month)
     }
 }
 

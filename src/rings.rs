@@ -172,15 +172,15 @@ pub trait RingsMod: AnyTrait + Send + Sync {
 /// Just like namespace, call some rings methods
 pub struct R;
 impl R {
-    pub fn instance(name: String) -> Result<RingsApplication, ()> {
+    pub fn instance(name: String) -> Result<RingsApplication, String> {
         for ring in RINGS.read().unwrap().iter() {
             let r = Arc::clone(ring);
             if r.read().unwrap().name.eq(&name) {
-                return Ok(Arc::clone(&ring));
+                return Ok(Arc::clone(ring));
             }
         }
 
-        Err(())
+        Err(format!("Rings instance '{}' not found", name))
     }
 
     // make rings
@@ -242,7 +242,7 @@ impl R {
             },
         };
 
-        Rings::serve(&rings_app).await;
+        Rings::serve(rings_app).await;
     }
 }
 
@@ -263,18 +263,17 @@ impl Rings {
     }
 
     pub async fn register_mod<T: RingsMod>(&mut self, mut md: T) -> &mut Self {
-        if !md.duplicate_able() {
-            if self.mods.iter().any(|x| x.name().eq(&md.name())) {
-                error!("Mod '{}' already registered!", md.name());
-                return self;
-            }
+        if !md.duplicate_able() && self.mods.iter().any(|x| x.name().eq(&md.name())) {
+            error!("Mod '{}' already registered!", md.name());
+            return self;
         }
 
         md.initialize().await.expect("initialize mod failed.");
         self.mods.push(Box::new(md));
         self.moments.push(Moment::now(&format!("mod [{}] registered", &self.name)));
 
-        self.mods.sort_by(|a, b| a.level().cmp(&b.level()));
+        // self.mods.sort_by(|a, b| a.level().cmp(&b.level()));
+        self.mods.sort_by_key(|a| a.level());
 
         self
     }

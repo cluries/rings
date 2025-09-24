@@ -20,7 +20,7 @@ use tower::{
 };
 
 /// Considering the intended usage, the quantity here cannot be excessive, regardless of memory consumption.
-static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(|| Default::default());
+static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(Default::default);
 
 ///
 pub type MiddlewareEventErr<T> = (Context, Option<T>, Option<erx::Erx>);
@@ -284,7 +284,7 @@ impl Averager {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Point {
     pub created: Option<Instant>,
     pub elapsed: Duration,
@@ -297,12 +297,6 @@ impl Point {
             self.elapsed = instant.elapsed();
         }
         self
-    }
-}
-
-impl Default for Point {
-    fn default() -> Self {
-        Self { created: None, elapsed: Duration::default(), errored: false }
     }
 }
 
@@ -448,7 +442,6 @@ impl Context {
         self
     }
 
-    ///
     pub fn extend_metadata_owned<I>(&mut self, iter: I) -> &mut Self
     where
         I: IntoIterator<Item = (String, String)>,
@@ -534,7 +527,8 @@ impl Manager {
         }
 
         self.middlewares.push(middleware);
-        self.middlewares.sort_by(|a, b| a.priority().cmp(&b.priority()));
+        // self.middlewares.sort_by(|a, b| a.priority().cmp(&b.priority()));
+        self.middlewares.sort_by_key(|a| a.priority());
         self
     }
 
@@ -553,12 +547,12 @@ impl Manager {
             return apply;
         }
 
-        middleware.methods().map_or(true, |methods| {
+        middleware.methods().is_none_or(|methods| {
             methods.iter().any(|method| {
                 let m = parts.method.as_str();
                 method.apply(m)
             })
-        }) && middleware.patterns().map_or(true, |patterns| {
+        }) && middleware.patterns().is_none_or(|patterns| {
             let path = parts.uri.path();
             patterns.iter().any(|pattern| pattern.apply(path))
         })
@@ -583,10 +577,16 @@ impl Manager {
     }
 }
 
-/// Convert ManagerLayer into a ServiceBuilder with Identity layer
-impl Into<ServiceBuilder<Stack<ManagerLayer, Identity>>> for ManagerLayer {
-    fn into(self) -> ServiceBuilder<Stack<ManagerLayer, Identity>> {
-        ServiceBuilder::new().layer(self)
+// Convert ManagerLayer into a ServiceBuilder with Identity layer
+// impl Into<ServiceBuilder<Stack<ManagerLayer, Identity>>> for ManagerLayer {
+//     fn into(self) -> ServiceBuilder<Stack<ManagerLayer, Identity>> {
+//         ServiceBuilder::new().layer(self)
+//     }
+// }
+
+impl From<ManagerLayer> for ServiceBuilder<Stack<ManagerLayer, Identity>> {
+    fn from(val: ManagerLayer) -> Self {
+        ServiceBuilder::new().layer(val)
     }
 }
 
@@ -678,11 +678,9 @@ where
                     },
                     MiddlewareImpl::Unimplemented((ctx, req, _ex)) => {
                         context = Some(ctx);
-                        match req {
-                            Some(req) => {
-                                request = Some(req);
-                            },
-                            None => {},
+
+                        if let Some(req) = req {
+                            request = Some(req);
                         }
                     },
                 }
@@ -747,11 +745,9 @@ where
                     },
                     MiddlewareImpl::Unimplemented((ctx, res, _ex)) => {
                         context = Some(ctx);
-                        match res {
-                            Some(res) => {
-                                response = Some(res);
-                            },
-                            None => {},
+
+                        if let Some(res) = res {
+                            response = Some(res);
                         };
                     },
                 }

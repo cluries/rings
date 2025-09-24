@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum HttpMethod {
     GET,
@@ -87,15 +89,15 @@ pub enum HttpCode {
     UnDefined = 0,
 }
 
-impl Into<&'static str> for HttpMethod {
-    fn into(self) -> &'static str {
-        self.as_str()
+impl From<HttpMethod> for &'static str {
+    fn from(method: HttpMethod) -> &'static str {
+        method.as_str()
     }
 }
 
-impl Into<String> for HttpMethod {
-    fn into(self) -> String {
-        self.as_str().to_string()
+impl From<HttpMethod> for String {
+    fn from(method: HttpMethod) -> String {
+        method.as_str().to_string()
     }
 }
 
@@ -116,24 +118,29 @@ impl HttpMethod {
     pub fn is(&self, method: &str) -> bool {
         self.as_str().eq_ignore_ascii_case(method)
     }
+}
 
-    pub fn from_str(method: &str) -> Option<HttpMethod> {
-        match method.to_uppercase().as_str() {
-            "GET" => Some(HttpMethod::GET),
-            "POST" => Some(HttpMethod::POST),
-            "DELETE" => Some(HttpMethod::DELETE),
-            "PUT" => Some(HttpMethod::PUT),
-            "HEAD" => Some(HttpMethod::HEAD),
-            "OPTIONS" => Some(HttpMethod::OPTIONS),
-            "TRACE" => Some(HttpMethod::TRACE),
-            "PATCH" => Some(HttpMethod::PATCH),
-            _ => None,
+impl FromStr for HttpMethod {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "GET" => Ok(HttpMethod::GET),
+            "POST" => Ok(HttpMethod::POST),
+            "DELETE" => Ok(HttpMethod::DELETE),
+            "PUT" => Ok(HttpMethod::PUT),
+            "HEAD" => Ok(HttpMethod::HEAD),
+            "OPTIONS" => Ok(HttpMethod::OPTIONS),
+            "TRACE" => Ok(HttpMethod::TRACE),
+            "PATCH" => Ok(HttpMethod::PATCH),
+            _ => Err(format!("Invalid HTTP method: {}", s)),
         }
     }
 }
-impl Into<crate::erx::Erx> for HttpCode {
-    fn into(self) -> crate::erx::Erx {
-        crate::erx::Erx::new(self.message())
+
+impl From<HttpCode> for crate::erx::Erx {
+    fn from(code: HttpCode) -> Self {
+        crate::erx::Erx::new(code.message())
     }
 }
 

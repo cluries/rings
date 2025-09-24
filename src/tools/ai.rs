@@ -22,7 +22,6 @@ pub struct Provider {
     pub key: String,
 }
 
-///
 pub struct LLM {
     provider: Provider,
 }
@@ -50,7 +49,7 @@ impl ChatResponse {
     }
 
     pub fn response_vec(&self) -> Vec<String> {
-        if self.response.choices.len() < 1 {
+        if self.response.choices.is_empty() {
             return Vec::new();
         }
 

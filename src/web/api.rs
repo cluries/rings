@@ -30,12 +30,12 @@ pub struct Out<T: Serialize> {
     pub profile: Option<Profile>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Debug {
     kvs: HashMap<String, String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Profile {}
 
 impl Debug {
@@ -103,7 +103,12 @@ impl<T: Serialize> Out<T> {
         if self.debug.is_none() {
             self.debug = Some(Debug::new());
         }
-        self.debug.as_mut().unwrap().add_item(key, value);
+
+        if let Some(debug) = self.debug.as_mut() {
+            debug.add_item(key, value);
+        } else {
+            tracing::error!("unable to add debug items: {{ {}=>{} }}", key, value);
+        }
         self
     }
 
@@ -111,20 +116,25 @@ impl<T: Serialize> Out<T> {
         if self.debug.is_none() {
             self.debug = Some(Debug::new());
         }
-        self.debug.as_mut().unwrap().add_items(kvs);
-        self
-    }
-
-    pub fn remove_debug_item(&mut self, key: &str) -> &mut Self {
-        if self.debug.is_some() {
-            self.debug.as_mut().unwrap().remove_item(key);
+        if let Some(debug) = self.debug.as_mut() {
+            debug.add_items(kvs);
+        } else {
+            tracing::error!("unable to add debug items: {:?}", kvs);
         }
         self
     }
 
+    pub fn remove_debug_item(&mut self, key: &str) -> &mut Self {
+        if let Some(debug) = self.debug.as_mut() {
+            debug.remove_item(key);
+        }
+
+        self
+    }
+
     pub fn remove_debug_items(&mut self, keys: Vec<String>) -> &mut Self {
-        if self.debug.is_some() {
-            self.debug.as_mut().unwrap().remove_items(keys);
+        if let Some(debug) = self.debug.as_mut() {
+            debug.remove_items(keys);
         }
         self
     }
@@ -171,6 +181,9 @@ impl<T: Serialize, E: ToString> From<Result<T, E>> for Out<T> {
     }
 }
 
+static APPLICATION_JSON: &'static str = "application/json";
+static RINGS_CORE: &'static str = "RingsCore/1.0";
+
 impl<T: Serialize> axum::response::IntoResponse for Out<T> {
     fn into_response(self) -> Response {
         let body = serde_json::to_string(&self);
@@ -187,8 +200,8 @@ impl<T: Serialize> axum::response::IntoResponse for Out<T> {
         *response.status_mut() = status;
 
         let headers = response.headers_mut();
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        headers.insert("Powered-By", HeaderValue::from_static("Rings"));
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
+        headers.insert("Powered-By", HeaderValue::from_static(RINGS_CORE));
 
         response.into_response()
     }

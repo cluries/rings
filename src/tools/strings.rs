@@ -125,7 +125,7 @@ pub mod word {
         let mut chars = s.chars();
         match chars.next() {
             None => String::new(),
-            Some(f) => f.to_uppercase().collect::<String>() + &chars.as_str(),
+            Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
         }
     }
 
@@ -133,7 +133,7 @@ pub mod word {
         let mut chars = s.chars();
         match chars.next() {
             None => String::new(),
-            Some(f) => f.to_lowercase().collect::<String>() + &chars.as_str(),
+            Some(f) => f.to_lowercase().collect::<String>() + chars.as_str(),
         }
     }
 
@@ -141,7 +141,7 @@ pub mod word {
         let mut chars = s.chars();
         match chars.next() {
             None => String::new(),
-            Some(f) => f.to_uppercase().collect::<String>() + &chars.as_str(),
+            Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
         }
     }
 
@@ -149,7 +149,7 @@ pub mod word {
         let mut chars = s.chars();
         match chars.next() {
             None => String::new(),
-            Some(f) => f.to_lowercase().collect::<String>() + &chars.as_str(),
+            Some(f) => f.to_lowercase().collect::<String>() + chars.as_str(),
         }
     }
 

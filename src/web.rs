@@ -54,7 +54,6 @@ pub struct Web {
     middleware_manager: Arc<crate::web::middleware::Manager>,
 }
 
-///
 pub fn make_web(
     name: &str, bind: &str, router_maker: fn() -> Vec<Router>, middlewares: Vec<Box<dyn crate::web::middleware::Middleware>>,
 ) -> Web {
@@ -86,7 +85,7 @@ impl Web {
         }
 
         let luactions = self.luactions.read().expect("luactions lock poisoned");
-        if luactions.len() > 0 {
+        if !luactions.is_empty() {
             info!("lua action found. adding lua [{}] actions", luactions.len());
             for luaction in luactions.iter() {
                 router = router.merge(luaction.route());

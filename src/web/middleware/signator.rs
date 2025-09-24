@@ -752,7 +752,7 @@ impl Payload {
 
     fn validate_signature(&self, key: String) -> Result<(), Error> {
         let payload = self.payload();
-        let server_signature = hash::hmac_sha1(&payload, &key).map_err(|s| Error::InternalError(s))?;
+        let server_signature = hash::hmac_sha1(&payload, &key).map_err(Error::InternalError)?;
 
         let client_signature = self.get_signature();
 
@@ -828,7 +828,11 @@ impl Payload {
         }
 
         // 验证签名长度
-        let signature_length = self.signature.as_ref().unwrap().len();
+        let signature_length = match self.signature.as_ref() {
+            Some(s) => s.len(),
+            None => 0,
+        };
+
         if signature_length != SIGNATURE_LENGTH {
             return Err(Error::InvalidSignatureLength { length: signature_length, expected: SIGNATURE_LENGTH });
         }
@@ -876,7 +880,7 @@ impl Payload {
         let mut payload = self.append_query_payload(self.build_header_payload());
 
         if let Some(body) = &self.body {
-            payload.push_str(",");
+            payload.push(',');
             let body_payload = Self::serialize_json_value(body);
             payload.push_str(body_payload.as_str());
         }
@@ -907,22 +911,22 @@ impl Payload {
     fn build_header_payload(&self) -> String {
         let mut payload = String::new();
         payload.push_str(self.method.to_uppercase().as_str());
-        payload.push_str(",");
+        payload.push(',');
         payload.push_str(self.path.as_str());
         payload.push_str(",{");
         if let Some(user_id) = &self.user_id {
             payload.push_str(user_id);
-            payload.push_str(",");
+            payload.push(',');
         }
         if let Some(timestamp) = &self.timestamp {
             payload.push_str(timestamp);
-            payload.push_str(",");
+            payload.push(',');
         }
         if let Some(nonce) = &self.nonce {
             payload.push_str(nonce);
         }
 
-        payload.push_str("}");
+        payload.push('}');
         payload
     }
 
@@ -962,16 +966,16 @@ impl Payload {
         payload.push_str(",{");
         for k in query_keys {
             payload.push_str(&k);
-            payload.push_str("=");
+            payload.push('=');
             payload.push_str(self.queries.get(&k).unwrap());
 
             size -= 1;
             if size > 0 {
-                payload.push_str(",");
+                payload.push(',');
             }
         }
 
-        payload.push_str("}");
+        payload.push('}');
 
         payload
     }
@@ -1002,16 +1006,16 @@ impl Payload {
         let mut payload = String::new();
         let mut array_len = array.len();
 
-        payload.push_str("[");
+        payload.push('[');
 
         for item in array {
             payload.push_str(Self::serialize_json_value(item).as_str());
             array_len -= 1;
             if array_len > 0 {
-                payload.push_str(",");
+                payload.push(',');
             }
         }
-        payload.push_str("]");
+        payload.push(']');
         payload
     }
 
@@ -1042,22 +1046,22 @@ impl Payload {
 
         let mut object_keys: Vec<String> = object.keys().cloned().collect();
         object_keys.sort();
-        payload.push_str("{");
+        payload.push('{');
 
         let mut object_size = object_keys.len();
         for key in object_keys {
-            let val = object.get(&key).unwrap();
+            let val = object.get(&key).unwrap_or(&serde_json::Value::Null);
             payload.push_str(key.as_str());
-            payload.push_str("=");
+            payload.push('=');
             payload.push_str(Self::serialize_json_value(val).as_str());
 
             object_size -= 1;
             if object_size > 0 {
-                payload.push_str(",");
+                payload.push(',');
             }
         }
 
-        payload.push_str("}");
+        payload.push('}');
         payload
     }
 

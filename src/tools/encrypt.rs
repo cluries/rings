@@ -181,7 +181,7 @@ impl AESMode {
         }
 
         let key = GAB128::from_slice(key);
-        let cipher = Aes128::new(&key);
+        let cipher = Aes128::new(key);
         let block_count = payload.len() / AESMode::BIT128_BLOCK_SIZE;
         let mut result = vec![];
         for i in 0..block_count {
@@ -189,7 +189,7 @@ impl AESMode {
                 GAB128::clone_from_slice(&payload[i * AESMode::BIT128_BLOCK_SIZE..(i + 1) * AESMode::BIT128_BLOCK_SIZE]);
             cipher.decrypt_block(&mut block);
             if i + 1 == block_count {
-                result.extend_from_slice(Pkcs7::unpad(&mut block).map_err(erx::smp)?);
+                result.extend_from_slice(Pkcs7::unpad(&block).map_err(erx::smp)?);
             } else {
                 result.extend_from_slice(&block);
             }
@@ -211,7 +211,7 @@ impl AESMode {
 
         let mut buffer = Self::padding_buffer(payload);
         let encoder: cbc::Encryptor<Aes128> = cbc::Encryptor::new(key, iv.as_slice().into());
-        let result = encoder.encrypt_padded_mut::<Pkcs7>(&mut buffer.as_mut_slice(), payload.len()).map_err(erx::smp)?.to_vec();
+        let result = encoder.encrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice(), payload.len()).map_err(erx::smp)?.to_vec();
 
         Ok(result)
     }
@@ -227,7 +227,7 @@ impl AESMode {
 
         let decoder: cbc::Decryptor<Aes128> = cbc::Decryptor::new(key, iv.as_slice().into());
         let mut buffer = payload.to_vec();
-        let result = decoder.decrypt_padded_mut::<Pkcs7>(&mut buffer.as_mut_slice()).map_err(erx::smp)?.to_vec();
+        let result = decoder.decrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice()).map_err(erx::smp)?.to_vec();
 
         Ok(result)
     }
@@ -243,7 +243,7 @@ impl AESMode {
 
         let mut buffer = Self::padding_buffer(payload);
         let encryptor: cfb_mode::Encryptor<Aes128> = cfb_mode::Encryptor::new(key, iv.as_slice().into());
-        let result = encryptor.encrypt_padded_mut::<Pkcs7>(&mut buffer.as_mut_slice(), payload.len()).map_err(erx::smp)?.to_vec();
+        let result = encryptor.encrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice(), payload.len()).map_err(erx::smp)?.to_vec();
 
         Ok(result)
     }
