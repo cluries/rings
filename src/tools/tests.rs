@@ -36,6 +36,6 @@ mod tests {
 
     #[test]
     pub fn test_current_working_path() {
-        println!("{}", tools::src_dir().to_string_lossy().to_string());
+        println!("{}", tools::src_dir().to_string_lossy());
     }
 }

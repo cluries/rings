@@ -17,7 +17,7 @@ pub mod types;
 pub mod url;
 pub mod validation;
 
-use crate::rings::{RingState, RingsMod, SafeRS};
+use crate::rings::{RingState, RingsMod, SafeRingState};
 use crate::web::luaction::LuaAction;
 
 use async_trait::async_trait;
@@ -47,7 +47,7 @@ pub struct Web {
     name: String,
     bind: String,
     router: Router,
-    stage: SafeRS,
+    stage: SafeRingState,
     luactions: Arc<RwLock<Vec<LuaAction>>>,
     router_maker: fn() -> Vec<Router>,
     router_reconfiger: Option<fn(router: Router) -> Router>,
@@ -62,7 +62,7 @@ pub fn make_web(
         name: name.to_string(),
         bind: bind.to_string(),
         router: Router::default(),
-        stage: RingState::srs_init(),
+        stage: RingState::inited_safe_ring_state(),
         luactions: Default::default(),
         router_maker,
         middleware_manager: Arc::new(crate::web::middleware::Manager::new(middlewares)),
@@ -133,7 +133,7 @@ impl RingsMod for Web {
     async fn initialize(&mut self) -> Result<(), crate::erx::Erx> {
         self.web_spec();
 
-        RingState::srs_set(&self.stage, RingState::Ready)?;
+        RingState::safe_ring_state_set(&self.stage, RingState::Ready)?;
 
         Ok(())
     }
@@ -143,7 +143,7 @@ impl RingsMod for Web {
     }
 
     async fn shutdown(&mut self) -> Result<(), crate::erx::Erx> {
-        let current = RingState::srs_get_must(&self.stage)?;
+        let current = RingState::safe_ring_state_must_get(&self.stage)?;
 
         if !current.is_ready_to_terminating() {
             return Err(crate::erx::Erx::new(
@@ -151,7 +151,7 @@ impl RingsMod for Web {
             ));
         }
 
-        RingState::srs_set(&self.stage, RingState::Terminating)?;
+        RingState::safe_ring_state_set(&self.stage, RingState::Terminating)?;
 
         Ok(())
     }
@@ -205,10 +205,12 @@ impl RingsMod for Web {
             let serve = axum::serve(listen.unwrap(), router).with_graceful_shutdown(graceful(Arc::clone(&stage), name.clone()));
 
             info!("WebMod[ {} ] try served : {}", &name, bind);
-            serve.await.expect(format!("WebMod[ {} ] failed to served : {}", &name, bind).as_str());
+            // serve.await.expect(format!("WebMod[ {} ] failed to served : {}", &name, bind).as_str());
+
+            serve.await.unwrap_or_else(|_| panic!("WebMod[ {} ] failed to served : {}", &name, bind));
 
             // *stage.write().unwrap() = RingState::Terminated;
-            let _ = RingState::srs_set_must(&stage, RingState::Terminated);
+            let _ = RingState::safe_ring_state_must_set(&stage, RingState::Terminated);
         };
 
         let integrated_router = crate::web::middleware::Manager::integrated(self.middleware_manager.clone(), self.router.clone());
@@ -219,7 +221,7 @@ impl RingsMod for Web {
     }
 
     fn stage(&self) -> RingState {
-        RingState::srs_get_must(&self.stage).unwrap()
+        RingState::safe_ring_state_must_get(&self.stage).unwrap()
     }
 
     fn level(&self) -> i64 {

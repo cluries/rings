@@ -2,6 +2,7 @@ use crate::any::AnyTrait;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use tracing::{error, info, span};
 
@@ -66,8 +67,8 @@ pub enum RingState {
 }
 
 /// Ring Thread Safe State
-/// SafeRS = Arc<RwLock<RingState>>
-pub type SafeRS = Arc<RwLock<RingState>>;
+/// SafeRingState = Arc<RwLock<RingState>>
+pub type SafeRingState = Arc<RwLock<RingState>>;
 
 impl Into<i32> for RingState {
     fn into(self) -> i32 {
@@ -97,6 +98,22 @@ impl From<i32> for RingState {
     }
 }
 
+impl FromStr for RingState {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "init" => Ok(RingState::Init),
+            "ready" => Ok(RingState::Ready),
+            "working" => Ok(RingState::Working),
+            "paused" => Ok(RingState::Paused),
+            "terminating" => Ok(RingState::Terminating),
+            "terminated" => Ok(RingState::Terminated),
+            _ => Err(format!("Unknown ring state: {}", s)),
+        }
+    }
+}
+
 impl Into<&str> for RingState {
     fn into(self) -> &'static str {
         match self {
@@ -116,25 +133,25 @@ impl RingState {
         matches!(self, RingState::Init | RingState::Ready | RingState::Working | RingState::Paused)
     }
 
-    pub fn srs_set(rs: &SafeRS, s: RingState) -> Result<(), crate::erx::Erx> {
+    pub fn safe_ring_state_set(rs: &SafeRingState, s: RingState) -> Result<(), crate::erx::Erx> {
         *rs.try_write().map_err(crate::erx::smp)? = s;
         Ok(())
     }
 
-    pub fn srs_set_must(rs: &SafeRS, s: RingState) -> Result<(), crate::erx::Erx> {
+    pub fn safe_ring_state_must_set(rs: &SafeRingState, s: RingState) -> Result<(), crate::erx::Erx> {
         *rs.write().map_err(crate::erx::smp)? = s;
         Ok(())
     }
 
-    pub fn srs_get(rs: &SafeRS) -> Result<RingState, crate::erx::Erx> {
+    pub fn safe_ring_state_get(rs: &SafeRingState) -> Result<RingState, crate::erx::Erx> {
         Ok(rs.try_read().map_err(crate::erx::smp)?.clone())
     }
 
-    pub fn srs_get_must(rs: &SafeRS) -> Result<RingState, crate::erx::Erx> {
+    pub fn safe_ring_state_must_get(rs: &SafeRingState) -> Result<RingState, crate::erx::Erx> {
         Ok(rs.read().map_err(crate::erx::smp)?.clone())
     }
 
-    pub fn srs_init() -> SafeRS {
+    pub fn inited_safe_ring_state() -> SafeRingState {
         Arc::new(RwLock::new(RingState::Init))
     }
 }
