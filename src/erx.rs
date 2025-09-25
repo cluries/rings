@@ -350,6 +350,10 @@ impl Erx {
         Erx { code: Default::default(), message: message.to_string(), extra: Vec::new() }
     }
 
+    pub fn boxed(message: &str) -> Box<Erx> {
+        Box::new(Erx::new(message))
+    }
+
     pub fn to_boxed(self) -> Box<Erx> {
         Box::new(self)
     }
