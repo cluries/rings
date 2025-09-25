@@ -316,7 +316,7 @@ impl From<String> for LayoutedC {
     fn from(value: String) -> Self {
         let mut c = LayoutedC::default();
         let parts: Vec<&str> = value.split("-").collect();
-        if let Some(application) = parts.get(0) {
+        if let Some(application) = parts.first() {
             c.application = application.to_string();
         }
         if let Some(domain) = parts.get(1) {
@@ -338,7 +338,7 @@ impl From<(String, String, String, String)> for LayoutedC {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Erx {
     code: LayoutedC,
     message: String,
@@ -380,7 +380,7 @@ impl Erx {
 
     pub fn description(&self) -> String {
         let mut description = self.code.layout_string();
-        description.push_str(" ");
+        description.push(' ');
         description.push_str(&self.message);
         if self.extra.is_empty() {
             return description;
@@ -405,7 +405,7 @@ impl Erx {
 
     /// get extra value, if not exists, return None
     pub fn extra_val(&self, key: &str) -> Option<String> {
-        if self.extra.len() < 1 {
+        if self.extra.is_empty() {
             return None;
         }
 
@@ -449,15 +449,21 @@ impl Display for Erx {
     }
 }
 
-impl Default for Erx {
-    fn default() -> Self {
-        Erx { code: Default::default(), message: Default::default(), extra: Default::default() }
-    }
-}
+// impl Default for Erx {
+//     fn default() -> Self {
+//         Erx { code: Default::default(), message: Default::default(), extra: Default::default() }
+//     }
+// }
 
-impl<T> Into<Result<T, Erx>> for Erx {
-    fn into(self) -> Result<T, Erx> {
-        Err(self)
+// impl<T> Into<Result<T, Erx>> for Erx {
+//     fn into(self) -> Result<T, Erx> {
+//         Err(self)
+//     }
+// }
+
+impl<T> From<Erx> for Result<T, Erx> {
+    fn from(value: Erx) -> Self {
+        Err(value)
     }
 }
 

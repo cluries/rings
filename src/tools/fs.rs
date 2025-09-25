@@ -39,7 +39,7 @@ working_dir() - 获取当前工作目录
 use serde::de::DeserializeOwned;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
-use crate::erx;
+use crate::erx::{smp_boxed, ResultBoxedE};
 use std::env;
 use std::path::{Path, PathBuf};
 
@@ -307,7 +307,7 @@ impl Directory {
     ///     Err(e) => println!("读取目录失败: {:?}", e),
     /// }
     /// ```
-    pub async fn files(&self) -> Result<Vec<String>, erx::Erx> {
+    pub async fn files(&self) -> ResultBoxedE<Vec<String>> {
         self.all(1 << Self::BIT_FILE).await
     }
 
@@ -334,7 +334,7 @@ impl Directory {
     ///     Err(e) => println!("读取目录失败: {:?}", e),
     /// }
     /// ```
-    pub async fn dirs(&self) -> Result<Vec<String>, erx::Erx> {
+    pub async fn dirs(&self) -> ResultBoxedE<Vec<String>> {
         self.all(1 << Self::BIT_DIR).await
     }
 
@@ -361,7 +361,7 @@ impl Directory {
     ///     Err(e) => println!("读取目录失败: {:?}", e),
     /// }
     /// ```
-    pub async fn symlinks(&self) -> Result<Vec<String>, erx::Erx> {
+    pub async fn symlinks(&self) -> ResultBoxedE<Vec<String>> {
         self.all(1 << Self::BIT_SYMLINK).await
     }
 
@@ -377,12 +377,12 @@ impl Directory {
     /// # 返回值
     /// - `Ok(Vec<String>)`: 符合条件的条目名列表
     /// - `Err(erx::Erx)`: I/O 错误
-    async fn all(&self, focus: i32) -> Result<Vec<String>, erx::Erx> {
-        let mut dir = tokio::fs::read_dir(&self.0).await.map_err(erx::smp)?;
+    async fn all(&self, focus: i32) -> ResultBoxedE<Vec<String>> {
+        let mut dir = tokio::fs::read_dir(&self.0).await.map_err(smp_boxed)?;
         let mut results: Vec<String> = Vec::new();
 
-        while let Some(entry) = dir.next_entry().await.map_err(erx::smp)? {
-            let ft = entry.file_type().await.map_err(erx::smp)?;
+        while let Some(entry) = dir.next_entry().await.map_err(smp_boxed)? {
+            let ft = entry.file_type().await.map_err(smp_boxed)?;
             if (((1 << Self::BIT_FILE) & focus) != 0 && ft.is_file())
                 || (((1 << Self::BIT_DIR) & focus) != 0 && ft.is_dir())
                 || (((1 << Self::BIT_SYMLINK) & focus) != 0 && ft.is_symlink())
@@ -414,8 +414,8 @@ impl Content {
     ///     Err(e) => println!("获取文件大小失败: {:?}", e),
     /// }
     /// ```
-    pub async fn len(&self) -> Result<u64, erx::Erx> {
-        Ok(tokio::fs::metadata(&self.0).await.map_err(erx::smp)?.len())
+    pub async fn len(&self) -> ResultBoxedE<u64> {
+        Ok(tokio::fs::metadata(&self.0).await.map_err(smp_boxed)?.len())
     }
 
     /// 读取文件头部指定字节数的内容
@@ -439,10 +439,10 @@ impl Content {
     ///     Err(e) => println!("读取失败: {:?}", e),
     /// }
     /// ```
-    pub async fn head(&self, size: usize) -> Result<Vec<u8>, erx::Erx> {
-        let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+    pub async fn head(&self, size: usize) -> ResultBoxedE<Vec<u8>> {
+        let mut fd = tokio::fs::File::open(&self.0).await.map_err(smp_boxed)?;
         let mut buffer = vec![0; size];
-        fd.read_exact(&mut buffer).await.map_err(erx::smp)?;
+        fd.read_exact(&mut buffer).await.map_err(smp_boxed)?;
         Ok(buffer)
     }
 
@@ -472,8 +472,8 @@ impl Content {
     ///     Err(e) => println!("读取失败: {:?}", e),
     /// }
     /// ```
-    pub async fn head_lines(&self, lines: usize) -> Result<Vec<String>, erx::Erx> {
-        let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+    pub async fn head_lines(&self, lines: usize) -> ResultBoxedE<Vec<String>> {
+        let fd = tokio::fs::File::open(&self.0).await.map_err(smp_boxed)?;
         let mut reader = tokio::io::BufReader::new(fd);
         let mut line = String::new();
         let mut result = Vec::new();
@@ -487,7 +487,7 @@ impl Content {
                     count += 1;
                     line.clear();
                 },
-                Err(e) => return Err(erx::smp(e)),
+                Err(e) => return Err(smp_boxed(e)),
             }
         }
 
@@ -516,7 +516,7 @@ impl Content {
     ///     Err(e) => println!("读取失败: {:?}", e),
     /// }
     /// ```
-    pub async fn head_string(&self, size: usize) -> Result<String, erx::Erx> {
+    pub async fn head_string(&self, size: usize) -> ResultBoxedE<String> {
         let v8 = self.head(size).await?;
         Ok(String::from_utf8_lossy(&v8).into_owned())
     }
@@ -546,23 +546,23 @@ impl Content {
     ///     Err(e) => println!("读取失败: {:?}", e),
     /// }
     /// ```
-    pub async fn tail(&self, size: usize) -> Result<Vec<u8>, erx::Erx> {
-        let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
-        let metadata = fd.metadata().await.map_err(erx::smp)?;
+    pub async fn tail(&self, size: usize) -> ResultBoxedE<Vec<u8>> {
+        let mut fd = tokio::fs::File::open(&self.0).await.map_err(smp_boxed)?;
+        let metadata = fd.metadata().await.map_err(smp_boxed)?;
         let file_size = metadata.len();
 
         if size as u64 > file_size {
             // If requested size is larger than file size, read entire file
             let mut buffer = Vec::new();
-            fd.read_to_end(&mut buffer).await.map_err(erx::smp)?;
+            fd.read_to_end(&mut buffer).await.map_err(smp_boxed)?;
             return Ok(buffer);
         }
 
         // Seek to position where we should start reading
-        fd.seek(std::io::SeekFrom::End(-(size as i64))).await.map_err(erx::smp)?;
+        fd.seek(std::io::SeekFrom::End(-(size as i64))).await.map_err(smp_boxed)?;
 
         let mut buffer = vec![0; size];
-        fd.read_exact(&mut buffer).await.map_err(erx::smp)?;
+        fd.read_exact(&mut buffer).await.map_err(smp_boxed)?;
         Ok(buffer)
     }
 
@@ -594,9 +594,9 @@ impl Content {
     ///     Err(e) => println!("读取失败: {:?}", e),
     /// }
     /// ```
-    pub async fn tail_lines(&self, lines: usize) -> Result<Vec<String>, erx::Erx> {
-        let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
-        let file_size = fd.metadata().await.map_err(erx::smp)?.len();
+    pub async fn tail_lines(&self, lines: usize) -> ResultBoxedE<Vec<String>> {
+        let fd = tokio::fs::File::open(&self.0).await.map_err(smp_boxed)?;
+        let file_size = fd.metadata().await.map_err(smp_boxed)?.len();
         let mut reader = tokio::io::BufReader::new(fd);
 
         // Use a circular buffer to store the last N lines
@@ -614,8 +614,8 @@ impl Content {
             position = position.saturating_sub(read_size as u64);
 
             // Seek to the current position
-            reader.seek(std::io::SeekFrom::Start(position)).await.map_err(erx::smp)?;
-            let bytes_read = reader.read_exact(&mut buffer[..read_size]).await.map_err(erx::smp)?;
+            reader.seek(std::io::SeekFrom::Start(position)).await.map_err(smp_boxed)?;
+            let bytes_read = reader.read_exact(&mut buffer[..read_size]).await.map_err(smp_boxed)?;
 
             // Convert chunk to string and process lines in reverse
             let chunk = String::from_utf8_lossy(&buffer[..bytes_read]);
@@ -658,7 +658,7 @@ impl Content {
     ///     Err(e) => println!("读取失败: {:?}", e),
     /// }
     /// ```
-    pub async fn tail_string(&self, size: usize) -> Result<String, erx::Erx> {
+    pub async fn tail_string(&self, size: usize) -> ResultBoxedE<String> {
         let v8 = self.tail(size).await?;
         Ok(String::from_utf8_lossy(&v8).into_owned())
     }
@@ -685,10 +685,10 @@ impl Content {
     ///     Err(e) => println!("读取失败: {:?}", e),
     /// }
     /// ```
-    pub async fn vec8(&self) -> Result<Vec<u8>, erx::Erx> {
-        let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+    pub async fn vec8(&self) -> ResultBoxedE<Vec<u8>> {
+        let mut fd = tokio::fs::File::open(&self.0).await.map_err(smp_boxed)?;
         let mut buffer = Vec::new();
-        fd.read_to_end(&mut buffer).await.map_err(erx::smp)?;
+        fd.read_to_end(&mut buffer).await.map_err(smp_boxed)?;
         Ok(buffer)
     }
 
@@ -716,10 +716,10 @@ impl Content {
     ///     Err(e) => println!("读取失败: {:?}", e),
     /// }
     /// ```
-    pub async fn lines(&self) -> Result<Vec<String>, erx::Erx> {
-        let mut fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
+    pub async fn lines(&self) -> ResultBoxedE<Vec<String>> {
+        let mut fd = tokio::fs::File::open(&self.0).await.map_err(smp_boxed)?;
         let mut buffer = String::new();
-        fd.read_to_string(&mut buffer).await.map_err(erx::smp)?;
+        fd.read_to_string(&mut buffer).await.map_err(smp_boxed)?;
         Ok(buffer.lines().map(|s| s.to_string()).collect())
     }
 
@@ -745,7 +745,7 @@ impl Content {
     ///     Err(e) => println!("读取失败: {:?}", e),
     /// }
     /// ```
-    pub async fn utf8_string(&self) -> Result<String, erx::Erx> {
+    pub async fn utf8_string(&self) -> ResultBoxedE<String> {
         let v8 = self.vec8().await?;
         Ok(String::from_utf8_lossy(&v8).into_owned())
     }
@@ -773,9 +773,9 @@ impl Content {
     ///     Err(e) => println!("截断失败: {:?}", e),
     /// }
     /// ```
-    pub async fn truncate(&self, size: u64) -> Result<(), erx::Erx> {
-        let fd = tokio::fs::File::open(&self.0).await.map_err(erx::smp)?;
-        fd.set_len(size).await.map_err(erx::smp)
+    pub async fn truncate(&self, size: u64) -> ResultBoxedE<()> {
+        let fd = tokio::fs::File::open(&self.0).await.map_err(smp_boxed)?;
+        fd.set_len(size).await.map_err(smp_boxed)
     }
 
     /// 写入内容到文件（覆盖模式）
@@ -802,10 +802,10 @@ impl Content {
     ///     Err(e) => println!("写入失败: {:?}", e),
     /// }
     /// ```
-    pub async fn write(&self, contents: &str) -> Result<(), erx::Erx> {
-        let mut fd = tokio::fs::File::create(&self.0).await.map_err(erx::smp)?;
-        fd.write_all(contents.as_bytes()).await.map_err(erx::smp)?;
-        fd.flush().await.map_err(erx::smp)
+    pub async fn write(&self, contents: &str) -> ResultBoxedE<()> {
+        let mut fd = tokio::fs::File::create(&self.0).await.map_err(smp_boxed)?;
+        fd.write_all(contents.as_bytes()).await.map_err(smp_boxed)?;
+        fd.flush().await.map_err(smp_boxed)
     }
 
     /// 追加内容到文件末尾
@@ -832,10 +832,10 @@ impl Content {
     ///     Err(e) => println!("追加失败: {:?}", e),
     /// }
     /// ```
-    pub async fn append(&self, contents: &str) -> Result<(), erx::Erx> {
-        let mut fd = tokio::fs::OpenOptions::new().append(true).open(&self.0).await.map_err(erx::smp)?;
-        fd.write_all(contents.as_bytes()).await.map_err(erx::smp)?;
-        fd.flush().await.map_err(erx::smp)
+    pub async fn append(&self, contents: &str) -> ResultBoxedE<()> {
+        let mut fd = tokio::fs::OpenOptions::new().append(true).open(&self.0).await.map_err(smp_boxed)?;
+        fd.write_all(contents.as_bytes()).await.map_err(smp_boxed)?;
+        fd.flush().await.map_err(smp_boxed)
     }
 
     /// 清空文件内容
@@ -858,7 +858,7 @@ impl Content {
     ///     Err(e) => println!("清空失败: {:?}", e),
     /// }
     /// ```
-    pub async fn clear(&self) -> Result<(), erx::Erx> {
+    pub async fn clear(&self) -> ResultBoxedE<()> {
         self.truncate(0).await
     }
 
@@ -896,9 +896,9 @@ impl Content {
     ///     Err(e) => println!("读取配置失败: {:?}", e),
     /// }
     /// ```
-    pub async fn json<T: DeserializeOwned>(&self) -> Result<T, erx::Erx> {
+    pub async fn json<T: DeserializeOwned>(&self) -> ResultBoxedE<T> {
         let json = self.utf8_string().await?;
-        serde_json::from_str(&json).map_err(erx::smp)
+        serde_json::from_str(&json).map_err(smp_boxed)
     }
 
     /// 将对象序列化为 JSON 并写入文件
@@ -941,8 +941,8 @@ impl Content {
     ///     Err(e) => println!("保存失败: {:?}", e),
     /// }
     /// ```
-    pub async fn write_json<T: serde::Serialize>(&self, obj: &T) -> Result<(), erx::Erx> {
-        let json = serde_json::to_string(obj).map_err(erx::smp)?;
+    pub async fn write_json<T: serde::Serialize>(&self, obj: &T) -> ResultBoxedE<()> {
+        let json = serde_json::to_string(obj).map_err(smp_boxed)?;
         self.write(&json).await
     }
 }

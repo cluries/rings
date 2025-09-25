@@ -283,15 +283,15 @@ impl From<i64> for Id {
     }
 }
 
-impl Into<i64> for Id {
-    fn into(self) -> i64 {
-        self.val
+impl From<Id> for i64 {
+    fn from(id: Id) -> Self {
+        id.val
     }
 }
 
-impl Into<String> for Id {
-    fn into(self) -> String {
-        self.val.to_string()
+impl From<Id> for String {
+    fn from(id: Id) -> Self {
+        id.val.to_string()
     }
 }
 

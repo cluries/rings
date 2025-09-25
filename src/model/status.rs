@@ -1,3 +1,4 @@
+use crate::erx::{Erx, ResultBoxedE};
 use serde::{Deserialize, Serialize};
 
 // Initialize = 0
@@ -25,10 +26,10 @@ const PREFIX_ERROR: &str = "ERR(";
 
 impl Status {
     /// parse from string
-    pub fn parse(formated: &str) -> crate::erx::ResultE<Self> {
+    pub fn parse(formated: &str) -> ResultBoxedE<Self> {
         let formated = formated.trim();
         if formated.len() < 1 {
-            return Err("Empty formated status".into());
+            return Err(Erx::boxed("Empty formated status"));
         }
 
         fn inner_parse(s: String) -> crate::erx::ResultE<(i32, String)> {
@@ -56,7 +57,7 @@ impl Status {
                     let parsed = inner_parse(formated[PREFIX_ERROR.len()..].to_string())?;
                     Self::error(parsed.0, &parsed.1)
                 } else {
-                    Err(format!("Unknown status: {}", formated).into())
+                    Err(Erx::boxed(&format!("Unknown status: {}", formated)))
                 }
             },
         }
@@ -106,19 +107,19 @@ impl Status {
         Status::MarkDeleted
     }
 
-    pub fn ok(val: i32, message: &str) -> crate::erx::ResultE<Self> {
+    pub fn ok(val: i32, message: &str) -> ResultBoxedE<Self> {
         if Self::valid_ok_code(val) {
             Ok(Status::OK(val, message.to_string()))
         } else {
-            Err(format!("invalid ok code:{}  code must GTE(>=) BOUNDARY_OK:{}", val, BOUNDARY_OK).into())
+            Err(Erx::boxed(&format!("invalid ok code:{}  code must GTE(>=) BOUNDARY_OK:{}", val, BOUNDARY_OK)))
         }
     }
 
-    pub fn error(val: i32, message: &str) -> crate::erx::ResultE<Self> {
+    pub fn error(val: i32, message: &str) -> ResultBoxedE<Self> {
         if Self::valid_error_code(val) {
             Ok(Status::Error(val, message.to_string()))
         } else {
-            Err(format!("invalid error code:{}, code must LTE(<=) BOUNDARY_ERROR:{}", val, BOUNDARY_ERROR).into())
+            Err(Erx::boxed(&format!("invalid error code:{}, code must LTE(<=) BOUNDARY_ERROR:{}", val, BOUNDARY_ERROR)))
         }
     }
 

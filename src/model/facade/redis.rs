@@ -36,7 +36,7 @@ where
     }
 }
 
-pub type Facade<T> = erx::ResultE<T>;
+pub type Facade<T> = erx::ResultBoxedE<T>;
 pub type FacadeBool = Facade<bool>;
 pub type FacadeFloat = Facade<f64>;
 pub type FacadeInt = Facade<i64>;
@@ -87,42 +87,42 @@ macro_rules! redis_c {
     // 基本形式：方法名、额外参数（不包括 key）、返回类型
     ($method_name:ident, ($($arg_name:ident: $arg_type:ty $(=> $transform:expr)?),*), $return_type:ty) => {
         pub fn $method_name<K: ToRedisArgs>(&self, key: K, $($arg_name: $arg_type),*) -> $return_type {
-            self.get_connection()?.$method_name(key, $(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp)
+            self.get_connection()?.$method_name(key, $(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp_boxed)
         }
     };
 
     // 支持额外泛型参数
     ($method_name:ident, ($($arg_name:ident: $arg_type:ty $(=> $transform:expr)?),*), $return_type:ty, generics: [$($generic:tt)*]) => {
         pub fn $method_name<K: ToRedisArgs, $($generic)*>(&self, key: K, $($arg_name: $arg_type),*) -> $return_type {
-            self.get_connection()?.$method_name(key, $(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp)
+            self.get_connection()?.$method_name(key, $(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp_boxed)
         }
     };
 
     // 支持 no_key：不添加 key: K
     ($method_name:ident, no_key, ($($arg_name:ident: $arg_type:ty $(=> $transform:expr)?),*), $return_type:ty) => {
         pub fn $method_name(&self, $($arg_name: $arg_type),*) -> $return_type {
-            self.get_connection()?.$method_name($(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp)
+            self.get_connection()?.$method_name($(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp_boxed)
         }
     };
 
     // 支持 no_key 和 generics
     ($method_name:ident, no_key, ($($arg_name:ident: $arg_type:ty $(=> $transform:expr)?),*), $return_type:ty, generics: [$($generic:tt)*]) => {
         pub fn $method_name<$($generic)*>(&self, $($arg_name: $arg_type),*) -> $return_type {
-            self.get_connection()?.$method_name($(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp)
+            self.get_connection()?.$method_name($(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp_boxed)
         }
     };
 
     // 支持显式指定 Redis 方法名
     ($method_name:ident, redis: $redis_method:ident, ($($arg_name:ident: $arg_type:ty $(=> $transform:expr)?),*), $return_type:ty) => {
         pub fn $method_name<K: ToRedisArgs>(&self, key: K, $($arg_name: $arg_type),*) -> $return_type {
-            self.get_connection()?.$redis_method(key, $(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp)
+            self.get_connection()?.$redis_method(key, $(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp_boxed)
         }
     };
 
     // 支持显式指定 Redis 方法名和 generics
     ($method_name:ident, redis: $redis_method:ident, ($($arg_name:ident: $arg_type:ty $(=> $transform:expr)?),*), $return_type:ty, generics: [$($generic:tt)*]) => {
         pub fn $method_name<K: ToRedisArgs, $($generic)*>(&self, key: K, $($arg_name: $arg_type),*) -> $return_type {
-            self.get_connection()?.$redis_method(key, $(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp)
+            self.get_connection()?.$redis_method(key, $(redis_c!(@process_arg $arg_name $($transform)?)),*).map_err(erx::smp_boxed)
         }
     };
 
@@ -156,8 +156,8 @@ impl Redis {
         Redis { trace: true, client: c }
     }
 
-    pub fn get_connection(&self) -> erx::ResultE<redis::Connection> {
-        self.client.get_connection().map_err(erx::smp)
+    pub fn get_connection(&self) -> erx::ResultBoxedE<redis::Connection> {
+        self.client.get_connection().map_err(erx::smp_boxed)
     }
 
     redis_b!(exists, del, unlink, persist);
