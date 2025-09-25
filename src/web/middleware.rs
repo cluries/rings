@@ -22,10 +22,10 @@ use tower::{
 /// Considering the intended usage, the quantity here cannot be excessive, regardless of memory consumption.
 static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(Default::default);
 
-///
+/// MiddlewareEventErr
 pub type MiddlewareEventErr<T> = (Context, Option<T>, Option<erx::Erx>);
 
-///
+/// MiddlewareFuture
 pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<(Context, T), MiddlewareEventErr<T>>> + Send>>;
 
 pub enum MiddlewareImpl<T, E> {

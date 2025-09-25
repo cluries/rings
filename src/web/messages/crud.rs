@@ -48,17 +48,11 @@ pub struct DeleteRequest {
     pub options: Option<DeleteOptions>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct DeleteOptions {
     pub soft_delete: bool,
     pub cascade: bool,
     pub return_deleted: bool,
-}
-
-impl Default for DeleteOptions {
-    fn default() -> Self {
-        Self { soft_delete: false, cascade: false, return_deleted: false }
-    }
 }
 
 /// 批量创建请求

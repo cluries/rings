@@ -42,7 +42,7 @@ pub const CCONSTRAINT_ACCURACY_OVER_CREATIVITY: [&'static str; 2] =
     ["Prioritize accuracy over creativity in all responses", "所有回答保持中立，不表达主观观点"];
 
 pub fn constraint_json(structure: &str) -> String {
-    let s = structure.split("\n").into_iter().map(|x| x.trim().to_string()).collect::<Vec<String>>();
+    let s = structure.split("\n").map(|x| x.trim().to_string()).collect::<Vec<String>>();
     format!("{}: {}", CONSTRAINT_ONLY_RESULTS_USE_JSON_PREFIX[0], s.join(""))
 }
 
@@ -88,7 +88,7 @@ impl PromptBuilder {
     }
 
     pub fn add_constraint(mut self, group: &str, constraint: &str) -> Self {
-        if let None = self.constraints {
+        if self.constraints.is_none() {
             let constrains = std::collections::HashMap::<String, Vec<String>>::new();
             self.constraints = Some(constrains);
         }

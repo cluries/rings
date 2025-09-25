@@ -9,6 +9,7 @@ pub struct LuaAction {
 
 async fn a() {}
 
+#[derive(Clone, Debug, Default)]
 pub struct LuaActionContext {}
 
 impl LuaAction {

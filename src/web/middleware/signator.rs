@@ -527,7 +527,7 @@ impl Middleware for Signator {
                     }
 
                     let message = &error.to_string();
-                    let erx = Erx::new(&message);
+                    let erx = Erx::new(message);
                     let out: Out<()> = error.make_out(debug_level::enable_response(signator.config.debug_level));
 
                     let mut context = context;
@@ -671,7 +671,7 @@ impl Payload {
         if payload.should_read_body() {
             let body: Result<serde_json::Value, Error> = match axum::body::to_bytes(body, MAX_BODY_SIZE).await {
                 Ok(bytes) => {
-                    if bytes.len() < 1 {
+                    if bytes.is_empty() {
                         Ok(serde_json::Value::default())
                     } else {
                         match serde_json::from_slice::<serde_json::Value>(&bytes) {

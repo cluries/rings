@@ -54,7 +54,7 @@ pub fn regex_find(regex: &str, string: &str) -> Option<String> {
     re.find(string).map(|m| m.as_str().to_string())
 }
 
-///
+/// Net
 impl Net {
     pub fn email(email: &str) -> bool {
         let r = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$";
