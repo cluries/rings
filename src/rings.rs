@@ -14,6 +14,7 @@ pub type RingsApplication = Arc<RwLock<Rings>>;
 /// Rings
 static RINGS: RwLock<Vec<RingsApplication>> = RwLock::new(Vec::new());
 
+#[allow(clippy::type_complexity)]
 static RINGS_INVOKE_MACRO: RwLock<Vec<(String, fn())>> = RwLock::new(Vec::new());
 
 /// name: ringsapp name

@@ -531,9 +531,10 @@ impl Manager {
         self
     }
 
-    pub fn applies(&self, parts: &Parts) -> Vec<&Box<dyn Middleware>> {
-        let mut middlewares = Vec::new();
+    pub fn applies(&self, parts: &Parts) -> Vec<&dyn Middleware> {
+        let mut middlewares: Vec<&dyn Middleware> = vec![];
         for middleware in &self.middlewares {
+            let middleware = &(**middleware);
             if self.should_apply_middleware(middleware, parts) {
                 middlewares.push(middleware);
             }
@@ -541,7 +542,7 @@ impl Manager {
         middlewares
     }
 
-    fn should_apply_middleware(&self, middleware: &Box<dyn Middleware>, parts: &Parts) -> bool {
+    fn should_apply_middleware(&self, middleware: &dyn Middleware, parts: &Parts) -> bool {
         if let Some(apply) = middleware.apply(parts) {
             return apply;
         }

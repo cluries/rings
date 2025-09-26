@@ -3,6 +3,7 @@ use mlua::{Error as LuaError, Function as LuaFunction, Lua as LuaLua};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+#[allow(clippy::type_complexity)]
 pub struct LuaBridge {
     code: String,
     lua: Arc<Mutex<LuaLua>>,
