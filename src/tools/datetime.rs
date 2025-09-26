@@ -37,10 +37,10 @@ pub enum Format {
     DatetimeWithTimeZone, // %Y-%m-%d %H:%M:%S %Z
 }
 
-pub const FORMAT_DATE: &'static str = "%Y-%m-%d";
-pub const FORMAT_TIME: &'static str = "%H:%M:%S";
-pub const FORMAT_DATETIME: &'static str = "%Y-%m-%d %H:%M:%S";
-pub const FORMAT_DATETIME_WITH_TIMEZONE: &'static str = "%Y-%m-%d %H:%M:%S %Z";
+pub const FORMAT_DATE: &str = "%Y-%m-%d";
+pub const FORMAT_TIME: &str = "%H:%M:%S";
+pub const FORMAT_DATETIME: &str = "%Y-%m-%d %H:%M:%S";
+pub const FORMAT_DATETIME_WITH_TIMEZONE: &str = "%Y-%m-%d %H:%M:%S %Z";
 
 impl Format {
     pub fn layout(&self) -> &'static str {

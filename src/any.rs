@@ -1,5 +1,5 @@
 /// Any trait implementation for any type.
-
+///
 /// Any trait implementation for any type.
 ///
 /// Defaults implementaion

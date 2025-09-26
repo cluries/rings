@@ -20,8 +20,8 @@ const MARK_DELETED: i32 = -1;
 const BOUNDARY_OK: i32 = 11;
 const BOUNDARY_ERROR: i32 = -11;
 
-const MARK_DELETED_STR: &'static str = "MarkDelete";
-const INITIALIZE_STR: &'static str = "Initialize";
+const MARK_DELETED_STR: &str = "MarkDelete";
+const INITIALIZE_STR: &str = "Initialize";
 const PREFIX_OK: &str = "OK(";
 const PREFIX_ERROR: &str = "ERR(";
 
@@ -29,13 +29,13 @@ impl Status {
     /// parse from string
     pub fn parse(formated: &str) -> ResultBoxedE<Self> {
         let formated = formated.trim();
-        if formated.len() < 1 {
+        if formated.is_empty() {
             return Err(Erx::boxed("Empty formated status"));
         }
 
         fn inner_parse(s: String) -> ResultBoxedE<(i32, String)> {
             let splits: Vec<&str> = s.splitn(2, " ").collect();
-            if splits.len() < 1 {
+            if splits.is_empty() {
                 return Err(Erx::boxed("Empty formated status"));
             }
 
@@ -51,11 +51,18 @@ impl Status {
             INITIALIZE_STR => Ok(Status::Initialize),
             MARK_DELETED_STR => Ok(Status::MarkDeleted),
             formated => {
-                if formated.starts_with(PREFIX_OK) {
-                    let parsed = inner_parse(formated[PREFIX_OK.len()..].to_string())?;
+                // if formated.starts_with(PREFIX_OK) {
+                //     let parsed = inner_parse(formated[PREFIX_OK.len()..].to_string())?;
+                //     Self::ok(parsed.0, &parsed.1)
+                // } else if formated.starts_with(PREFIX_ERROR) {
+                //     let parsed = inner_parse(formated[PREFIX_ERROR.len()..].to_string())?;
+                //     Self::error(parsed.0, &parsed.1)
+                // }
+                if let Some(stripped) = formated.strip_prefix(PREFIX_OK) {
+                    let parsed = inner_parse(stripped.to_string())?;
                     Self::ok(parsed.0, &parsed.1)
-                } else if formated.starts_with(PREFIX_ERROR) {
-                    let parsed = inner_parse(formated[PREFIX_ERROR.len()..].to_string())?;
+                } else if let Some(stripped) = formated.strip_prefix(PREFIX_ERROR) {
+                    let parsed = inner_parse(stripped.to_string())?;
                     Self::error(parsed.0, &parsed.1)
                 } else {
                     Err(Erx::boxed(&format!("Unknown status: {}", formated)))

@@ -67,6 +67,12 @@ pub fn vector_gcd(numbers: &[u8]) -> Option<u8> {
     numbers.iter().fold(numbers[0], |a, &b| gcd(a, b)).into()
 }
 
+impl<T> Default for Balanced<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> Balanced<T> {
     pub fn new() -> Self {
         Balanced { counter: 0, weights: Vec::new(), weights_pool: Vec::new(), circle: 0 }
@@ -88,7 +94,7 @@ impl<T> Balanced<T> {
     }
 
     pub fn add_weights(&mut self, weights: Vec<Weighted<T>>) -> &mut Self {
-        self.weights.extend(weights.into_iter());
+        self.weights.extend(weights);
         self.rebuild_weight_pool();
         self
     }
@@ -189,7 +195,7 @@ impl<T> Balanced<T> {
     }
 }
 
-const DEFAULT_CONCURRENT_TIMEOUT: u128 = 1000_000_000;
+const DEFAULT_CONCURRENT_TIMEOUT: u128 = 1_000_000_000;
 
 impl<T> Weighted<T> {
     pub fn new(

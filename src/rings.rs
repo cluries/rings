@@ -70,6 +70,10 @@ pub enum RingState {
 /// SafeRingState = Arc<RwLock<RingState>>
 pub type SafeRingState = Arc<RwLock<RingState>>;
 
+// impl std::fmt::Display for RingState {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {}
+// }
+
 impl From<RingState> for i32 {
     fn from(s: RingState) -> Self {
         match s {
@@ -144,11 +148,11 @@ impl RingState {
     }
 
     pub fn safe_ring_state_get(rs: &SafeRingState) -> ResultBoxedE<RingState> {
-        Ok(rs.try_read().map_err(smp_boxed)?.clone())
+        Ok(*rs.try_read().map_err(smp_boxed)?)
     }
 
     pub fn safe_ring_state_must_get(rs: &SafeRingState) -> ResultBoxedE<RingState> {
-        Ok(rs.read().map_err(smp_boxed)?.clone())
+        Ok(*rs.read().map_err(smp_boxed)?)
     }
 
     pub fn inited_safe_ring_state() -> SafeRingState {
@@ -334,8 +338,8 @@ impl Rings {
         self
     }
 
-    pub fn get_state(&self) -> Result<RingState, crate::erx::Erx> {
-        Ok(self.state.try_read().map_err(crate::erx::smp)?.clone())
+    pub fn get_state(&self) -> ResultBoxedE<RingState> {
+        Ok(*self.state.try_read().map_err(smp_boxed)?)
     }
 
     pub fn get_state_unchecked(&self) -> RingState {

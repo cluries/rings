@@ -1,4 +1,4 @@
-use crate::erx::{smp_boxed, ResultBoxedE, ResultBoxedEX};
+use crate::erx::{smp_boxed, Erx, ResultBoxedE, ResultBoxedEX};
 use crate::rings::RingState;
 use crate::service::ServiceManager;
 use async_trait::async_trait;
@@ -125,11 +125,10 @@ impl crate::rings::RingsMod for SchedulerManager {
 
     async fn shutdown(&mut self) -> ResultBoxedEX {
         info!("scheduler manager [{}] shutdown", SCHEDULER_MANAGER_NAME);
-        let current = self.stage.try_read().map_err(smp_boxed)?.clone();
+        let current = *self.stage.try_read().map_err(smp_boxed)?;
         if !current.is_ready_to_terminating() {
-            return Err(crate::erx::Erx::boxed(
-                format!("Ring:{} current state:{} can not terminate", self.name(), <RingState as Into<&str>>::into(current)).as_str(),
-            ));
+            let current: &str = current.into();
+            return Err(Erx::boxed(&format!("Ring:{} current state:{} can not terminate", self.name(), current)));
         }
 
         let scheduler = Arc::clone(&self.scheduler);
@@ -194,7 +193,7 @@ impl crate::rings::RingsMod for SchedulerManager {
     }
 
     fn stage(&self) -> RingState {
-        self.stage.read().unwrap().clone()
+        *self.stage.read().unwrap()
     }
 
     fn level(&self) -> i64 {

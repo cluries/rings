@@ -7,7 +7,7 @@ pub mod sqlgen;
 pub mod status;
 pub mod zero;
 
-use crate::erx;
+use crate::erx::{smp_boxed, Erx, ResultBoxedE};
 use redis;
 
 // use deadpool_redis::{
@@ -34,17 +34,17 @@ pub fn shared_must() -> &'static DatabaseConnection {
 }
 
 /// get shared DatabaseConnection
-pub fn shared() -> erx::ResultE<&'static DatabaseConnection> {
-    SHARED_DB_CONNECTION.get().ok_or("SHARED_DB_CONNECTION get failed".into())
+pub fn shared() -> ResultBoxedE<&'static DatabaseConnection> {
+    SHARED_DB_CONNECTION.get().ok_or(Erx::boxed("SHARED_DB_CONNECTION get failed"))
 }
 
 /// For async connections, connection pooling isn't necessary, unless blocking commands are used.
 /// The MultiplexedConnection is cloneable and can be used safely from multiple threads, so a single connection can be easily reused.
 /// For automatic reconnections consider using ConnectionManager with the connection-manager feature.
 /// Async cluster connections also don't require pooling and are thread-safe and reusable.
-pub fn make_redis_client() -> erx::ResultE<redis::Client> {
-    let s = SHARED_REDIS_CONNECT_STRING.read().map_err(erx::smp)?.clone();
-    redis::Client::open(s).map_err(erx::smp)
+pub fn make_redis_client() -> ResultBoxedE<redis::Client> {
+    let s = SHARED_REDIS_CONNECT_STRING.read().map_err(smp_boxed)?.clone();
+    redis::Client::open(s).map_err(smp_boxed)
 }
 
 // get redis connection from pool
@@ -112,7 +112,7 @@ pub async fn new_database_connection(backend: Backend) -> DatabaseConnection {
     const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
     const ACQUIRE_TIMEOUT: Duration = Duration::from_secs(8);
     const IDLE_TIMEOUT: Duration = Duration::from_secs(60 * 5);
-    const MAX_LIFETIME: Duration = Duration::from_secs(60 * 60 * 1);
+    const MAX_LIFETIME: Duration = Duration::from_secs(60 * 60);
 
     let connection_string = backend.connect.clone();
     let mut opt = ConnectOptions::new(connection_string.clone());

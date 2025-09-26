@@ -1,4 +1,4 @@
-use crate::erx::Erx;
+use crate::erx::{smp_boxed, Erx, ResultBoxedE, ResultBoxedEX};
 use std::sync::{Arc, RwLock};
 use tokio::sync::OnceCell;
 use tokio_cron_scheduler::Job;
@@ -200,8 +200,7 @@ impl ServiceManager {
     /// * `name` - service name
     /// * `service` - service
     /// # Returns
-    /// * `Result<Arc<RwLock<Box<dyn ServiceTrait>>>, Erx>` - managed service
-    pub fn register<T>(&self) -> Result<Managed, Erx>
+    pub fn register<T>(&self) -> ResultBoxedE<Managed>
     where
         T: ServiceTrait + Default,
     {
@@ -209,7 +208,7 @@ impl ServiceManager {
         let name = ctx.name().to_owned();
 
         if self.managed_by_name(&name).is_some() {
-            return Err(Erx::new(format!("Service '{}' already registered!", name).as_str()));
+            return Err(Erx::boxed(format!("Service '{}' already registered!", name).as_str()));
         }
 
         match self.managed.try_write() {
@@ -219,7 +218,7 @@ impl ServiceManager {
                 write_guard.push(Arc::clone(&warp));
                 Ok(warp)
             },
-            Err(er) => Err(Erx::new(er.to_string().as_str())),
+            Err(er) => Err(Erx::boxed(er.to_string().as_str())),
         }
     }
 
@@ -227,17 +226,16 @@ impl ServiceManager {
     /// # Arguments
     /// * `name` - service name
     /// # Returns
-    /// * `Result<(), Erx>` - unregister result
-    pub fn unregister<T: ServiceTrait + Default>(&self) -> Result<(), Erx> {
+    pub fn unregister<T: ServiceTrait + Default>(&self) -> ResultBoxedEX {
         let name = T::default().name().to_owned();
 
         self.get::<T>()
-            .ok_or(Erx::new(format!("Service '{}' was not registered!", name).as_str()))?
+            .ok_or(Erx::boxed(format!("Service '{}' was not registered!", name).as_str()))?
             .try_write()
-            .map_err(crate::erx::smp)?
+            .map_err(smp_boxed)?
             .release();
 
-        self.managed.try_write().map_err(crate::erx::smp)?.retain(|m| match m.try_read() {
+        self.managed.try_write().map_err(smp_boxed)?.retain(|m| match m.try_read() {
             Err(ex) => {
                 tracing::error!("{}", ex);
                 true
@@ -261,7 +259,6 @@ impl ServiceManager {
     /// # Arguments
     /// * `invoke` - invoke function
     /// # Returns
-    /// * `Result<Fut::Output, Erx>` - invoke result
     ///
     /// # Examples
     ///  let r = m.using::<TestService, _, _>(|srv| {
@@ -269,17 +266,17 @@ impl ServiceManager {
     ///      async move { r }
     ///  }).await;
     ///
-    pub fn using<T, F, Fut>(&self, invoke: F) -> Result<Fut, Erx>
+    pub fn using<T, F, Fut>(&self, invoke: F) -> ResultBoxedE<Fut>
     where
         T: ServiceTrait + Default,
         F: Fn(&T) -> Fut,
         Fut: std::future::Future,
     {
         let name = T::service_name().to_string();
-        let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' Not Registered!", &name)))?;
-        let read_guard = managed.try_read().map_err(crate::erx::smp)?;
+        let managed = self.managed_by_name(&name).ok_or(Erx::boxed(&format!("Service '{}' Not Registered!", &name)))?;
+        let read_guard = managed.try_read().map_err(crate::erx::smp_boxed)?;
         let service =
-            (&*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::new(format!("Unable to Cast Service '{}'", &name).as_str()))?;
+            (&*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::boxed(format!("Unable to Cast Service '{}'", &name).as_str()))?;
         let output = invoke(service);
         Ok(output)
     }
@@ -297,20 +294,20 @@ impl ServiceManager {
     ///      async move { r }
     ///  }).await;
     ///
-    pub fn using_mut<T, F, Fut>(&self, invoke: F) -> Result<Fut, Erx>
+    pub fn using_mut<T, F, Fut>(&self, invoke: F) -> ResultBoxedE<Fut>
     where
         T: ServiceTrait + Default,
         F: Fn(&mut T) -> Fut,
         Fut: std::future::Future,
     {
         let name = T::service_name().to_string();
-        let managed = self.managed_by_name(&name).ok_or(Erx::new(&format!("Service '{}' Not Registered!", &name)))?;
-        let mut write_guard = managed.try_write().map_err(crate::erx::smp)?;
+        let managed = self.managed_by_name(&name).ok_or(Erx::boxed(&format!("Service '{}' Not Registered!", &name)))?;
+        let mut write_guard = managed.try_write().map_err(smp_boxed)?;
 
-        let service = (&mut *write_guard)
+        let service = (*write_guard)
             .as_any_mut()
             .downcast_mut::<T>()
-            .ok_or(Erx::new(format!("Unable to Cast Service '{}'", &name).as_str()))?;
+            .ok_or(Erx::boxed(format!("Unable to Cast Service '{}'", &name).as_str()))?;
         let output = invoke(service);
         Ok(output)
     }

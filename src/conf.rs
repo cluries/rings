@@ -77,7 +77,7 @@ pub fn extends(file: &str) -> &'static Config {
 pub fn rebit() -> &'static RwLock<Rebit> {
     static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
     REBIT.get_or_init(|| {
-        RwLock::new(|| -> Rebit {
+        RwLock::new({
             let r = settings().read().unwrap().clone().try_deserialize::<Rebit>();
             if cfg!(test) {
                 Rebit {
@@ -92,7 +92,7 @@ pub fn rebit() -> &'static RwLock<Rebit> {
             } else {
                 r.unwrap_or_else(|e| panic!("rebit loading error: {}", e))
             }
-        }())
+        })
     })
 }
 

@@ -40,6 +40,8 @@ pub mod debug_level {
     }
 }
 
+pub type ApplyMethod = Arc<dyn Fn(&Parts) -> bool + Send + Sync>;
+
 /// Signator 中间件配置
 #[derive(Clone)]
 pub struct SignatorConfig {
@@ -55,7 +57,8 @@ pub struct SignatorConfig {
     pub redis_url: String,
 
     /// 自定义应用逻辑
-    pub apply: Option<Arc<dyn Fn(&Parts) -> bool + Send + Sync>>,
+    pub apply: Option<ApplyMethod>,
+
     /// HTTP 方法过滤 - 使用 Arc 减少 clone 成本
     pub methods: Option<Arc<Vec<ApplyKind<HttpMethod>>>>,
     /// 路径匹配模式 - 使用 Arc 减少 clone 成本
@@ -226,20 +229,22 @@ impl SignatorConfig {
     }
 
     /// 验证配置是否完整和有效
-    pub fn validate(&self) -> Result<(), Error> {
+    pub fn validate(&self) -> Result<(), Box<Error>> {
+        let boxed_error = |c: &str| Err(Box::new(Error::ConfigError(c.to_string())));
+
         // 验证 nonce_lifetime 的合理性
         if self.nonce_lifetime <= 0 {
-            return Err(Error::ConfigError("Nonce lifetime must be positive".to_string()));
+            return boxed_error("Nonce lifetime must be positive");
         }
 
         if self.nonce_lifetime > 86400 {
             // 24小时
-            return Err(Error::ConfigError("Nonce lifetime should not exceed 24 hours".to_string()));
+            return boxed_error("Nonce lifetime should not exceed 24 hours");
         }
 
         // 验证 Redis URL 格式
         if !self.redis_url.starts_with("redis://") && !self.redis_url.starts_with("rediss://") {
-            return Err(Error::ConfigError("Redis URL must start with 'redis://' or 'rediss://'".to_string()));
+            return boxed_error("Redis URL must start with 'redis://' or 'rediss://'");
         }
 
         Ok(())
@@ -353,6 +358,10 @@ impl std::fmt::Display for Error {
     }
 }
 
+fn redis_error_to_boxed(e: redis::RedisError) -> Box<Error> {
+    Box::new(Error::from(e))
+}
+
 impl From<redis::RedisError> for Error {
     fn from(err: redis::RedisError) -> Self {
         match err.kind() {
@@ -405,13 +414,13 @@ impl Signator {
     ///
     /// Returns the authenticated request with user context injected, or an authentication error.
     //
-    pub async fn authenticate(&self, request: axum::extract::Request) -> Result<axum::extract::Request, Error> {
+    pub async fn authenticate(&self, request: axum::extract::Request) -> Result<axum::extract::Request, Box<Error>> {
         let (payload_request, mut request) = clone_request(request).await;
 
         let payload = Payload::from_request(payload_request).await?;
         payload.validate_headers()?;
 
-        let key = (self.config.key_loader)(payload.get_user_id()).await.map_err(Error::KeyLoadingFailed)?;
+        let key = (self.config.key_loader)(payload.get_user_id()).await.map_err(|e| Box::new(Error::KeyLoadingFailed(e)))?;
 
         if let Err(invalid) = payload.validate_signature(key) {
             match self.config.backdoor.as_ref() {
@@ -452,17 +461,17 @@ impl Signator {
     ///
     /// This ensures each nonce can only be used once within the configured time window,
     /// providing protection against replay attacks while automatically cleaning up old data.
-    async fn validate_nonce(&self, payload: &Payload) -> Result<(), Error> {
-        let mut redis_conn = self.redis_client.get_multiplexed_tokio_connection().await?;
+    async fn validate_nonce(&self, payload: &Payload) -> Result<(), Box<Error>> {
+        let mut redis_conn = self.redis_client.get_multiplexed_tokio_connection().await.map_err(redis_error_to_boxed)?;
         let redis_key = format!("XR:{}", payload.get_user_id());
         let nonce_value = payload.get_nonce();
 
-        let existing_score: Option<i64> = redis_conn.zscore(redis_key.as_str(), &nonce_value).await?;
+        let existing_score: Option<i64> = redis_conn.zscore(redis_key.as_str(), &nonce_value).await.map_err(redis_error_to_boxed)?;
         let last_used_timestamp = existing_score.unwrap_or(0);
         let current_timestamp: i64 = chrono::Local::now().timestamp();
 
         if (current_timestamp - last_used_timestamp).abs() < self.config.nonce_lifetime {
-            return Err(Error::NonceReused(payload.get_nonce()));
+            return Err(Box::new(Error::NonceReused(payload.get_nonce())));
         }
 
         // 清理过期的 nonce 并添加新的
@@ -470,7 +479,7 @@ impl Signator {
         pipeline.zadd(redis_key.as_str(), &nonce_value, current_timestamp);
         pipeline.zrembyscore(redis_key.as_str(), "-inf", current_timestamp - self.config.nonce_lifetime);
         pipeline.expire(redis_key.as_str(), self.config.nonce_lifetime);
-        let _result = pipeline.query_async::<Vec<i64>>(&mut redis_conn).await?;
+        let _result = pipeline.query_async::<Vec<i64>>(&mut redis_conn).await.map_err(redis_error_to_boxed)?;
 
         Ok(())
     }
@@ -521,7 +530,7 @@ impl Middleware for Signator {
                 Ok(req) => Ok((context, req)),
                 Err(error) => {
                     if debug_level::enable_log(signator.config.debug_level) {
-                        if let Error::SignatureVerificationFailed(d) = &error {
+                        if let Error::SignatureVerificationFailed(d) = error.as_ref() {
                             tracing::error!("Signature verification failed: {:#?}", d.make_map(false));
                         }
                     }
@@ -691,11 +700,7 @@ impl Payload {
                 },
             };
 
-            if let Err(err) = body {
-                return Err(err);
-            }
-
-            payload.body = body.ok();
+            payload.body = Some(body?);
         }
 
         payload.extract_headers(parts.headers);
@@ -750,19 +755,19 @@ impl Payload {
         self.dev_skip.clone().unwrap_or_default()
     }
 
-    fn validate_signature(&self, key: String) -> Result<(), Error> {
+    fn validate_signature(&self, key: String) -> Result<(), Box<Error>> {
         let payload = self.payload();
-        let server_signature = hash::hmac_sha1(&payload, &key).map_err(Error::InternalError)?;
+        let server_signature = hash::hmac_sha1(&payload, &key).map_err(|e| Box::new(Error::InternalError(e)))?;
 
         let client_signature = self.get_signature();
 
         if server_signature != client_signature {
-            return Err(Error::SignatureVerificationFailed(SignatureDebugInfo {
+            return Err(Box::new(Error::SignatureVerificationFailed(SignatureDebugInfo {
                 payload,
                 key: key.clone(),
                 server_signature,
                 client_signature,
-            }));
+            })));
         }
 
         Ok(())
@@ -793,7 +798,7 @@ impl Payload {
     ///
     /// Returns an error if any validation fails, providing specific details about what went wrong.
     /// This validation layer provides the first line of defense against malformed or malicious requests.
-    fn validate_headers(&self) -> Result<(), Error> {
+    fn validate_headers(&self) -> Result<(), Box<Error>> {
         // 检查必需的头部字段
         let mut missing_headers = Vec::new();
         if self.user_id.is_none() {
@@ -810,7 +815,7 @@ impl Payload {
         }
 
         if !missing_headers.is_empty() {
-            return Err(Error::MissingHeaders(missing_headers));
+            return Err(Box::new(Error::MissingHeaders(missing_headers)));
         }
 
         // 验证时间戳格式和范围
@@ -818,13 +823,13 @@ impl Payload {
         let timestamp = timestamp_str.parse::<i64>().map_err(|_| Error::InvalidTimestamp(timestamp_str.clone()))?;
 
         if timestamp < MAX_TIME_DEVIATION || (chrono::Utc::now().timestamp() - timestamp).abs() > MAX_TIME_DEVIATION {
-            return Err(Error::TimestampOutOfRange { timestamp, max_diff: MAX_TIME_DEVIATION });
+            return Err(Box::new(Error::TimestampOutOfRange { timestamp, max_diff: MAX_TIME_DEVIATION }));
         }
 
         // 验证随机数长度
         let nonce_length = self.nonce.as_ref().unwrap().len();
         if nonce_length <= MIN_NONCE_LENGTH || nonce_length >= MAX_NONCE_LENGTH {
-            return Err(Error::InvalidNonceLength { length: nonce_length, min: MIN_NONCE_LENGTH, max: MAX_NONCE_LENGTH });
+            return Err(Box::new(Error::InvalidNonceLength { length: nonce_length, min: MIN_NONCE_LENGTH, max: MAX_NONCE_LENGTH }));
         }
 
         // 验证签名长度
@@ -834,7 +839,7 @@ impl Payload {
         };
 
         if signature_length != SIGNATURE_LENGTH {
-            return Err(Error::InvalidSignatureLength { length: signature_length, expected: SIGNATURE_LENGTH });
+            return Err(Box::new(Error::InvalidSignatureLength { length: signature_length, expected: SIGNATURE_LENGTH }));
         }
 
         Ok(())

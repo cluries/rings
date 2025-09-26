@@ -1,8 +1,8 @@
 // Don't change this value, it will be replaced by the commit build time
-pub static COMMIT_BUILD: &'static str = "20250308100426";
+pub static COMMIT_BUILD: &str = "20250308100426";
 
 // Don't change this value, it will be replaced by the version
-pub static VERSION: &'static str = "0.1.0 - Dev";
+pub static VERSION: &str = "0.1.0 - Dev";
 
 pub mod any;
 pub mod app;

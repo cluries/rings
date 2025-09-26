@@ -7,9 +7,9 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-const ORIGIN_ERX_CODE: &'static str = "ORIGIN_ERX_CODE";
-const JSON_SERIAL_ERROR: &'static str = "JSON serialization error";
-const OPTION_NONE_MESSAGE: &'static str = "Sorry, some error occurred, but no message was provided";
+const ORIGIN_ERX_CODE: &str = "ORIGIN_ERX_CODE";
+const JSON_SERIAL_ERROR: &str = "JSON serialization error";
+const OPTION_NONE_MESSAGE: &str = "Sorry, some error occurred, but no message was provided";
 
 pub type OutAny = Out<serde_json::Value>;
 
