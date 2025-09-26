@@ -14,12 +14,23 @@ pub type RingsApplication = Arc<RwLock<Rings>>;
 /// Rings
 static RINGS: RwLock<Vec<RingsApplication>> = RwLock::new(Vec::new());
 
+static TOKIO_RUNTIME: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();
+
 #[allow(clippy::type_complexity)]
 static RINGS_INVOKE_MACRO: RwLock<Vec<(String, fn())>> = RwLock::new(Vec::new());
 
 /// name: ringsapp name
 pub fn add_rings_invoke_macro(name: &str, func: fn()) {
     RINGS_INVOKE_MACRO.write().unwrap().push((name.to_string(), func));
+}
+
+/// shared tokio runtime
+pub fn shared_tokio_runtime() -> &'static tokio::runtime::Runtime {
+    TOKIO_RUNTIME.get_or_init(|| tokio::runtime::Runtime::new().unwrap())
+}
+
+pub fn block_on<F: core::future::Future>(future: F) -> F::Output {
+    shared_tokio_runtime().block_on(future)
 }
 
 /// Rings Application

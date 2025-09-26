@@ -1,3 +1,4 @@
+use crate::rings::block_on;
 use config::{Config, Value};
 use serde::{Deserialize, Serialize};
 ///  struct GetDefault;
@@ -18,6 +19,30 @@ use tokio::sync::RwLock;
 pub struct GetDefault;
 pub struct GetOption;
 pub struct Has;
+
+/// get rebit instance
+/// # Returns
+/// * `&'static RwLock<Rebit>` - rebit instance
+pub fn rebit() -> &'static RwLock<Rebit> {
+    static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
+    REBIT.get_or_init(|| {
+        RwLock::new({
+            if cfg!(test) {
+                Rebit {
+                    name: "Rebit".to_string(),
+                    short: "REBT".to_string(),
+                    debug: true,
+                    web: Default::default(),
+                    model: Model { backends: None },
+                    log: None,
+                    extends: None,
+                }
+            } else {
+                block_on(async { settings().read().await.clone().try_deserialize::<Rebit>() }).expect("rebit loading error")
+            }
+        })
+    })
+}
 
 /// get settings
 /// it's not recommand to call settings() directly
@@ -58,32 +83,6 @@ pub async fn extends(file: &str) -> &'static Config {
     write.insert(key, c);
 
     unsafe { &*(extends.read().await.get(file).unwrap() as *const Config) }
-}
-
-/// get rebit instance
-/// # Returns
-/// * `&'static RwLock<Rebit>` - rebit instance
-pub fn rebit() -> &'static RwLock<Rebit> {
-    static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
-    REBIT.get_or_init(|| {
-        RwLock::new({
-            if cfg!(test) {
-                Rebit {
-                    name: "Rebit".to_string(),
-                    short: "REBT".to_string(),
-                    debug: true,
-                    web: Default::default(),
-                    model: Model { backends: None },
-                    log: None,
-                    extends: None,
-                }
-            } else {
-                let runtime = tokio::runtime::Runtime::new().unwrap();
-                let r = runtime.block_on(async { settings().read().await.clone().try_deserialize::<Rebit>() });
-                r.unwrap_or_else(|e| panic!("rebit loading error: {}", e))
-            }
-        })
-    })
 }
 
 /// init config
@@ -393,29 +392,29 @@ mod tests {
     use super::*;
     use crate::tools::tests::tools::project_dir;
 
-    #[test]
-    fn tests() {
+    #[tokio::test]
+    async fn tests() {
         // print!("{:?}", settings().read().unwrap().clone().try_deserialize::<std::collections::HashMap<String, Value>>().unwrap());
-        println!("{:?}", GetOption::string("name"));
-        println!("{:?}", GetOption::table("model.backends.postgre"));
+        println!("{:?}", GetOption::string("name").await);
+        println!("{:?}", GetOption::table("model.backends.postgre").await);
     }
 
-    #[test]
-    fn test_path_value() {
+    #[tokio::test]
+    async fn test_path_value() {
         #[derive(Debug, Deserialize, Serialize, Clone)]
         struct Port {
             pub tcp: i32,
             pub udp: i32,
         }
 
-        println!("{:?}", GetOption::get::<Vec<Port>>("providers.cnpc.management.ports"));
+        println!("{:?}", GetOption::get::<Vec<Port>>("providers.cnpc.management.ports").await);
     }
 
     /// test extends
-    #[test]
-    fn test_extends() {
+    #[tokio::test]
+    async fn test_extends() {
         let tests_load = format!("{}/tests/using-test-config.yml", project_dir().to_string_lossy());
-        let c = extends(&tests_load);
+        let c = extends(&tests_load).await;
         println!("{:?}", c);
     }
 }

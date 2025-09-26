@@ -31,6 +31,7 @@ pub struct ChatResponse {
     response: CreateChatCompletionResponse,
 }
 
+#[derive(Default)]
 pub struct PromptsBuilder {
     messages: Vec<ChatCompletionRequestMessage>,
 }

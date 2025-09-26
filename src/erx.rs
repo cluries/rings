@@ -3,7 +3,7 @@
 /// ResultEX = ResultE<()>;
 /// fn smp<T: ToString>(error: T) -> Erx
 /// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
-use crate::conf;
+use crate::{conf, rings::block_on};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
@@ -14,12 +14,7 @@ use std::sync::OnceLock;
 static APP_SHORT: OnceLock<String> = OnceLock::new();
 
 pub fn app_short() -> String {
-    APP_SHORT
-        .get_or_init(|| {
-            let runtime = tokio::runtime::Runtime::new().unwrap();
-            runtime.block_on(async { conf::rebit().read().await.short.clone() })
-        })
-        .clone()
+    APP_SHORT.get_or_init(|| block_on(async { conf::rebit().read().await.short.clone() })).clone()
 }
 
 /// Zero
