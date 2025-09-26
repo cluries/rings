@@ -326,15 +326,14 @@ impl Rings {
     }
 
     pub async fn remove_mod(&mut self, name: &str) -> &mut Self {
-        let drain = |m: &Box<dyn RingsMod>| m.name().eq(name);
-
+        // let drain = |m: &dyn RingsMod| m.name().eq(name);
         for m in &mut self.mods {
-            if drain(m) {
+            if name.eq(&m.name()) {
                 m.unregister().await.expect("unregister mod failed.");
             }
         }
 
-        self.mods.retain(|m| !drain(m));
+        self.mods.retain(|m| !name.eq(&m.name()));
 
         self
     }
