@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::fmt;
 use std::str::FromStr;
-use std::sync::{OnceLock, RwLock};
+use std::sync::OnceLock;
+use tokio::sync::RwLock;
 
 //get or default
 pub struct GetDefault;
@@ -36,39 +37,27 @@ pub fn settings() -> &'static RwLock<Config> {
 /// * `&'static Config` - config instance
 /// # Panics
 /// * if file not found or invalid
-pub fn extends(file: &str) -> &'static Config {
+pub async fn extends(file: &str) -> &'static Config {
     static EXTENDS: OnceLock<RwLock<std::collections::HashMap<&'static str, Config>>> = OnceLock::new();
     let extends = EXTENDS.get_or_init(|| RwLock::new(std::collections::HashMap::new()));
 
-    match extends.read() {
-        Ok(read) => {
-            if read.contains_key(file) {
-                let c = read.get(file).unwrap();
-                return unsafe { &*(c as *const Config) };
-            }
-        },
-        Err(er) => {
-            panic!("{}", er)
-        },
+    let read = extends.read().await;
+    if read.contains_key(file) {
+        let c = read.get(file).unwrap();
+        return unsafe { &*(c as *const Config) };
     }
 
-    match extends.write() {
-        Ok(mut write) => {
-            let c = {
-                let conf = config::File::with_name(file).required(true);
-                let builder = Config::builder().add_source(conf);
-                builder.build().unwrap()
-            };
+    let mut write = extends.write().await;
+    let c = {
+        let conf = config::File::with_name(file).required(true);
+        let builder = Config::builder().add_source(conf);
+        builder.build().unwrap()
+    };
 
-            let key = Box::leak(file.to_owned().into_boxed_str());
-            write.insert(key, c);
-        },
-        Err(er) => {
-            panic!("{}", er)
-        },
-    }
+    let key = Box::leak(file.to_owned().into_boxed_str());
+    write.insert(key, c);
 
-    unsafe { &*(extends.read().unwrap().get(file).unwrap() as *const Config) }
+    unsafe { &*(extends.read().await.get(file).unwrap() as *const Config) }
 }
 
 /// get rebit instance
@@ -78,7 +67,6 @@ pub fn rebit() -> &'static RwLock<Rebit> {
     static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
     REBIT.get_or_init(|| {
         RwLock::new({
-            let r = settings().read().unwrap().clone().try_deserialize::<Rebit>();
             if cfg!(test) {
                 Rebit {
                     name: "Rebit".to_string(),
@@ -90,6 +78,8 @@ pub fn rebit() -> &'static RwLock<Rebit> {
                     extends: None,
                 }
             } else {
+                let runtime = tokio::runtime::Runtime::new().unwrap();
+                let r = runtime.block_on(async { settings().read().await.clone().try_deserialize::<Rebit>() });
                 r.unwrap_or_else(|e| panic!("rebit loading error: {}", e))
             }
         })
@@ -144,12 +134,10 @@ fn init_config() -> Config {
 /// make getter for settings, if not found, return default value
 macro_rules! make_setting_getter_default {
     ($name:ident, $type:ty, $getter:ident) => {
-        pub fn $name(k: &str, default: $type) -> $type {
+        pub async fn $name(k: &str, default: $type) -> $type {
             // let settings = settings().read();
-            match settings().read() {
-                Ok(guard) => guard.$getter(k).unwrap_or(default),
-                Err(_) => default,
-            }
+            let guard = settings().read().await;
+            guard.$getter(k).unwrap_or(default)
         }
     };
 }
@@ -157,12 +145,10 @@ macro_rules! make_setting_getter_default {
 /// make getter for settings, return Option value
 macro_rules! make_setting_getter_option {
     ($name:ident, $type:ty, $getter:ident) => {
-        pub fn $name(k: &str) -> Option<$type> {
+        pub async fn $name(k: &str) -> Option<$type> {
             // let settings = settings().read();
-            match settings().read() {
-                Ok(guard) => guard.$getter(k).ok(),
-                Err(_) => None,
-            }
+            let guard = settings().read().await;
+            guard.$getter(k).ok()
         }
     };
 }
@@ -188,29 +174,22 @@ make_setting_getter!(table, std::collections::HashMap<String, Value>, get_table)
 make_setting_getter!(array, Vec<Value>, get_array);
 
 impl GetOption {
-    pub fn get<'de, T: Deserialize<'de>>(key: &str) -> Option<T> {
-        match settings().read() {
-            Ok(guard) => guard.get(key).ok(),
-            Err(_) => None,
-        }
+    pub async fn get<'de, T: Deserialize<'de>>(key: &str) -> Option<T> {
+        let guard = settings().read().await;
+        guard.get(key).ok()
     }
 }
 impl GetDefault {
-    pub fn get<'de, T: Deserialize<'de>>(key: &str, default: T) -> T {
-        match settings().read() {
-            Ok(guard) => guard.get(key).unwrap_or(default),
-            Err(_) => default,
-        }
+    pub async fn get<'de, T: Deserialize<'de>>(key: &str, default: T) -> T {
+        let guard = settings().read().await;
+        guard.get(key).unwrap_or(default)
     }
 }
 
 impl Has {
-    pub fn has<T: for<'a> serde::Deserialize<'a>>(k: &str) -> bool {
-        let settings = settings().read();
-        match settings {
-            Ok(guard) => guard.get::<T>(k).is_ok(),
-            Err(_) => false,
-        }
+    pub async fn has<T: for<'a> serde::Deserialize<'a>>(k: &str) -> bool {
+        let guard = settings().read().await;
+        guard.get::<T>(k).is_ok()
     }
 }
 

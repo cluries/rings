@@ -14,7 +14,12 @@ use std::sync::OnceLock;
 static APP_SHORT: OnceLock<String> = OnceLock::new();
 
 pub fn app_short() -> String {
-    APP_SHORT.get_or_init(|| conf::rebit().read().expect("failed read rebit object").short.clone()).clone()
+    APP_SHORT
+        .get_or_init(|| {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(async { conf::rebit().read().await.short.clone() })
+        })
+        .clone()
 }
 
 /// Zero

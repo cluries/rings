@@ -28,7 +28,7 @@ pub async fn logging_initialize() {
         }
     }
 
-    let rebit = crate::conf::rebit().read().expect("conf::rebit is not initialized");
+    let rebit = crate::conf::rebit().read().await;
     let app_name = rebit.name.clone();
     let log_conf = match &rebit.log {
         None => Default::default(),
