@@ -1,4 +1,4 @@
-use crate::erx;
+use crate::erx::{self, ResultBoxedE};
 use std::ops::IndexMut;
 
 ///
@@ -133,7 +133,7 @@ impl<T> Balanced<T> {
         self
     }
 
-    pub fn balance(&mut self, job: &Job) -> Result<(T, InvokedLink), erx::Erx> {
+    pub fn balance(&mut self, job: &Job) -> ResultBoxedE<(T, InvokedLink)> {
         fn try_acquire_resource<T>(weight: &mut Weighted<T>, job: &Job, used_millis: u128) -> Option<(T, InvokedLink)> {
             if !(weight.condition)(job) {
                 return None;
@@ -153,11 +153,11 @@ impl<T> Balanced<T> {
         }
 
         if self.weights.is_empty() {
-            return Err(erx::Erx::new("no weights available"));
+            return Err(erx::Erx::boxed("no weights available"));
         }
 
         if self.weights_pool.is_empty() {
-            return Err(erx::Erx::new("all weights have zero priority"));
+            return Err(erx::Erx::boxed("all weights have zero priority"));
         }
 
         let used_millis = millis();
@@ -176,7 +176,7 @@ impl<T> Balanced<T> {
             attempts -= 1;
         }
 
-        Err(erx::Erx::new("no available resources"))
+        Err(erx::Erx::boxed("no available resources"))
     }
 
     pub fn unlock(&mut self, link: &InvokedLink) -> &mut Self {
@@ -227,10 +227,10 @@ impl<T> Weighted<T> {
         self
     }
 
-    pub fn add_concurrent(&mut self, concurrent: Concurrent) -> Result<(), erx::Erx> {
+    pub fn add_concurrent(&mut self, concurrent: Concurrent) -> ResultBoxedE<()> {
         for c in self.concurrents.iter() {
             if c.id == concurrent.id {
-                return erx::Erx::new("concurrent id already exists").into();
+                return Err(erx::Erx::boxed("concurrent id already exists"));
             }
         }
 
@@ -252,7 +252,7 @@ impl<T> Weighted<T> {
         self.concurrents.len()
     }
 
-    pub fn try_using(&mut self, timeout: u128, used_millis: u128) -> Result<(u32, u128), erx::Erx> {
+    pub fn try_using(&mut self, timeout: u128, used_millis: u128) -> ResultBoxedE<(u32, u128)> {
         let millis = if used_millis == 0 { millis() } else { used_millis };
 
         for concurrent in self.concurrents.iter_mut() {
@@ -270,7 +270,7 @@ impl<T> Weighted<T> {
             return Ok(r);
         }
 
-        Err(erx::Erx::new("all concurrents are busy"))
+        Err(erx::Erx::boxed("all concurrents are busy"))
     }
 }
 
