@@ -344,7 +344,7 @@ impl Rings {
 
     pub fn get_state_unchecked(&self) -> RingState {
         match self.state.try_read() {
-            Ok(state) => state.clone(),
+            Ok(state) => *state,
             Err(_) => RingState::Unknown,
         }
     }

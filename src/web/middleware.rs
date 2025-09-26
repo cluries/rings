@@ -57,7 +57,6 @@ where
     //         ApplyKind::Exclude(p) => !checker(p),
     //     }
     // }
-
     pub fn apply(&self, value: &str) -> bool {
         match self {
             ApplyKind::Include(t) => t.apply(value),

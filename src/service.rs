@@ -276,7 +276,7 @@ impl ServiceManager {
         let managed = self.managed_by_name(&name).ok_or(Erx::boxed(&format!("Service '{}' Not Registered!", &name)))?;
         let read_guard = managed.try_read().map_err(crate::erx::smp_boxed)?;
         let service =
-            (&*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::boxed(format!("Unable to Cast Service '{}'", &name).as_str()))?;
+            (*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::boxed(format!("Unable to Cast Service '{}'", &name).as_str()))?;
         let output = invoke(service);
         Ok(output)
     }

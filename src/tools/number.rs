@@ -1,5 +1,4 @@
-/// https://crates.io/crates/rust_decimal
-///
+// https://crates.io/crates/rust_decimal
 // #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 // pub enum Number {
 //     I8(i8),

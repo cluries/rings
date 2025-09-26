@@ -146,7 +146,8 @@ impl From<HttpCode> for crate::erx::Erx {
 
 impl HttpCode {
     pub fn okay(code: i32) -> bool {
-        code >= 200 && code < 300
+        // code >= 200 && code < 300
+        (200..300).contains(&code)
     }
 
     pub fn ok(&self) -> bool {

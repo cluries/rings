@@ -99,7 +99,8 @@ pub fn smp_boxed<T: ToString>(error: T) -> Box<Erx> {
 /// - 生成的错误消息格式为: "{additional} : {原始错误消息}"
 /// - 使用默认的错误代码（LayoutedC::default()）
 /// - 不包含任何额外信息（extra字段为空）
-/// 适用于需要为一系列相关错误添加统一上下文信息的场景，比如在特定模块或函数中批量处理错误时
+///
+///  适用于需要为一系列相关错误添加统一上下文信息的场景，比如在特定模块或函数中批量处理错误时
 ///
 /// # 示例
 /// ```
@@ -432,7 +433,7 @@ impl Erx {
             return None;
         }
 
-        self.extra.iter().find(|e| e.0.eq(key)).and_then(|e| Some(e.1.clone()))
+        self.extra.iter().find(|e| e.0.eq(key)).map(|e| e.1.clone())
     }
 
     /// get extra value, if not exists, return defaults
