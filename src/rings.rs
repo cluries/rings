@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, OnceLock};
+use tokio::sync::RwLock;
 use tracing::{error, info, span};
 
 /// Rings Application
@@ -12,12 +13,16 @@ use tracing::{error, info, span};
 pub type RingsApplication = Arc<RwLock<Rings>>;
 
 /// Rings
-static RINGS: RwLock<Vec<RingsApplication>> = RwLock::new(Vec::new());
+static _RINGS: OnceLock<RwLock<Vec<RingsApplication>>> = OnceLock::new();
 
-static TOKIO_RUNTIME: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();
+static TOKIO_RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
 
 #[allow(clippy::type_complexity)]
-static RINGS_INVOKE_MACRO: RwLock<Vec<(String, fn())>> = RwLock::new(Vec::new());
+static RINGS_INVOKE_MACRO: std::sync::RwLock<Vec<(String, fn())>> = std::sync::RwLock::new(Vec::new());
+
+fn ring_apps() -> &'static RwLock<Vec<RingsApplication>> {
+    _RINGS.get_or_init(|| RwLock::new(vec![]))
+}
 
 /// name: ringsapp name
 pub fn add_rings_invoke_macro(name: &str, func: fn()) {
@@ -154,8 +159,9 @@ impl RingState {
         Ok(())
     }
 
-    pub fn safe_ring_state_must_set(rs: &SafeRingState, s: RingState) -> ResultBoxedEX {
-        *rs.write().map_err(smp_boxed)? = s;
+    pub async fn safe_ring_state_must_set(rs: &SafeRingState, s: RingState) -> ResultBoxedEX {
+        let mut g = rs.write().await;
+        *g = s;
         Ok(())
     }
 
@@ -163,8 +169,8 @@ impl RingState {
         Ok(*rs.try_read().map_err(smp_boxed)?)
     }
 
-    pub fn safe_ring_state_must_get(rs: &SafeRingState) -> ResultBoxedE<RingState> {
-        Ok(*rs.read().map_err(smp_boxed)?)
+    pub async fn safe_ring_state_must_get(rs: &SafeRingState) -> ResultBoxedE<RingState> {
+        Ok(*rs.read().await)
     }
 
     pub fn inited_safe_ring_state() -> SafeRingState {
@@ -180,7 +186,7 @@ pub trait RingsMod: AnyTrait + Send + Sync {
     async fn unregister(&mut self) -> ResultBoxedEX;
     async fn shutdown(&mut self) -> ResultBoxedEX;
     async fn fire(&mut self) -> ResultBoxedEX;
-    fn stage(&self) -> RingState;
+    async fn stage(&self) -> RingState;
     fn level(&self) -> i64;
 }
 
@@ -188,10 +194,10 @@ pub trait RingsMod: AnyTrait + Send + Sync {
 /// Just like namespace, call some rings methods
 pub struct R;
 impl R {
-    pub fn instance(name: String) -> Result<RingsApplication, String> {
-        for ring in RINGS.read().unwrap().iter() {
+    pub async fn instance(name: String) -> Result<RingsApplication, String> {
+        for ring in ring_apps().read().await.iter() {
             let r = Arc::clone(ring);
-            if r.read().unwrap().name.eq(&name) {
+            if r.read().await.name.eq(&name) {
                 return Ok(Arc::clone(ring));
             }
         }
@@ -214,7 +220,29 @@ impl R {
 
         let arc: RingsApplication = Arc::new(RwLock::new(app));
 
-        match RINGS.try_write() {
+        // match ring_apps().try_write() {
+        //     Ok(mut rings) => {
+        //         // # TODO
+        //         // Currently, only one app registration is supported.
+        //         // When we change this later, we need to synchronously modify
+        //         // the support for multiple RingApps in other components
+        //         // like ServiceManager, SchedulerManager, and Model.
+        //         if rings.len() > 1 {
+        //             panic!(
+        //                 "Sorry, you've already registered an app. \
+        //             The current version only supports registering one app. \
+        //             We'll support multiple apps as soon as possible."
+        //             );
+        //         }
+
+        //         rings.push(Arc::clone(&arc));
+        //     },
+        //     Err(ex) => {
+        //         error!("make rings push RINGS: {}", ex);
+        //     },
+        // }
+
+        match ring_apps().try_write() {
             Ok(mut rings) => {
                 // # TODO
                 // Currently, only one app registration is supported.
@@ -295,14 +323,14 @@ impl Rings {
     }
 
     pub async fn shutdown(&mut self) {
-        if !self.state.read().unwrap().is_ready_to_terminating() {
+        if !self.state.read().await.is_ready_to_terminating() {
             return;
         }
 
         self.make_moment("shutdown");
 
         info!("rings::shutdown....");
-        *self.state.write().unwrap() = RingState::Terminating;
+        *self.state.write().await = RingState::Terminating;
 
         for md in self.mods.iter_mut() {
             match md.shutdown().await {
@@ -374,7 +402,7 @@ impl Rings {
             }
         }
 
-        *self.state.write().unwrap() = RingState::Working;
+        *self.state.write().await = RingState::Working;
 
         // let mut groups: HashMap<i64, Vec<_>> = HashMap::new();
         // for m in self.mods.iter_mut() {
@@ -419,13 +447,17 @@ impl Rings {
         // tokio::spawn(ctrl_c(self.name.clone(), Arc::clone(&self.state)));
     }
 
-    pub fn mods_stages(&self) -> HashMap<String, RingState> {
-        self.mods.iter().map(|m| (m.name().to_string(), m.stage())).collect()
+    pub async fn mods_stages(&self) -> HashMap<String, RingState> {
+        let mut map: HashMap<String, RingState> = HashMap::new();
+        for m in self.mods.iter() {
+            map.insert(m.name().to_string(), m.stage().await);
+        }
+        map
     }
 
-    pub fn mods_all_terminated(&self) -> bool {
+    pub async fn mods_all_terminated(&self) -> bool {
         for m in self.mods.iter() {
-            if m.stage() != RingState::Terminated {
+            if m.stage().await != RingState::Terminated {
                 return false;
             }
         }
@@ -433,8 +465,8 @@ impl Rings {
         true
     }
 
-    pub fn set_state(&self, state: RingState) {
-        *self.state.write().unwrap() = state;
+    pub async fn set_state(&self, state: RingState) {
+        *self.state.write().await = state;
     }
 
     async fn serve(app: &RingsApplication) {
@@ -447,14 +479,17 @@ impl Rings {
         tokio::signal::ctrl_c().await.expect("attempt to terminate immediately");
         info!("rings::listen_signal_kill received Ctrl-C, shutting down");
 
-        match app.write() {
-            Ok(mut write_app) => {
-                write_app.shutdown().await;
-            },
-            Err(er) => {
-                error!("failed to listen_signal_kill: {}", er);
-            },
-        };
+        // match app.write().await {
+        //     Ok(mut write_app) => {
+        //         write_app.shutdown().await;
+        //     },
+        //     Err(er) => {
+        //         error!("failed to listen_signal_kill: {}", er);
+        //     },
+        // };
+
+        let mut write_app = app.write().await;
+        write_app.shutdown().await;
     }
 
     async fn holding(app: &RingsApplication) {
@@ -479,12 +514,12 @@ impl Rings {
                         continue;
                     }
 
-                    if ring.mods_all_terminated() {
+                    if ring.mods_all_terminated().await {
                         info!("all mods terminated, breaking loop");
                         break;
                     }
 
-                    let mod_stages = ring.mods_stages();
+                    let mod_stages = ring.mods_stages().await;
                     info!("mod stages: {:?}", mod_stages);
                 },
                 Err(_) => {
@@ -493,7 +528,7 @@ impl Rings {
             }
         }
 
-        app.write().unwrap().set_state(RingState::Terminated);
+        app.write().await.set_state(RingState::Terminated).await;
     }
 
     pub fn description(&self) -> String {

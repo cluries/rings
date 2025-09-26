@@ -3,8 +3,8 @@ use crate::rings::RingState;
 use crate::service::ServiceManager;
 use async_trait::async_trait;
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
-use tokio::sync::RwLock as ToKioRwLock;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_cron_scheduler::JobScheduler;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -14,7 +14,7 @@ use uuid::Uuid;
 pub struct SchedulerManager {
     stage: Arc<RwLock<RingState>>,
     count: u64,
-    scheduler: Arc<ToKioRwLock<JobScheduler>>,
+    scheduler: Arc<RwLock<JobScheduler>>,
 }
 
 impl SchedulerManager {
@@ -27,7 +27,7 @@ impl SchedulerManager {
             })
         }));
 
-        Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: Arc::new(ToKioRwLock::new(scheduler)) }
+        Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: Arc::new(RwLock::new(scheduler)) }
     }
 
     pub async fn add_job(&mut self, job: tokio_cron_scheduler::Job) -> ResultBoxedE<String> {
@@ -142,7 +142,7 @@ impl crate::rings::RingsMod for SchedulerManager {
     }
 
     async fn fire(&mut self) -> ResultBoxedEX {
-        *self.stage.write().unwrap() = RingState::Working;
+        *self.stage.write().await = RingState::Working;
 
         let stage = self.stage.clone();
         let dog = async move {
@@ -165,7 +165,7 @@ impl crate::rings::RingsMod for SchedulerManager {
                 tokio::time::sleep(duration).await;
             }
 
-            *stage.write().unwrap() = RingState::Terminated;
+            *stage.write().await = RingState::Terminated;
 
             stage_read_lock_failures
         };
@@ -192,8 +192,8 @@ impl crate::rings::RingsMod for SchedulerManager {
         Ok(())
     }
 
-    fn stage(&self) -> RingState {
-        *self.stage.read().unwrap()
+    async fn stage(&self) -> RingState {
+        *self.stage.read().await
     }
 
     fn level(&self) -> i64 {

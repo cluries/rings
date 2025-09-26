@@ -143,7 +143,7 @@ impl RingsMod for Web {
     }
 
     async fn shutdown(&mut self) -> ResultBoxedE<()> {
-        let current = RingState::safe_ring_state_must_get(&self.stage)?;
+        let current = RingState::safe_ring_state_must_get(&self.stage).await?;
 
         if !current.is_ready_to_terminating() {
             return Err(crate::erx::Erx::boxed(&format!(
@@ -186,16 +186,16 @@ impl RingsMod for Web {
     // }
 
     async fn fire(&mut self) -> ResultBoxedE<()> {
-        let web_listen = |name: String, bind: String, router: Router, stage: Arc<RwLock<RingState>>| async move {
+        let web_listen = |name: String, bind: String, router: Router, stage: Arc<tokio::sync::RwLock<RingState>>| async move {
             let listen = tokio::net::TcpListener::bind(bind.as_str()).await;
             if listen.is_err() {
                 error!("[{} - webserver] can't bind to : {}  ERROR: {}", &name, bind, listen.unwrap_err());
                 return;
             }
 
-            let graceful = |stage: Arc<RwLock<RingState>>, name: String| async move {
+            let graceful = |stage: Arc<tokio::sync::RwLock<RingState>>, name: String| async move {
                 loop {
-                    let stage = *stage.read().unwrap();
+                    let stage = *stage.read().await;
                     if stage == RingState::Terminating || stage == RingState::Terminated {
                         info!("WebMod[ {} ] terminating, current state:{:?}", name, stage);
                         break;
@@ -212,7 +212,7 @@ impl RingsMod for Web {
             serve.await.unwrap_or_else(|_| panic!("WebMod[ {} ] failed to served : {}", &name, bind));
 
             // *stage.write().unwrap() = RingState::Terminated;
-            let _ = RingState::safe_ring_state_must_set(&stage, RingState::Terminated);
+            let _ = RingState::safe_ring_state_must_set(&stage, RingState::Terminated).await;
         };
 
         let integrated_router = crate::web::middleware::Manager::integrated(self.middleware_manager.clone(), self.router.clone());
@@ -222,8 +222,8 @@ impl RingsMod for Web {
         Ok(())
     }
 
-    fn stage(&self) -> RingState {
-        RingState::safe_ring_state_must_get(&self.stage).unwrap()
+    async fn stage(&self) -> RingState {
+        RingState::safe_ring_state_must_get(&self.stage).await.unwrap()
     }
 
     fn level(&self) -> i64 {
