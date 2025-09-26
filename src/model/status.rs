@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 // OK( value > 10)
 // Error( value < -10)
 // MarkDeleted = -1
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone, Default)]
 pub enum Status {
+    #[default]
     Initialize,
     OK(i32, String),
     Error(i32, String), //
@@ -32,17 +33,17 @@ impl Status {
             return Err(Erx::boxed("Empty formated status"));
         }
 
-        fn inner_parse(s: String) -> crate::erx::ResultE<(i32, String)> {
+        fn inner_parse(s: String) -> ResultBoxedE<(i32, String)> {
             let splits: Vec<&str> = s.splitn(2, " ").collect();
             if splits.len() < 1 {
-                return Err("Empty formated status".into());
+                return Err(Erx::boxed("Empty formated status"));
             }
 
             if !splits[0].ends_with(")") {
-                return Err("Invalid formated status".into());
+                return Err(Erx::boxed("Invalid formated status"));
             }
 
-            let code = splits[0][..splits[0].len() - 1].parse::<i32>().map_err(crate::erx::smp)?;
+            let code = splits[0][..splits[0].len() - 1].parse::<i32>().map_err(crate::erx::smp_boxed)?;
             Ok((code, if splits.len() > 1 { splits[1] } else { "" }.to_string()))
         }
 
@@ -143,15 +144,9 @@ impl std::fmt::Display for Status {
     }
 }
 
-impl Default for Status {
-    fn default() -> Self {
-        Status::Initialize
-    }
-}
-
-impl Into<i32> for Status {
-    fn into(self) -> i32 {
-        match self {
+impl From<Status> for i32 {
+    fn from(s: Status) -> Self {
+        match s {
             Status::Initialize => INITIALIZE,
             Status::OK(v, _) => v,
             Status::Error(v, _) => v,
@@ -160,9 +155,9 @@ impl Into<i32> for Status {
     }
 }
 
-impl Into<(i32, String)> for Status {
-    fn into(self) -> (i32, String) {
-        match self {
+impl From<Status> for (i32, String) {
+    fn from(s: Status) -> Self {
+        match s {
             Status::Initialize => (INITIALIZE, String::new()),
             Status::OK(v, m) => (v, m),
             Status::Error(v, m) => (v, m),

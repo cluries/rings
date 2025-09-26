@@ -135,13 +135,13 @@ impl Factory {
         self.millis.load(Ordering::Relaxed)
     }
 
-    fn ensure_current_millis(&self) -> erx::ResultE<i64> {
+    fn ensure_current_millis(&self) -> erx::ResultBoxedE<i64> {
         let mut millis: i64;
         let mut trys = 10;
 
         loop {
             if trys < 1 {
-                return Err("Exceeded the maximum number of attempts".into());
+                return Err(erx::Erx::boxed("Exceeded the maximum number of attempts"));
             }
             trys -= 1;
 
@@ -167,11 +167,11 @@ impl Factory {
         Ok(millis)
     }
 
-    pub fn make(&self) -> erx::ResultE<Id> {
+    pub fn make(&self) -> erx::ResultBoxedE<Id> {
         let millis = self.ensure_current_millis()?;
         let seq = self.sequence.fetch_add(1, Ordering::Relaxed);
         if seq > MAX_SEQUENCE {
-            return Err("beyond sequence limits".into());
+            return Err(erx::Erx::boxed("beyond sequence limits"));
         }
 
         let shorter = ShorterMills::with_mills(millis).shorter();
@@ -180,7 +180,7 @@ impl Factory {
         Ok(Id { val })
     }
 
-    pub fn make_n(&self, n: u16) -> erx::ResultE<Vec<Id>> {
+    pub fn make_n(&self, n: u16) -> erx::ResultBoxedE<Vec<Id>> {
         if n < 1 {
             return Ok(vec![]);
         }
@@ -193,7 +193,7 @@ impl Factory {
         if seq + n > MAX_SEQUENCE {
             // rollback
             self.sequence.fetch_sub(n, Ordering::AcqRel);
-            return Err("beyond sequence limits".into());
+            return Err(erx::Erx::boxed("beyond sequence limits"));
         }
 
         let mut ids: Vec<Id> = Vec::new();
@@ -241,14 +241,7 @@ impl Id {
     }
 
     pub fn description(self) -> String {
-        format!(
-            "{} shard:{:02} seq:{:03} millis:{} second:{}",
-            self.val.to_string(),
-            self.sharding(),
-            self.sequence(),
-            self.millis(),
-            self.second()
-        )
+        format!("{} shard:{:02} seq:{:03} millis:{} second:{}", self.val, self.sharding(), self.sequence(), self.millis(), self.second())
     }
 
     pub fn value(self) -> i64 {

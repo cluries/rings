@@ -17,7 +17,7 @@ impl Enc {
     }
 
     pub fn ens<T: Serialize>(obj: &T) -> String {
-        serde_json::to_string(obj).unwrap_or(Default::default())
+        serde_json::to_string(obj).unwrap_or_default()
     }
 
     pub fn pretty<T: Serialize>(obj: &T) -> ResultBoxedE<String> {

@@ -181,8 +181,8 @@ impl<T: Serialize, E: ToString> From<Result<T, E>> for Out<T> {
     }
 }
 
-static APPLICATION_JSON: &'static str = "application/json";
-static RINGS_CORE: &'static str = "RingsCore/1.0";
+static APPLICATION_JSON: &str = "application/json";
+static RINGS_CORE: &str = "RingsCore/1.0";
 
 impl<T: Serialize> axum::response::IntoResponse for Out<T> {
     fn into_response(self) -> Response {

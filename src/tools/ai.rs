@@ -91,10 +91,6 @@ impl ChatResponse {
 }
 
 impl PromptsBuilder {
-    pub fn default() -> Self {
-        Self { messages: Vec::new() }
-    }
-
     pub fn add(&mut self, message: ChatCompletionRequestMessage) -> &mut Self {
         self.messages.push(message);
         self

@@ -364,7 +364,7 @@ impl Rebit {
     pub fn has_backend(&self) -> bool {
         match &self.model.backends {
             None => false,
-            Some(bs) => bs.len() > 0,
+            Some(bs) => !bs.is_empty(),
         }
     }
 
@@ -376,7 +376,7 @@ impl Rebit {
     /// # Returns
     /// * `bool` - true if has web config
     pub fn has_web(&self) -> bool {
-        self.web.len() > 0
+        !self.web.is_empty()
     }
 
     /// get web config

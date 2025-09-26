@@ -62,7 +62,7 @@ impl Net {
     }
 
     pub fn china_mobile(mobile: &str) -> bool {
-        mobile.len() == 11 && mobile.starts_with("1") && mobile.chars().all(|c| c.is_digit(10))
+        mobile.len() == 11 && mobile.starts_with("1") && mobile.chars().all(|c| c.is_ascii_digit())
     }
 
     pub fn chinese(s: &str) -> bool {

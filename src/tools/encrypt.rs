@@ -1,4 +1,4 @@
-use crate::erx;
+use crate::erx::{self, ResultBoxedE};
 
 use base64::Engine;
 use rand::Rng;
@@ -145,13 +145,14 @@ impl AESMode {
     fn padding_buffer(payload: &[u8]) -> Vec<u8> {
         let mut payload_vec = payload.to_vec();
         let padding_count = AESMode::BIT128_BLOCK_SIZE - payload.len() % AESMode::BIT128_BLOCK_SIZE;
-        payload_vec.extend(std::iter::repeat(0).take(padding_count));
+        // payload_vec.extend(std::iter::repeat(0).take(padding_count));
+        payload_vec.extend(std::iter::repeat_n(0, padding_count));
         payload_vec
     }
 
     fn ecb_encrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         let key = GAB128::from_slice(key);
-        let cipher = Aes128::new(&key);
+        let cipher = Aes128::new(key);
 
         let payload_length = payload.len();
         let block_count = payload_length / AESMode::BIT128_BLOCK_SIZE + 1;
@@ -177,7 +178,8 @@ impl AESMode {
     }
 
     fn ecb_decrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
-        if payload.len() % AESMode::BIT128_BLOCK_SIZE != 0 {
+        // if payload.len() % AESMode::BIT128_BLOCK_SIZE != 0 {
+        if !payload.len().is_multiple_of(AESMode::BIT128_BLOCK_SIZE) {
             return Err(erx::Erx::boxed("invalid payload size, must be a multiple of 16"));
         }
 
@@ -275,7 +277,7 @@ impl AESMode {
         type Aes128Ofb = ofb::Ofb<Aes128>;
         let mut buffer = payload.to_vec();
         let mut cipher = Aes128Ofb::new(key.into(), iv.as_slice().into());
-        cipher.apply_keystream(&mut buffer.as_mut_slice());
+        cipher.apply_keystream(buffer.as_mut_slice());
 
         Ok(buffer)
     }
@@ -294,7 +296,7 @@ impl AESMode {
         };
         let mut buffer = payload.to_vec();
         let mut cipher = Aes128Ctr64LE::new(key.into(), iv.as_slice().into());
-        cipher.apply_keystream(&mut buffer.as_mut_slice());
+        cipher.apply_keystream(buffer.as_mut_slice());
         Ok(buffer)
     }
 
@@ -352,9 +354,9 @@ impl RSABits {
 pub struct RSAUtils;
 
 impl RSAUtils {
-    pub fn gen_key_pair(bits: RSABits) -> Result<(String, String), erx::Erx> {
+    pub fn gen_key_pair(bits: RSABits) -> ResultBoxedE<(String, String)> {
         let mut rng = CompatRng::<rand::rngs::ThreadRng>::thread_rng();
-        let private_key = RsaPrivateKey::new(&mut rng, bits.bits()).map_err(erx::smp)?;
+        let private_key = RsaPrivateKey::new(&mut rng, bits.bits()).map_err(erx::smp_boxed)?;
         let public_key = RsaPublicKey::from(&private_key);
 
         let private_key = private_key.to_pkcs1_pem(Default::default()).map_err(erx::smp)?.to_string();
@@ -373,7 +375,7 @@ impl Encrypt {
     pub fn encrypt(&self, input: &[u8]) -> CryptedResult {
         let result = match self {
             Encrypt::AES { key, mode } => mode.encrypt(key.as_bytes(), input)?,
-            Encrypt::RSA { private_key: _, public_key, padding } => padding.encrypt(&public_key, input)?,
+            Encrypt::RSA { private_key: _, public_key, padding } => padding.encrypt(public_key, input)?,
         };
 
         Ok(result)
@@ -382,7 +384,7 @@ impl Encrypt {
     pub fn decrypt(&self, input: &[u8]) -> CryptedResult {
         let result = match self {
             Encrypt::AES { key, mode } => mode.decrypt(key.as_bytes(), input)?,
-            Encrypt::RSA { private_key, public_key: _, padding } => padding.decrypt(&private_key, input)?,
+            Encrypt::RSA { private_key, public_key: _, padding } => padding.decrypt(private_key, input)?,
         };
 
         Ok(result)

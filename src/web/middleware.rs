@@ -2,7 +2,7 @@
 /// 实现对tower middleware的抽象
 pub mod signator;
 
-use crate::erx;
+use crate::erx::{self, Erx, ResultBoxedEX};
 use crate::web::define::HttpMethod;
 use axum::{extract::Request, http::request::Parts, response::Response};
 use dashmap::DashMap;
@@ -23,7 +23,7 @@ use tower::{
 static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(Default::default);
 
 /// MiddlewareEventErr
-pub type MiddlewareEventErr<T> = (Context, Option<T>, Option<erx::Erx>);
+pub type MiddlewareEventErr<T> = (Context, Option<T>, Option<Erx>);
 
 /// MiddlewareFuture
 pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<(Context, T), MiddlewareEventErr<T>>> + Send>>;
@@ -558,16 +558,16 @@ impl Manager {
         })
     }
 
-    pub fn metrics_update<F>(&self, name: &str, f: F) -> Result<(), erx::Erx>
+    pub fn metrics_update<F>(&self, name: &str, f: F) -> ResultBoxedEX
     where
-        F: FnOnce(&mut Metrics) -> Result<(), erx::Erx>,
+        F: FnOnce(&mut Metrics) -> ResultBoxedEX,
     {
-        self.metrics.get_mut(name).map_or(Err(erx::Erx::new("metrics not found")), |metrics_ref| {
+        self.metrics.get_mut(name).map_or(Err(erx::Erx::boxed("metrics not found")), |metrics_ref| {
             let metrics_ref = Arc::clone(&metrics_ref);
             let metrics_guard = metrics_ref.try_write();
             match metrics_guard {
                 Ok(mut metrics_guard) => f(&mut metrics_guard),
-                Err(ex) => Err(erx::Erx::new(ex.to_string().as_str())),
+                Err(ex) => Err(erx::Erx::boxed(ex.to_string().as_str())),
             }
         })
     }

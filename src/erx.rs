@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::Display;
+use std::str::FromStr;
 use std::sync::OnceLock;
 
 static APP_SHORT: OnceLock<String> = OnceLock::new();
@@ -17,7 +18,7 @@ pub fn app_short() -> String {
 }
 
 /// Zero
-pub static LAYOUTED_C_ZERO: &'static str = "0000";
+pub static LAYOUTED_C_ZERO: &str = "0000";
 
 /// ResultE<T> = Result<T, Erx>;
 pub type ResultE<T> = Result<T, Erx>;
@@ -52,6 +53,7 @@ pub fn describe_error(e: &dyn std::error::Error) -> String {
 /// - 将错误的主要消息（error.to_string()）作为message字段
 /// - 使用默认的错误代码（LayoutedC::default()）
 /// - 在extra字段中添加"ORIGIN"键，值为完整的错误链描述
+///
 /// 适用于需要保留原始错误完整信息的场景，特别是当错误具有复杂的因果链时
 /// 与smp函数的区别在于：emp专门处理Error类型并保留错误链信息，而smp只是简单的字符串转换
 ///
@@ -78,6 +80,7 @@ pub fn emp_boxed<T: std::error::Error>(error: T) -> Box<Erx> {
 /// - 使用默认的错误代码（LayoutedC::default()）
 /// - 将输入参数转换为字符串作为错误消息
 /// - 不包含任何额外信息（extra字段为空）
+///
 /// 适用于需要快速创建简单错误的场景，不需要复杂的错误分类或额外上下文信息
 pub fn smp<T: ToString>(error: T) -> Erx {
     Erx { code: Default::default(), message: error.to_string(), extra: Vec::new() }
@@ -136,7 +139,7 @@ pub enum PreL4 {
     TASK,
     /// Cron: Cron错误
     CRON,
-    ///
+    /// Other: 其他错误
     OTHE,
 }
 
@@ -156,24 +159,44 @@ impl PreL4 {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<PreL4> {
-        match s.to_uppercase().as_str() {
-            "FUZZ" => Some(PreL4::FUZZ),
-            "COMM" => Some(PreL4::COMM),
-            "MIDL" => Some(PreL4::MIDL),
-            "SERV" => Some(PreL4::SERV),
-            "MODE" => Some(PreL4::MODE),
-            "ACTN" => Some(PreL4::ACTN),
-            "UNDF" => Some(PreL4::UNDF),
-            "TASK" => Some(PreL4::TASK),
-            "CRON" => Some(PreL4::CRON),
-            "OTHE" => Some(PreL4::OTHE),
-            _ => None,
-        }
-    }
+    // pub fn from_str(s: &str) -> Option<PreL4> {
+    //     match s.to_uppercase().as_str() {
+    //         "FUZZ" => Some(PreL4::FUZZ),
+    //         "COMM" => Some(PreL4::COMM),
+    //         "MIDL" => Some(PreL4::MIDL),
+    //         "SERV" => Some(PreL4::SERV),
+    //         "MODE" => Some(PreL4::MODE),
+    //         "ACTN" => Some(PreL4::ACTN),
+    //         "UNDF" => Some(PreL4::UNDF),
+    //         "TASK" => Some(PreL4::TASK),
+    //         "CRON" => Some(PreL4::CRON),
+    //         "OTHE" => Some(PreL4::OTHE),
+    //         _ => None,
+    //     }
+    // }
 
     pub fn layoutc(&self, category: &str, detail: &str) -> LayoutedC {
         LayoutedC::new(self.four(), category, detail)
+    }
+}
+
+impl FromStr for PreL4 {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "FUZZ" => Ok(PreL4::FUZZ),
+            "COMM" => Ok(PreL4::COMM),
+            "MIDL" => Ok(PreL4::MIDL),
+            "SERV" => Ok(PreL4::SERV),
+            "MODE" => Ok(PreL4::MODE),
+            "ACTN" => Ok(PreL4::ACTN),
+            "UNDF" => Ok(PreL4::UNDF),
+            "TASK" => Ok(PreL4::TASK),
+            "CRON" => Ok(PreL4::CRON),
+            "OTHE" => Ok(PreL4::OTHE),
+            _ => Err(format!("Invalid PreL4 string: {}", s)),
+        }
     }
 }
 
@@ -271,7 +294,7 @@ impl LayoutedC {
     }
 
     pub fn is_okc(&self) -> bool {
-        self.domain.replace("0", "").len() == 0 && self.category.replace("0", "").len() == 0 && self.detail.replace("0", "").len() == 0
+        self.domain.replace("0", "").is_empty() && self.category.replace("0", "").is_empty() && self.detail.replace("0", "").is_empty()
     }
 
     pub fn layout_string(&self) -> String {

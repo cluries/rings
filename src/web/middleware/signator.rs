@@ -371,13 +371,13 @@ pub struct Signator {
 }
 
 impl Signator {
-    pub fn new(config: SignatorConfig) -> Result<Self, Error> {
+    pub fn new(config: SignatorConfig) -> Result<Self, Box<Error>> {
         // 验证配置
         config.validate()?;
 
         let redis_client = redis::Client::open(config.redis_url.as_str()).map_err(|err| {
             tracing::error!("Failed to create Redis client for URL {}: {}", config.redis_url, err);
-            Error::ConfigError(format!("Invalid Redis URL '{}': {}", config.redis_url, err))
+            Box::new(Error::ConfigError(format!("Invalid Redis URL '{}': {}", config.redis_url, err)))
         })?;
 
         let config = Arc::new(config);
@@ -610,19 +610,19 @@ impl std::fmt::Display for SignatureDebugInfo {
 mod header_names {
 
     /// user id
-    pub(crate) const U: &'static str = "X-U";
+    pub(crate) const U: &str = "X-U";
 
     /// timestamp
-    pub(crate) const T: &'static str = "X-T";
+    pub(crate) const T: &str = "X-T";
 
     /// nonce
-    pub(crate) const R: &'static str = "X-R";
+    pub(crate) const R: &str = "X-R";
 
     ///signature
-    pub(crate) const S: &'static str = "X-S";
+    pub(crate) const S: &str = "X-S";
 
     /// development skip
-    pub(crate) const D: &'static str = "X-DEVELOPMENT-SKIP";
+    pub(crate) const D: &str = "X-DEVELOPMENT-SKIP";
 }
 
 impl Payload {

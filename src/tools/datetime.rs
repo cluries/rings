@@ -81,19 +81,19 @@ impl Format {
         }
     }
 
-    pub fn parse_to_utc(&self, datetime: &str) -> erx::ResultE<chrono::DateTime<chrono::Utc>> {
+    pub fn parse_to_utc(&self, datetime: &str) -> erx::ResultBoxedE<chrono::DateTime<chrono::Utc>> {
         let datetime = chrono::DateTime::parse_from_str(datetime, self.layout());
         match datetime {
             Ok(datetime) => Ok(datetime.with_timezone(&chrono::Utc)),
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(erx::Erx::boxed(e.to_string().as_str())),
         }
     }
 
-    pub fn parse_to_local(&self, datetime: &str) -> erx::ResultE<chrono::DateTime<chrono::Local>> {
+    pub fn parse_to_local(&self, datetime: &str) -> erx::ResultBoxedE<chrono::DateTime<chrono::Local>> {
         let datetime = chrono::DateTime::parse_from_str(datetime, self.layout());
         match datetime {
             Ok(datetime) => Ok(datetime.with_timezone(&chrono::Local)),
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(erx::Erx::boxed(e.to_string().as_str())),
         }
     }
 }

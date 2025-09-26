@@ -17,6 +17,7 @@ pub mod types;
 pub mod url;
 pub mod validation;
 
+use crate::erx::ResultBoxedE;
 use crate::rings::{RingState, RingsMod, SafeRingState};
 use crate::web::luaction::LuaAction;
 
@@ -129,7 +130,7 @@ impl RingsMod for Web {
         false
     }
 
-    async fn initialize(&mut self) -> Result<(), crate::erx::Erx> {
+    async fn initialize(&mut self) -> ResultBoxedE<()> {
         self.web_spec();
 
         RingState::safe_ring_state_set(&self.stage, RingState::Ready)?;
@@ -137,17 +138,19 @@ impl RingsMod for Web {
         Ok(())
     }
 
-    async fn unregister(&mut self) -> Result<(), crate::erx::Erx> {
+    async fn unregister(&mut self) -> ResultBoxedE<()> {
         self.shutdown().await
     }
 
-    async fn shutdown(&mut self) -> Result<(), crate::erx::Erx> {
+    async fn shutdown(&mut self) -> ResultBoxedE<()> {
         let current = RingState::safe_ring_state_must_get(&self.stage)?;
 
         if !current.is_ready_to_terminating() {
-            return Err(crate::erx::Erx::new(
-                format!("Ring:{} current state:{} can not terminate", self.name, <RingState as Into<&str>>::into(current)).as_str(),
-            ));
+            return Err(crate::erx::Erx::boxed(&format!(
+                "Ring:{} current state:{} can not terminate",
+                self.name,
+                <RingState as Into<&str>>::into(current)
+            )));
         }
 
         RingState::safe_ring_state_set(&self.stage, RingState::Terminating)?;
@@ -182,7 +185,7 @@ impl RingsMod for Web {
     //     Ok(())
     // }
 
-    async fn fire(&mut self) -> Result<(), crate::erx::Erx> {
+    async fn fire(&mut self) -> ResultBoxedE<()> {
         let web_listen = |name: String, bind: String, router: Router, stage: Arc<RwLock<RingState>>| async move {
             let listen = tokio::net::TcpListener::bind(bind.as_str()).await;
             if listen.is_err() {

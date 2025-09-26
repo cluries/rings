@@ -86,7 +86,7 @@ pub async fn initialize_model_connection(backends: Dict<Backend>) {
     }
 
     for (backend_name, backend) in backends {
-        if backend.connect.len() < 1 {
+        if backend.connect.is_empty() {
             warn!("Backend '{}' connect string is empty, pass", backend_name);
             continue;
         }

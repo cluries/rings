@@ -1,4 +1,5 @@
 use crate::any::AnyTrait;
+use crate::erx::{smp_boxed, ResultBoxedE, ResultBoxedEX};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -39,7 +40,6 @@ pub struct Moment {
     time: i64,
 }
 
-///
 impl Moment {
     /// Moment with current time
     pub fn now(name: &str) -> Self {
@@ -70,9 +70,9 @@ pub enum RingState {
 /// SafeRingState = Arc<RwLock<RingState>>
 pub type SafeRingState = Arc<RwLock<RingState>>;
 
-impl Into<i32> for RingState {
-    fn into(self) -> i32 {
-        match self {
+impl From<RingState> for i32 {
+    fn from(s: RingState) -> Self {
+        match s {
             RingState::Init => 1,
             RingState::Ready => 10,
             RingState::Working => 100,
@@ -114,9 +114,9 @@ impl FromStr for RingState {
     }
 }
 
-impl Into<&str> for RingState {
-    fn into(self) -> &'static str {
-        match self {
+impl From<RingState> for &str {
+    fn from(s: RingState) -> Self {
+        match s {
             RingState::Init => "init",
             RingState::Ready => "ready",
             RingState::Working => "working",
@@ -133,22 +133,22 @@ impl RingState {
         matches!(self, RingState::Init | RingState::Ready | RingState::Working | RingState::Paused)
     }
 
-    pub fn safe_ring_state_set(rs: &SafeRingState, s: RingState) -> Result<(), crate::erx::Erx> {
-        *rs.try_write().map_err(crate::erx::smp)? = s;
+    pub fn safe_ring_state_set(rs: &SafeRingState, s: RingState) -> ResultBoxedEX {
+        *rs.try_write().map_err(smp_boxed)? = s;
         Ok(())
     }
 
-    pub fn safe_ring_state_must_set(rs: &SafeRingState, s: RingState) -> Result<(), crate::erx::Erx> {
-        *rs.write().map_err(crate::erx::smp)? = s;
+    pub fn safe_ring_state_must_set(rs: &SafeRingState, s: RingState) -> ResultBoxedEX {
+        *rs.write().map_err(smp_boxed)? = s;
         Ok(())
     }
 
-    pub fn safe_ring_state_get(rs: &SafeRingState) -> Result<RingState, crate::erx::Erx> {
-        Ok(rs.try_read().map_err(crate::erx::smp)?.clone())
+    pub fn safe_ring_state_get(rs: &SafeRingState) -> ResultBoxedE<RingState> {
+        Ok(rs.try_read().map_err(smp_boxed)?.clone())
     }
 
-    pub fn safe_ring_state_must_get(rs: &SafeRingState) -> Result<RingState, crate::erx::Erx> {
-        Ok(rs.read().map_err(crate::erx::smp)?.clone())
+    pub fn safe_ring_state_must_get(rs: &SafeRingState) -> ResultBoxedE<RingState> {
+        Ok(rs.read().map_err(smp_boxed)?.clone())
     }
 
     pub fn inited_safe_ring_state() -> SafeRingState {
@@ -160,10 +160,10 @@ impl RingState {
 pub trait RingsMod: AnyTrait + Send + Sync {
     fn name(&self) -> String;
     fn duplicate_able(&self) -> bool;
-    async fn initialize(&mut self) -> Result<(), crate::erx::Erx>;
-    async fn unregister(&mut self) -> Result<(), crate::erx::Erx>;
-    async fn shutdown(&mut self) -> Result<(), crate::erx::Erx>;
-    async fn fire(&mut self) -> Result<(), crate::erx::Erx>;
+    async fn initialize(&mut self) -> ResultBoxedEX;
+    async fn unregister(&mut self) -> ResultBoxedEX;
+    async fn shutdown(&mut self) -> ResultBoxedEX;
+    async fn fire(&mut self) -> ResultBoxedEX;
     fn stage(&self) -> RingState;
     fn level(&self) -> i64;
 }

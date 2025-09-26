@@ -211,7 +211,7 @@ impl Is {
     /// }
     /// ```
     pub async fn exists(&self) -> bool {
-        tokio::fs::try_exists(&self.0).await.ok().map_or(false, |b| b)
+        tokio::fs::try_exists(&self.0).await.ok().is_some_and(|b| b)
     }
 
     /// 检查路径是否为目录
@@ -985,12 +985,11 @@ impl From<Directory> for Is {
 ///     let text = content.utf8_string().await?;
 /// }
 /// ```
-impl Into<Content> for Is {
-    fn into(self) -> Content {
-        Content(self.0)
+impl From<Is> for Content {
+    fn from(is: Is) -> Self {
+        Content(is.0)
     }
 }
-
 /// 类型转换实现：Content -> Is
 ///
 /// 允许将 `Content` 结构体转换为 `Is` 结构体，

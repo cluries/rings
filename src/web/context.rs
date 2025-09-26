@@ -28,7 +28,7 @@ impl Context {
             self.ident_history.push(ident);
         }
 
-        self.ident = Some(Ident { ident: ident, by: by });
+        self.ident = Some(Ident { ident, by });
         self
     }
 
@@ -83,8 +83,6 @@ impl Context {
     pub fn get_all_vals(&self) -> &HashMap<String, String> {
         &self.vals
     }
-    
-
 }
 
 impl Default for Context {
