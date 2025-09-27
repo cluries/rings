@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Ident {
+    /// user ident
     pub ident: String,
+    /// who provide it, maybe some middleware
     pub by: String,
 }
 

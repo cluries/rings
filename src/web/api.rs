@@ -1,15 +1,17 @@
 use crate::erx::{Erx, LayoutedC};
 use crate::web::except::Except;
-use axum::http::header::CONTENT_TYPE;
+use axum::http::header::{CONTENT_TYPE, SERVER};
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::Response;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-const ORIGIN_ERX_CODE: &str = "ORIGIN_ERX_CODE";
-const JSON_SERIAL_ERROR: &str = "JSON serialization error";
-const OPTION_NONE_MESSAGE: &str = "Sorry, some error occurred, but no message was provided";
+static ORIGIN_ERX_CODE: &str = "ORIGIN_ERX_CODE";
+static JSON_SERIAL_ERROR: &str = "JSON serialization error";
+static OPTION_NONE_MESSAGE: &str = "Sorry, some error occurred, but no message was provided";
+static APPLICATION_JSON: &str = "application/json";
+static RINGS_CORE: &str = "RingsCore/1.0";
 
 pub type OutAny = Out<serde_json::Value>;
 
@@ -36,15 +38,22 @@ pub struct Debug {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Profile {}
+pub struct Profile {
+    start: i64,
+    finsh: i64,
+}
 
 impl Debug {
     pub fn new() -> Debug {
         Debug { kvs: HashMap::new() }
     }
 
-    pub fn add_item(&mut self, key: &str, value: &str) -> &mut Debug {
-        self.kvs.insert(key.to_string(), value.to_string());
+    pub fn add_item<K, V>(&mut self, key: K, val: V) -> &mut Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.kvs.insert(key.into(), val.into());
         self
     }
 
@@ -181,9 +190,6 @@ impl<T: Serialize, E: ToString> From<Result<T, E>> for Out<T> {
     }
 }
 
-static APPLICATION_JSON: &str = "application/json";
-static RINGS_CORE: &str = "RingsCore/1.0";
-
 impl<T: Serialize> axum::response::IntoResponse for Out<T> {
     fn into_response(self) -> Response {
         let body = serde_json::to_string(&self);
@@ -201,7 +207,7 @@ impl<T: Serialize> axum::response::IntoResponse for Out<T> {
 
         let headers = response.headers_mut();
         headers.insert(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
-        headers.insert("Powered-By", HeaderValue::from_static(RINGS_CORE));
+        headers.insert(SERVER, HeaderValue::from_static(RINGS_CORE));
 
         response.into_response()
     }
