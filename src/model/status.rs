@@ -51,13 +51,6 @@ impl Status {
             INITIALIZE_STR => Ok(Status::Initialize),
             MARK_DELETED_STR => Ok(Status::MarkDeleted),
             formated => {
-                // if formated.starts_with(PREFIX_OK) {
-                //     let parsed = inner_parse(formated[PREFIX_OK.len()..].to_string())?;
-                //     Self::ok(parsed.0, &parsed.1)
-                // } else if formated.starts_with(PREFIX_ERROR) {
-                //     let parsed = inner_parse(formated[PREFIX_ERROR.len()..].to_string())?;
-                //     Self::error(parsed.0, &parsed.1)
-                // }
                 if let Some(stripped) = formated.strip_prefix(PREFIX_OK) {
                     let parsed = inner_parse(stripped.to_string())?;
                     Self::ok(parsed.0, &parsed.1)

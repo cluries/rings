@@ -61,8 +61,8 @@ impl LuaBridge {
     }
 }
 
-unsafe impl Send for LuaBridge {}
-unsafe impl Sync for LuaBridge {}
+// unsafe impl Send for LuaBridge {}
+// unsafe impl Sync for LuaBridge {}
 
 #[cfg(test)]
 mod tests {

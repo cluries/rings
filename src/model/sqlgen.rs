@@ -1,3 +1,7 @@
+pub trait SQLGenTrait {
+    fn placeholders(&self) -> Vec<String>;
+}
+
 pub struct Like {
     val: String,
 }
