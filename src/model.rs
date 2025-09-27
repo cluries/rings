@@ -7,7 +7,7 @@ pub mod sqlgen;
 pub mod status;
 pub mod zero;
 
-use crate::erx::{smp_boxed, Erx, ResultBoxedE};
+use crate::erx::{simple_conv_boxed, Erx, ResultBoxedE};
 use redis;
 
 // use deadpool_redis::{
@@ -43,8 +43,8 @@ pub fn shared() -> ResultBoxedE<&'static DatabaseConnection> {
 /// For automatic reconnections consider using ConnectionManager with the connection-manager feature.
 /// Async cluster connections also don't require pooling and are thread-safe and reusable.
 pub fn make_redis_client() -> ResultBoxedE<redis::Client> {
-    let s = SHARED_REDIS_CONNECT_STRING.read().map_err(smp_boxed)?.clone();
-    redis::Client::open(s).map_err(smp_boxed)
+    let s = SHARED_REDIS_CONNECT_STRING.read().map_err(simple_conv_boxed)?.clone();
+    redis::Client::open(s).map_err(simple_conv_boxed)
 }
 
 // get redis connection from pool

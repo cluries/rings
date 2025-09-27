@@ -9,7 +9,6 @@ pub mod httpclient;
 pub mod id;
 pub mod json;
 pub mod lua;
-pub mod mcp;
 pub mod number;
 pub mod promptor;
 pub mod rand;

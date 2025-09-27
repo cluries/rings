@@ -1,4 +1,4 @@
-use crate::erx::{smp, Erx, ResultE};
+use crate::erx::{simple_conv, Erx, ResultE};
 use crate::web::url::join as url_join;
 use reqwest;
 use reqwest::Response;
@@ -184,7 +184,7 @@ impl Client {
     /// Returns the response body as a string.
     pub async fn get(&self, path: &str) -> ResultE<String> {
         let url = url_join(&self.base, path);
-        let response = self.cli.get(url).send().await.map_err(smp)?;
+        let response = self.cli.get(url).send().await.map_err(simple_conv)?;
         Self::_response_untyped(response).await
     }
 
@@ -192,7 +192,7 @@ impl Client {
     /// Returns the response body as a string.
     pub async fn post(&self, path: &str, body: String) -> ResultE<String> {
         let url = url_join(&self.base, path);
-        let response = self.cli.post(url).body(body).send().await.map_err(smp)?;
+        let response = self.cli.post(url).body(body).send().await.map_err(simple_conv)?;
         Self::_response_untyped(response).await
     }
 
@@ -200,7 +200,7 @@ impl Client {
     /// Returns the response body as a string.
     pub async fn put(&self, path: &str, body: String) -> ResultE<String> {
         let url = url_join(&self.base, path);
-        let response = self.cli.put(url).body(body).send().await.map_err(smp)?;
+        let response = self.cli.put(url).body(body).send().await.map_err(simple_conv)?;
         Self::_response_untyped(response).await
     }
 
@@ -208,7 +208,7 @@ impl Client {
     /// Returns the response body as a string.
     pub async fn delete(&self, path: &str) -> ResultE<String> {
         let url = url_join(&self.base, path);
-        let response = self.cli.delete(url).send().await.map_err(smp)?;
+        let response = self.cli.delete(url).send().await.map_err(simple_conv)?;
         Self::_response_untyped(response).await
     }
 
@@ -216,7 +216,7 @@ impl Client {
     /// Returns the response body as a string.
     pub async fn head(&self, path: &str) -> ResultE<String> {
         let url = url_join(&self.base, path);
-        let response = self.cli.head(url).send().await.map_err(smp)?;
+        let response = self.cli.head(url).send().await.map_err(simple_conv)?;
         Self::_response_untyped(response).await
     }
 
@@ -225,7 +225,7 @@ impl Client {
         T: serde::de::DeserializeOwned,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.get(url).send().await.map_err(smp)?;
+        let response = self.cli.get(url).send().await.map_err(simple_conv)?;
         Self::_response_typed(response).await
     }
 
@@ -235,7 +235,7 @@ impl Client {
         RequestT: serde::Serialize + ?Sized,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.post(url).json(params).send().await.map_err(smp)?;
+        let response = self.cli.post(url).json(params).send().await.map_err(simple_conv)?;
         Self::_response_typed(response).await
     }
 
@@ -245,7 +245,7 @@ impl Client {
         RequestT: serde::Serialize + ?Sized,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.put(url).json(params).send().await.map_err(smp)?;
+        let response = self.cli.put(url).json(params).send().await.map_err(simple_conv)?;
         Self::_response_typed(response).await
     }
 
@@ -254,7 +254,7 @@ impl Client {
         ResponseT: serde::de::DeserializeOwned,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.delete(url).send().await.map_err(smp)?;
+        let response = self.cli.delete(url).send().await.map_err(simple_conv)?;
         Self::_response_typed(response).await
     }
 
@@ -263,7 +263,7 @@ impl Client {
         ResponseT: serde::de::DeserializeOwned,
     {
         let url = url_join(&self.base, path);
-        let response = self.cli.head(url.as_str()).send().await.map_err(smp)?;
+        let response = self.cli.head(url.as_str()).send().await.map_err(simple_conv)?;
         Self::_response_typed(response).await
     }
 
@@ -294,7 +294,7 @@ impl Client {
 
     async fn _response_untyped(response: Response) -> ResultE<String> {
         let status = response.status();
-        let body = response.text().await.map_err(smp)?;
+        let body = response.text().await.map_err(simple_conv)?;
         match status.is_success() {
             true => Ok(body),
             false => Err(Erx::new(&body)),
@@ -306,9 +306,9 @@ impl Client {
         T: serde::de::DeserializeOwned,
     {
         if response.status().is_success() {
-            Ok(response.json::<T>().await.map_err(smp)?)
+            Ok(response.json::<T>().await.map_err(simple_conv)?)
         } else {
-            let body = response.text().await.map_err(smp)?;
+            let body = response.text().await.map_err(simple_conv)?;
             Err(Erx::new(&body))
         }
     }

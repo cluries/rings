@@ -1,5 +1,5 @@
 use crate::any::AnyTrait;
-use crate::erx::{smp_boxed, ResultBoxedE, ResultBoxedEX};
+use crate::erx::{simple_conv_boxed, ResultBoxedE, ResultBoxedEX};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -155,7 +155,7 @@ impl RingState {
     }
 
     pub fn safe_ring_state_set(rs: &SafeRingState, s: RingState) -> ResultBoxedEX {
-        *rs.try_write().map_err(smp_boxed)? = s;
+        *rs.try_write().map_err(simple_conv_boxed)? = s;
         Ok(())
     }
 
@@ -166,7 +166,7 @@ impl RingState {
     }
 
     pub fn safe_ring_state_get(rs: &SafeRingState) -> ResultBoxedE<RingState> {
-        Ok(*rs.try_read().map_err(smp_boxed)?)
+        Ok(*rs.try_read().map_err(simple_conv_boxed)?)
     }
 
     pub async fn safe_ring_state_must_get(rs: &SafeRingState) -> ResultBoxedE<RingState> {
@@ -378,7 +378,7 @@ impl Rings {
     }
 
     pub fn get_state(&self) -> ResultBoxedE<RingState> {
-        Ok(*self.state.try_read().map_err(smp_boxed)?)
+        Ok(*self.state.try_read().map_err(simple_conv_boxed)?)
     }
 
     pub fn get_state_unchecked(&self) -> RingState {

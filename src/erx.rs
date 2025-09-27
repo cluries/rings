@@ -1,8 +1,3 @@
-/// Layouted: 预设好的一些Layout快速方法
-/// ResultE<T> = Result<T, Erx>;
-/// ResultEX = ResultE<()>;
-/// fn smp<T: ToString>(error: T) -> Erx
-/// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
 use crate::{conf, rings::block_on};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -45,9 +40,9 @@ pub fn describe_error(e: &dyn std::error::Error) -> String {
     description
 }
 
-/// emp
-/// emp: error message processor - 将标准错误类型转换为Erx错误类型
-/// emp函数的作用是将任何实现了std::error::Error trait的错误转换为Erx错误类型：
+/// error_conv
+/// error_conv: error message processor - 将标准错误类型转换为Erx错误类型
+/// error_conv 函数的作用是将任何实现了std::error::Error trait的错误转换为Erx错误类型：
 /// - 接受一个实现了std::error::Error trait的错误参数
 /// - 使用describe_error函数获取完整的错误链描述，并将其作为额外信息存储在extra字段中
 /// - 将错误的主要消息（error.to_string()）作为message字段
@@ -63,18 +58,18 @@ pub fn describe_error(e: &dyn std::error::Error) -> String {
 /// let erx = emp(io_error);
 /// // erx.extra 中会包含 ("ORIGIN", "完整的错误描述包括错误链")
 /// ```
-pub fn emp<T: std::error::Error>(error: T) -> Erx {
+pub fn error_conv<T: std::error::Error>(error: T) -> Erx {
     let extra = vec![(String::from("ORIGIN"), describe_error(&error))];
     let message = error.to_string();
     Erx { code: Default::default(), message, extra }
 }
 
-/// emp_boxed: emp but return Box<Erx>
-pub fn emp_boxed<T: std::error::Error>(error: T) -> Box<Erx> {
-    Box::new(emp(error))
+/// error_conv_boxed: error_conv but return Box<Erx>
+pub fn error_conv_boxed<T: std::error::Error>(error: T) -> Box<Erx> {
+    Box::new(error_conv(error))
 }
 
-/// smp: simple convert T: ToString to Erx
+/// simple_conv: simple convert T: ToString to Erx
 /// smp函数的作用是将任何实现了ToString trait的类型简单转换为Erx错误类型
 /// 这是一个便捷函数，用于快速创建基本的错误对象：
 /// - 使用默认的错误代码（LayoutedC::default()）
@@ -82,18 +77,18 @@ pub fn emp_boxed<T: std::error::Error>(error: T) -> Box<Erx> {
 /// - 不包含任何额外信息（extra字段为空）
 ///
 /// 适用于需要快速创建简单错误的场景，不需要复杂的错误分类或额外上下文信息
-pub fn smp<T: ToString>(error: T) -> Erx {
+pub fn simple_conv<T: ToString>(error: T) -> Erx {
     Erx { code: Default::default(), message: error.to_string(), extra: Vec::new() }
 }
 
-/// smp_boxed: smp but return Box<Erx>
-pub fn smp_boxed<T: ToString>(error: T) -> Box<Erx> {
-    Box::new(smp(error))
+/// simple_conv_boxed: simple_conv but return Box<Erx>
+pub fn simple_conv_boxed<T: ToString>(error: T) -> Box<Erx> {
+    Box::new(simple_conv(error))
 }
 
-/// amp: return a function that convert T: ToString to Erx
-/// amp: 返回一个函数，该函数将T: ToString转换为Erx，并在错误消息前添加额外的上下文信息
-/// amp函数的作用是创建一个错误转换闭包，用于为错误消息添加上下文前缀：
+/// additional_conv: return a function that convert T: ToString to Erx
+/// additional_conv: 返回一个函数，该函数将T: ToString转换为Erx，并在错误消息前添加额外的上下文信息
+/// additional_conv 函数的作用是创建一个错误转换闭包，用于为错误消息添加上下文前缀：
 /// - 接受一个additional参数作为错误消息的前缀
 /// - 返回一个闭包，该闭包可以将任何实现了ToString trait的类型转换为Erx
 /// - 生成的错误消息格式为: "{additional} : {原始错误消息}"
@@ -108,13 +103,13 @@ pub fn smp_boxed<T: ToString>(error: T) -> Box<Erx> {
 /// let error = db_error_converter("Connection timeout");
 /// // 生成的错误消息为: "Database operation failed : Connection timeout"
 /// ```
-pub fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
+pub fn additional_conv<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
     let additional = additional.to_string();
     move |err: T| Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() }
 }
 
-/// amp_boxed: amp but return Box<Erx>
-pub fn amp_boxed<T: ToString>(additional: &str) -> impl Fn(T) -> Box<Erx> {
+/// additional_conv_boxed: additional_conv but return Box<Erx>
+pub fn additional_conv_boxed<T: ToString>(additional: &str) -> impl Fn(T) -> Box<Erx> {
     let additional = additional.to_string();
     move |err: T| Box::new(Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() })
 }
@@ -473,12 +468,6 @@ impl Display for Erx {
     }
 }
 
-// impl Default for Erx {
-//     fn default() -> Self {
-//         Erx { code: Default::default(), message: Default::default(), extra: Default::default() }
-//     }
-// }
-
 // impl<T> Into<Result<T, Erx>> for Erx {
 //     fn into(self) -> Result<T, Erx> {
 //         Err(self)
@@ -509,7 +498,7 @@ impl From<String> for Erx {
             return Erx::default();
         }
 
-        serde_json::from_str(&str).unwrap_or_else(|_| Erx::new(&str))
+        serde_json::from_str(&str).unwrap_or(Erx::new(&str))
     }
 }
 

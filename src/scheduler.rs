@@ -1,4 +1,4 @@
-use crate::erx::{smp_boxed, Erx, ResultBoxedE, ResultBoxedEX};
+use crate::erx::{simple_conv_boxed, Erx, ResultBoxedE, ResultBoxedEX};
 use crate::rings::RingState;
 use crate::service::ServiceManager;
 use async_trait::async_trait;
@@ -32,15 +32,15 @@ impl SchedulerManager {
 
     pub async fn add_job(&mut self, job: tokio_cron_scheduler::Job) -> ResultBoxedE<String> {
         let scheduler = Arc::clone(&self.scheduler);
-        let guard = scheduler.try_write().map_err(smp_boxed)?;
-        guard.add(job).await.map(Into::into).map_err(smp_boxed)
+        let guard = scheduler.try_write().map_err(simple_conv_boxed)?;
+        guard.add(job).await.map(Into::into).map_err(simple_conv_boxed)
     }
 
     pub async fn remove_job(&mut self, job_id: String) -> ResultBoxedEX {
         let scheduler = Arc::clone(&self.scheduler);
-        let guard = scheduler.try_write().map_err(smp_boxed)?;
-        let uuid = Uuid::from_str(&job_id).map_err(smp_boxed)?;
-        guard.remove(&uuid).await.map_err(smp_boxed)
+        let guard = scheduler.try_write().map_err(simple_conv_boxed)?;
+        let uuid = Uuid::from_str(&job_id).map_err(simple_conv_boxed)?;
+        guard.remove(&uuid).await.map_err(simple_conv_boxed)
     }
 }
 
@@ -125,7 +125,7 @@ impl crate::rings::RingsMod for SchedulerManager {
 
     async fn shutdown(&mut self) -> ResultBoxedEX {
         info!("scheduler manager [{}] shutdown", SCHEDULER_MANAGER_NAME);
-        let current = *self.stage.try_read().map_err(smp_boxed)?;
+        let current = *self.stage.try_read().map_err(simple_conv_boxed)?;
         if !current.is_ready_to_terminating() {
             let current: &str = current.into();
             return Err(Erx::boxed(&format!("Ring:{} current state:{} can not terminate", self.name(), current)));
@@ -136,7 +136,7 @@ impl crate::rings::RingsMod for SchedulerManager {
             error!("scheduler service lock poisoned: {}", ex);
         }
 
-        *self.stage.try_write().map_err(smp_boxed)? = RingState::Terminating;
+        *self.stage.try_write().map_err(simple_conv_boxed)? = RingState::Terminating;
 
         Ok(())
     }

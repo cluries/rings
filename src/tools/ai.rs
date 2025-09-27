@@ -1,6 +1,6 @@
 // https://github.com/64bit/async-openai
 
-use crate::erx::{smp_boxed, Erx, ResultBoxedE};
+use crate::erx::{simple_conv_boxed, Erx, ResultBoxedE};
 use crate::tools::strings::suber;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::{
@@ -87,7 +87,7 @@ impl ChatResponse {
             c = &c[..c.len() - SUFFIX.len()];
         }
 
-        serde_json::from_str::<T>(c).map_err(smp_boxed)
+        serde_json::from_str::<T>(c).map_err(simple_conv_boxed)
     }
 }
 
@@ -185,10 +185,10 @@ impl LLM {
             .response_format(async_openai::types::ResponseFormat::Text)
             .messages(prompt)
             .build()
-            .map_err(smp_boxed)?;
+            .map_err(simple_conv_boxed)?;
 
         let start = SystemTime::now();
-        let response = self.cli().chat().create(request).await.map_err(smp_boxed)?;
+        let response = self.cli().chat().create(request).await.map_err(simple_conv_boxed)?;
         let duration = SystemTime::now().duration_since(start).unwrap_or_default();
         Ok(ChatResponse::new(duration, response))
     }

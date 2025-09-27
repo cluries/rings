@@ -1,4 +1,4 @@
-use crate::erx::{smp_boxed, Erx, ResultBoxedE, ResultBoxedEX};
+use crate::erx::{simple_conv_boxed, Erx, ResultBoxedE, ResultBoxedEX};
 use std::sync::{Arc, RwLock};
 use tokio::sync::OnceCell;
 use tokio_cron_scheduler::Job;
@@ -232,10 +232,10 @@ impl ServiceManager {
         self.get::<T>()
             .ok_or(Erx::boxed(format!("Service '{}' was not registered!", name).as_str()))?
             .try_write()
-            .map_err(smp_boxed)?
+            .map_err(simple_conv_boxed)?
             .release();
 
-        self.managed.try_write().map_err(smp_boxed)?.retain(|m| match m.try_read() {
+        self.managed.try_write().map_err(simple_conv_boxed)?.retain(|m| match m.try_read() {
             Err(ex) => {
                 tracing::error!("{}", ex);
                 true
@@ -274,7 +274,7 @@ impl ServiceManager {
     {
         let name = T::service_name().to_string();
         let managed = self.managed_by_name(&name).ok_or(Erx::boxed(&format!("Service '{}' Not Registered!", &name)))?;
-        let read_guard = managed.try_read().map_err(crate::erx::smp_boxed)?;
+        let read_guard = managed.try_read().map_err(crate::erx::simple_conv_boxed)?;
         let service =
             (*read_guard).as_any().downcast_ref::<T>().ok_or(Erx::boxed(format!("Unable to Cast Service '{}'", &name).as_str()))?;
         let output = invoke(service);
@@ -302,7 +302,7 @@ impl ServiceManager {
     {
         let name = T::service_name().to_string();
         let managed = self.managed_by_name(&name).ok_or(Erx::boxed(&format!("Service '{}' Not Registered!", &name)))?;
-        let mut write_guard = managed.try_write().map_err(smp_boxed)?;
+        let mut write_guard = managed.try_write().map_err(simple_conv_boxed)?;
 
         let service = (*write_guard)
             .as_any_mut()

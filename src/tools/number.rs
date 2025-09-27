@@ -81,3 +81,7 @@ pub mod conv {
         format!("{:b}", value)
     }
 }
+
+pub struct Number {}
+
+impl Number {}

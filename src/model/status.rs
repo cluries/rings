@@ -43,7 +43,7 @@ impl Status {
                 return Err(Erx::boxed("Invalid formated status"));
             }
 
-            let code = splits[0][..splits[0].len() - 1].parse::<i32>().map_err(crate::erx::smp_boxed)?;
+            let code = splits[0][..splits[0].len() - 1].parse::<i32>().map_err(crate::erx::simple_conv_boxed)?;
             Ok((code, if splits.len() > 1 { splits[1] } else { "" }.to_string()))
         }
 

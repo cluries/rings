@@ -192,7 +192,7 @@ impl AESMode {
                 GAB128::clone_from_slice(&payload[i * AESMode::BIT128_BLOCK_SIZE..(i + 1) * AESMode::BIT128_BLOCK_SIZE]);
             cipher.decrypt_block(&mut block);
             if i + 1 == block_count {
-                result.extend_from_slice(Pkcs7::unpad(&block).map_err(erx::smp)?);
+                result.extend_from_slice(Pkcs7::unpad(&block).map_err(erx::simple_conv)?);
             } else {
                 result.extend_from_slice(&block);
             }
@@ -214,7 +214,7 @@ impl AESMode {
 
         let mut buffer = Self::padding_buffer(payload);
         let encoder: cbc::Encryptor<Aes128> = cbc::Encryptor::new(key, iv.as_slice().into());
-        let result = encoder.encrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice(), payload.len()).map_err(erx::smp)?.to_vec();
+        let result = encoder.encrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice(), payload.len()).map_err(erx::simple_conv)?.to_vec();
 
         Ok(result)
     }
@@ -230,7 +230,7 @@ impl AESMode {
 
         let decoder: cbc::Decryptor<Aes128> = cbc::Decryptor::new(key, iv.as_slice().into());
         let mut buffer = payload.to_vec();
-        let result = decoder.decrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice()).map_err(erx::smp)?.to_vec();
+        let result = decoder.decrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice()).map_err(erx::simple_conv)?.to_vec();
 
         Ok(result)
     }
@@ -246,7 +246,7 @@ impl AESMode {
 
         let mut buffer = Self::padding_buffer(payload);
         let encryptor: cfb_mode::Encryptor<Aes128> = cfb_mode::Encryptor::new(key, iv.as_slice().into());
-        let result = encryptor.encrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice(), payload.len()).map_err(erx::smp)?.to_vec();
+        let result = encryptor.encrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice(), payload.len()).map_err(erx::simple_conv)?.to_vec();
 
         Ok(result)
     }
@@ -261,7 +261,7 @@ impl AESMode {
 
         let mut buf = payload.to_vec();
         let dec: cfb_mode::Decryptor<Aes128> = cfb_mode::Decryptor::new(key, iv.as_slice().into());
-        let result = dec.decrypt_padded_mut::<Pkcs7>(&mut buf).map_err(erx::smp)?.to_vec();
+        let result = dec.decrypt_padded_mut::<Pkcs7>(&mut buf).map_err(erx::simple_conv)?.to_vec();
 
         Ok(result)
     }
@@ -314,9 +314,9 @@ impl RSAPadding {
     fn encrypt(&self, public_key: &str, payload: &[u8]) -> CryptedResult {
         match self {
             RSAPadding::PKCS1v15 => {
-                let key: RsaPublicKey = DecodeRsaPublicKey::from_pkcs1_pem(public_key).map_err(erx::smp)?;
+                let key: RsaPublicKey = DecodeRsaPublicKey::from_pkcs1_pem(public_key).map_err(erx::simple_conv)?;
                 let mut rng = CompatRng::<rand::rngs::ThreadRng>::thread_rng();
-                let result = key.encrypt(&mut rng, Pkcs1v15Encrypt, payload).map_err(erx::smp)?;
+                let result = key.encrypt(&mut rng, Pkcs1v15Encrypt, payload).map_err(erx::simple_conv)?;
                 Ok(result)
             },
         }
@@ -325,8 +325,8 @@ impl RSAPadding {
     fn decrypt(&self, private_key: &str, payload: &[u8]) -> CryptedResult {
         match self {
             RSAPadding::PKCS1v15 => {
-                let key: RsaPrivateKey = DecodeRsaPrivateKey::from_pkcs1_pem(private_key).map_err(erx::smp)?;
-                let result = key.decrypt(Pkcs1v15Encrypt, payload).map_err(erx::smp)?;
+                let key: RsaPrivateKey = DecodeRsaPrivateKey::from_pkcs1_pem(private_key).map_err(erx::simple_conv)?;
+                let result = key.decrypt(Pkcs1v15Encrypt, payload).map_err(erx::simple_conv)?;
                 Ok(result)
             },
         }
@@ -356,11 +356,11 @@ pub struct RSAUtils;
 impl RSAUtils {
     pub fn gen_key_pair(bits: RSABits) -> ResultBoxedE<(String, String)> {
         let mut rng = CompatRng::<rand::rngs::ThreadRng>::thread_rng();
-        let private_key = RsaPrivateKey::new(&mut rng, bits.bits()).map_err(erx::smp_boxed)?;
+        let private_key = RsaPrivateKey::new(&mut rng, bits.bits()).map_err(erx::simple_conv_boxed)?;
         let public_key = RsaPublicKey::from(&private_key);
 
-        let private_key = private_key.to_pkcs1_pem(Default::default()).map_err(erx::smp)?.to_string();
-        let public_key = public_key.to_pkcs1_pem(Default::default()).map_err(erx::smp)?.to_string();
+        let private_key = private_key.to_pkcs1_pem(Default::default()).map_err(erx::simple_conv)?.to_string();
+        let public_key = public_key.to_pkcs1_pem(Default::default()).map_err(erx::simple_conv)?.to_string();
 
         Ok((private_key, public_key))
     }
@@ -397,7 +397,7 @@ impl Encrypt {
     }
 
     pub fn decrypt_string_base64(&self, input: &str) -> CryptedResult {
-        let decoded = base64::prelude::BASE64_STANDARD.decode(input.as_bytes()).map_err(erx::smp)?;
+        let decoded = base64::prelude::BASE64_STANDARD.decode(input.as_bytes()).map_err(erx::simple_conv)?;
         self.decrypt(&decoded)
     }
 }

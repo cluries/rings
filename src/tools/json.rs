@@ -1,4 +1,4 @@
-use crate::erx::{smp_boxed, ResultBoxedE};
+use crate::erx::{simple_conv_boxed, ResultBoxedE};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json;
 
@@ -13,7 +13,7 @@ pub struct Describe;
 
 impl Enc {
     pub fn en<T: Serialize>(obj: &T) -> ResultBoxedE<String> {
-        serde_json::to_string(obj).map_err(smp_boxed)
+        serde_json::to_string(obj).map_err(simple_conv_boxed)
     }
 
     pub fn ens<T: Serialize>(obj: &T) -> String {
@@ -21,13 +21,13 @@ impl Enc {
     }
 
     pub fn pretty<T: Serialize>(obj: &T) -> ResultBoxedE<String> {
-        serde_json::to_string_pretty(obj).map_err(smp_boxed)
+        serde_json::to_string_pretty(obj).map_err(simple_conv_boxed)
     }
 }
 
 impl Dec {
     pub fn de<T: DeserializeOwned>(json: &str) -> ResultBoxedE<T> {
-        serde_json::from_str(json).map_err(smp_boxed)
+        serde_json::from_str(json).map_err(simple_conv_boxed)
     }
 
     pub async fn file<T: DeserializeOwned>(filename: &str) -> ResultBoxedE<T> {
@@ -42,7 +42,7 @@ impl Dec {
 
 impl Describe {
     pub fn describe<T: Serialize>(object: &T, cribe: std::collections::HashMap<String, String>) -> ResultBoxedE<String> {
-        let mut value = serde_json::to_value(object).map_err(smp_boxed)?;
+        let mut value = serde_json::to_value(object).map_err(simple_conv_boxed)?;
 
         fn recurse(current: &mut serde_json::Value, path: &str, descriptions: &std::collections::HashMap<String, String>) {
             match current {
@@ -75,7 +75,7 @@ impl Describe {
 
         recurse(&mut value, "", &cribe);
 
-        serde_json::to_string(&value).map_err(smp_boxed)
+        serde_json::to_string(&value).map_err(simple_conv_boxed)
     }
 }
 
