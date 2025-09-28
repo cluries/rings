@@ -89,7 +89,7 @@ pub async fn registe_to_shared<T: ServiceTrait + Default>() {
 /// * `release` - release service
 /// * `ready` - check service is ready
 /// * `schedules` - get service schedules
-pub trait ServiceTrait: crate::any::AnyTrait + Send + Sync {
+pub trait ServiceTrait: crate::core::traits::any::AnyTrait + Send + Sync {
     fn service_name() -> &'static str
     where
         Self: Sized,

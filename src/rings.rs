@@ -1,4 +1,4 @@
-use crate::any::AnyTrait;
+use crate::core::traits::any::AnyTrait;
 use crate::erx::{simple_conv_boxed, ResultBoxedE, ResultBoxedEX};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
