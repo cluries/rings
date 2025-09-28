@@ -15,8 +15,6 @@ pub type RingsApplication = Arc<RwLock<Rings>>;
 /// Rings
 static _RINGS: OnceLock<RwLock<Vec<RingsApplication>>> = OnceLock::new();
 
-static TOKIO_RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-
 #[allow(clippy::type_complexity)]
 static RINGS_INVOKE_MACRO: std::sync::RwLock<Vec<(String, fn())>> = std::sync::RwLock::new(Vec::new());
 
@@ -27,15 +25,6 @@ fn ring_apps() -> &'static RwLock<Vec<RingsApplication>> {
 /// name: ringsapp name
 pub fn add_rings_invoke_macro(name: &str, func: fn()) {
     RINGS_INVOKE_MACRO.write().unwrap().push((name.to_string(), func));
-}
-
-/// shared tokio runtime
-pub fn shared_tokio_runtime() -> &'static tokio::runtime::Runtime {
-    TOKIO_RUNTIME.get_or_init(|| tokio::runtime::Runtime::new().unwrap())
-}
-
-pub fn block_on<F: core::future::Future>(future: F) -> F::Output {
-    shared_tokio_runtime().block_on(future)
 }
 
 /// Rings Application

@@ -1,22 +1,10 @@
-// use std::sync::OnceLock;
+static TOKIO_RUNTIME: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();
 
-pub struct Runtime {
-    async_runtime: tokio::runtime::Runtime,
-    application_names: (String, String), // fullname, shortname
+/// shared tokio runtime
+pub fn shared_tokio_runtime() -> &'static tokio::runtime::Runtime {
+    TOKIO_RUNTIME.get_or_init(|| tokio::runtime::Runtime::new().unwrap())
 }
 
-// static SHARED: std::sync::OnceLock<Runtime> = OnceLock::new();
-
-// pub fn shared() -> mut &'static Runtime {
-//     SHARED.get_or_init(|| Runtime { async_runtime: ToKioRuntime::new().unwrap(), application_names: ("".to_string(), "".to_string()) })
-// }
-
-impl Runtime {
-    pub fn application_name(&self) -> &str {
-        &self.application_names.0
-    }
-
-    pub fn application_short(&self) -> &str {
-        &self.application_names.1
-    }
+pub fn tokio_block_on<F: core::future::Future>(future: F) -> F::Output {
+    shared_tokio_runtime().block_on(future)
 }

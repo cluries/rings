@@ -1,4 +1,4 @@
-use crate::rings::block_on;
+use crate::core::runtime::tokio_block_on;
 use config::{Config, Value};
 use serde::{Deserialize, Serialize};
 ///  struct GetDefault;
@@ -38,7 +38,7 @@ pub fn rebit() -> &'static RwLock<Rebit> {
                     extends: None,
                 }
             } else {
-                block_on(async { settings().read().await.clone().try_deserialize::<Rebit>() }).expect("rebit loading error")
+                tokio_block_on(async { settings().read().await.clone().try_deserialize::<Rebit>() }).expect("rebit loading error")
             }
         })
     })
