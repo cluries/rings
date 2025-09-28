@@ -191,7 +191,6 @@ pub trait RingsMod: AnyTrait + Send + Sync {
 }
 
 /// R
-/// Just like namespace, call some rings methods
 pub struct R;
 impl R {
     pub async fn instance(name: String) -> Result<RingsApplication, String> {
