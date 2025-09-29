@@ -329,7 +329,7 @@ macro_rules! ds {
 #[allow(unused)]
 mod tests {
     use super::*;
-    use crate::any::AnyTrait;
+    use crate::core::traits::any::AnyTrait;
     use crate::tools::rand::rand_i64;
     use std::any::Any;
 

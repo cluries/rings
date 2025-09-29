@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="ALL" />
+  </component>
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/Cargo.toml">
+      <package file="$PROJECT_DIR$/ringb">
+        <enabledFeature name="default" />
+      </package>
+      <package file="$PROJECT_DIR$/ringm">
+        <enabledFeature name="default" />
+        <enabledFeature name="use_func_register" />
+      </package>
+      <package file="$PROJECT_DIR$">
+        <enabledFeature name="default" />
+      </package>
+    </cargoProject>
+    <cargoProject FILE="$PROJECT_DIR$/rexamples/Cargo.toml">
+      <package file="$PROJECT_DIR$/rexamples/model">
+        <enabledFeature name="default" />
+      </package>
+      <package file="$PROJECT_DIR$/rexamples">
+        <enabledFeature name="default" />
+      </package>
+      <package file="$PROJECT_DIR$/rexamples/schedule">
+        <enabledFeature name="default" />
+      </package>
+      <package file="$PROJECT_DIR$/rexamples/service">
+        <enabledFeature name="default" />
+      </package>
+      <package file="$PROJECT_DIR$/rexamples/web">
+        <enabledFeature name="default" />
+      </package>
+    </cargoProject>
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="8f6937ce-904c-4e57-9f34-755afa45f25f" name="Changes" comment="" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="RsBuildProfile:dev" />
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Rust File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="3E0NguyJ" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 7
+}</component>
+  <component name="ProjectId" id="2to0tTfQERNdEm2mwVO0dBVQjy9" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Cargo.Run rexamples.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Run ringb.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test conf::tests::test_path_value.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test conf::tests::tests.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test id::tests.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test model::facade::redis::tests::test_redis_value.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test model::jq::tests::test_postgres_json_operations.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test object::test_dict_any.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test service::tests::test_service_manager.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::fs::tests::test_join_path.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::fs::tests::test_tail_string.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::id::tests::test_12.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::id::tests::test_id.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::id::tests::test_id_n.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::id::tests::test_try.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::openai::tests::test_chat_single.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::promptor::tests::test_custom_tone_and_format.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::tests::tests::test_current_working_path.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test tools::tests::tests::test_set_config_env.executor&quot;: &quot;Run&quot;,
+    &quot;Cargo.Test web::middleware::tests::test_middleware.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.rust.reset.selective.auto.import&quot;: &quot;true&quot;,
+    &quot;SHELLCHECK.PATH&quot;: &quot;/Users/progux/Library/Application Support/JetBrains/RustRover2025.1/plugins/Shell Script/shellcheck&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/progux/Workspace/iusworks/rings&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;org.rust.cargo.project.model.PROJECT_DISCOVERY&quot;: &quot;true&quot;,
+    &quot;org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon&quot;: &quot;&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/tests" />
+      <recent name="$PROJECT_DIR$/rexamples/src/rm/home" />
+      <recent name="$PROJECT_DIR$/src/tools" />
+    </key>
+  </component>
+  <component name="RsExternalLinterProjectSettings">
+    <option name="runOnTheFly" value="false" />
+  </component>
+  <component name="RunManager" selected="Cargo.Run rexamples">
+    <configuration name="Run rexamples" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="buildProfileId" value="dev" />
+      <option name="command" value="run --package rexamples --bin rexamples" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$/rexamples" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test tools::id::tests::test_try" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="buildProfileId" value="dev" />
+      <option name="command" value="test --package rings --lib tools::id::tests::test_try -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test tools::openai::tests::test_chat_single" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="buildProfileId" value="test" />
+      <option name="command" value="test --package rings --lib tools::openai::tests::test_chat_single -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test tools::promptor::tests::test_custom_tone_and_format" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package rings --lib tools::promptor::tests::test_custom_tone_and_format -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test tools::tests::tests::test_set_config_env" type="CargoCommandRunConfiguration" factoryName="Cargo Command" temporary="true">
+      <option name="command" value="test --package rings --lib tools::tests::tests::test_set_config_env -- --exact" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <option name="emulateTerminal" value="true" />
+      <option name="channel" value="DEFAULT" />
+      <option name="requiredFeatures" value="true" />
+      <option name="allFeatures" value="false" />
+      <option name="withSudo" value="false" />
+      <option name="buildTarget" value="REMOTE" />
+      <option name="backtrace" value="SHORT" />
+      <option name="isRedirectInput" value="false" />
+      <option name="redirectInputPath" value="" />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Cargo.Test tools::tests::tests::test_set_config_env" />
+        <item itemvalue="Cargo.Test tools::promptor::tests::test_custom_tone_and_format" />
+        <item itemvalue="Cargo.Test tools::openai::tests::test_chat_single" />
+        <item itemvalue="Cargo.Test tools::id::tests::test_try" />
+        <item itemvalue="Cargo.Run rexamples" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="8f6937ce-904c-4e57-9f34-755afa45f25f" name="Changes" comment="" />
+      <created>1741003334501</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1741003334501</updated>
+      <workItem from="1741003335535" duration="58000" />
+      <workItem from="1741003395448" duration="61000" />
+      <workItem from="1741003509851" duration="79000" />
+      <workItem from="1741003639366" duration="9001000" />
+      <workItem from="1741093728934" duration="6081000" />
+      <workItem from="1741185818692" duration="5167000" />
+      <workItem from="1741392376389" duration="2879000" />
+      <workItem from="1741399560481" duration="39000" />
+      <workItem from="1741400049785" duration="251000" />
+      <workItem from="1741491117573" duration="2360000" />
+      <workItem from="1741785249209" duration="3624000" />
+      <workItem from="1742098050390" duration="6330000" />
+      <workItem from="1742389928778" duration="8592000" />
+      <workItem from="1742553508323" duration="27000" />
+      <workItem from="1742558332311" duration="35000" />
+      <workItem from="1742558445386" duration="108000" />
+      <workItem from="1742558616352" duration="3154000" />
+      <workItem from="1742563002238" duration="2367000" />
+      <workItem from="1742566345645" duration="827000" />
+      <workItem from="1742635208907" duration="409000" />
+      <workItem from="1742637907404" duration="656000" />
+      <workItem from="1742697064594" duration="145000" />
+      <workItem from="1742818719834" duration="8467000" />
+      <workItem from="1743303231258" duration="11124000" />
+      <workItem from="1743422560162" duration="4214000" />
+      <workItem from="1743509563977" duration="4927000" />
+      <workItem from="1743596310576" duration="3364000" />
+      <workItem from="1744027793633" duration="3022000" />
+      <workItem from="1745237039850" duration="27000" />
+      <workItem from="1745237101267" duration="39000" />
+      <workItem from="1746538357656" duration="14257000" />
+      <workItem from="1747312095586" duration="9968000" />
+      <workItem from="1747447777493" duration="12592000" />
+      <workItem from="1747832279598" duration="629000" />
+      <workItem from="1748011692905" duration="757000" />
+      <workItem from="1749132636790" duration="783000" />
+      <workItem from="1749260904226" duration="4000" />
+      <workItem from="1749261401650" duration="5863000" />
+      <workItem from="1749270497696" duration="1831000" />
+      <workItem from="1749473362224" duration="47000" />
+      <workItem from="1749650919792" duration="1123000" />
+      <workItem from="1749652292225" duration="43000" />
+      <workItem from="1749652556812" duration="116000" />
+      <workItem from="1750078638661" duration="7380000" />
+      <workItem from="1750686317449" duration="131000" />
+      <workItem from="1750687665161" duration="16000" />
+      <workItem from="1750687817154" duration="18000" />
+      <workItem from="1750689017039" duration="49000" />
+      <workItem from="1750689412041" duration="101000" />
+      <workItem from="1750775539752" duration="18000" />
+      <workItem from="1751032146337" duration="5905000" />
+      <workItem from="1751115771528" duration="7000" />
+      <workItem from="1751117314163" duration="2709000" />
+      <workItem from="1751289552337" duration="4413000" />
+      <workItem from="1751620998467" duration="1045000" />
+      <workItem from="1751891825830" duration="17000" />
+      <workItem from="1752758652501" duration="904000" />
+      <workItem from="1752850341787" duration="51000" />
+      <workItem from="1753106061032" duration="2676000" />
+      <workItem from="1753193244717" duration="668000" />
+      <workItem from="1753275009937" duration="4435000" />
+      <workItem from="1753281772866" duration="1726000" />
+      <workItem from="1753366045990" duration="2542000" />
+      <workItem from="1754187067573" duration="6000" />
+      <workItem from="1754187113462" duration="6000" />
+      <workItem from="1754192361422" duration="1272000" />
+      <workItem from="1754918880233" duration="3772000" />
+      <workItem from="1755692760481" duration="162000" />
+      <workItem from="1755693060990" duration="6000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/ringb/src/cargo.rs</url>
+          <line>73</line>
+          <option name="timeStamp" value="4" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/src/web/middleware/signator.rs</url>
+          <line>530</line>
+          <option name="timeStamp" value="5" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/src/web/middleware.rs</url>
+          <line>707</line>
+          <option name="timeStamp" value="6" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/src/web/middleware.rs</url>
+          <line>726</line>
+          <option name="timeStamp" value="7" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+</project>

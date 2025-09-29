@@ -103,7 +103,6 @@ impl PromptsBuilder {
 
     pub fn user(&mut self, message: &str) -> &mut Self {
         use async_openai::types::ChatCompletionRequestUserMessageArgs;
-
         self.messages.push(ChatCompletionRequestUserMessageArgs::default().content(message).build().unwrap().into());
         self
     }
@@ -154,15 +153,23 @@ impl PromptsBuilder {
     }
 }
 
-// impl Into<Vec<ChatCompletionRequestMessage>> for PromptsBuilder {
-//     fn into(self) -> Vec<ChatCompletionRequestMessage> {
-//         self.messages()
-//     }
-// }
+impl<S, U> From<(S, U)> for PromptsBuilder
+where
+    S: Into<String>,
+    U: Into<String>,
+{
+    fn from(value: (S, U)) -> Self {
+        let sys: String = value.0.into();
+        let user: String = value.1.into();
+        let mut builder = PromptsBuilder::default();
+        (&mut builder).system(&sys).user(&user);
+        builder
+    }
+}
 
 impl From<PromptsBuilder> for Vec<ChatCompletionRequestMessage> {
-    fn from(b: PromptsBuilder) -> Self {
-        b.messages()
+    fn from(builder: PromptsBuilder) -> Self {
+        builder.messages()
     }
 }
 
