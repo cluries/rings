@@ -162,7 +162,7 @@ where
         let sys: String = value.0.into();
         let user: String = value.1.into();
         let mut builder = PromptsBuilder::default();
-        (&mut builder).system(&sys).user(&user);
+        builder.system(&sys).user(&user);
         builder
     }
 }
