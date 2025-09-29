@@ -2,10 +2,10 @@
 /// format:
 use crate::erx;
 
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::OnceLock;
 
 /// generate id
 /// actually, it is call shared().make()
@@ -48,9 +48,7 @@ const MIN_VALUE: i64 = 1_000_000_000_000_000_000;
 
 const BASE62: i64 = 62;
 
-lazy_static! {
-    static ref _shared_factory: Factory = Factory::new("SHARED", 0);
-}
+static SHARED_FACTORY: OnceLock<Factory> = OnceLock::new();
 
 /// id
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -68,7 +66,7 @@ pub struct Factory {
 
 /// gets shared id factory
 pub fn shared() -> &'static Factory {
-    &_shared_factory
+    SHARED_FACTORY.get_or_init(|| Factory::new("SHARED", 0))
 }
 
 struct ShorterMills {
@@ -137,13 +135,13 @@ impl Factory {
         self.millis.load(Ordering::Relaxed)
     }
 
-    fn ensure_current_millis(&self) -> erx::ResultE<i64> {
+    fn ensure_current_millis(&self) -> erx::ResultBoxedE<i64> {
         let mut millis: i64;
         let mut trys = 10;
 
         loop {
             if trys < 1 {
-                return Err("Exceeded the maximum number of attempts".into());
+                return Err(erx::Erx::boxed("Exceeded the maximum number of attempts"));
             }
             trys -= 1;
 
@@ -169,11 +167,11 @@ impl Factory {
         Ok(millis)
     }
 
-    pub fn make(&self) -> erx::ResultE<Id> {
+    pub fn make(&self) -> erx::ResultBoxedE<Id> {
         let millis = self.ensure_current_millis()?;
         let seq = self.sequence.fetch_add(1, Ordering::Relaxed);
         if seq > MAX_SEQUENCE {
-            return Err("beyond sequence limits".into());
+            return Err(erx::Erx::boxed("beyond sequence limits"));
         }
 
         let shorter = ShorterMills::with_mills(millis).shorter();
@@ -182,7 +180,7 @@ impl Factory {
         Ok(Id { val })
     }
 
-    pub fn make_n(&self, n: u16) -> erx::ResultE<Vec<Id>> {
+    pub fn make_n(&self, n: u16) -> erx::ResultBoxedE<Vec<Id>> {
         if n < 1 {
             return Ok(vec![]);
         }
@@ -195,7 +193,7 @@ impl Factory {
         if seq + n > MAX_SEQUENCE {
             // rollback
             self.sequence.fetch_sub(n, Ordering::AcqRel);
-            return Err("beyond sequence limits".into());
+            return Err(erx::Erx::boxed("beyond sequence limits"));
         }
 
         let mut ids: Vec<Id> = Vec::new();
@@ -243,14 +241,7 @@ impl Id {
     }
 
     pub fn description(self) -> String {
-        format!(
-            "{} shard:{:02} seq:{:03} millis:{} second:{}",
-            self.val.to_string(),
-            self.sharding(),
-            self.sequence(),
-            self.millis(),
-            self.second()
-        )
+        format!("{} shard:{:02} seq:{:03} millis:{} second:{}", self.val, self.sharding(), self.sequence(), self.millis(), self.second())
     }
 
     pub fn value(self) -> i64 {
@@ -285,15 +276,15 @@ impl From<i64> for Id {
     }
 }
 
-impl Into<i64> for Id {
-    fn into(self) -> i64 {
-        self.val
+impl From<Id> for i64 {
+    fn from(id: Id) -> Self {
+        id.val
     }
 }
 
-impl Into<String> for Id {
-    fn into(self) -> String {
-        self.val.to_string()
+impl From<Id> for String {
+    fn from(id: Id) -> Self {
+        id.val.to_string()
     }
 }
 

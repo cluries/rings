@@ -1,15 +1,17 @@
 use crate::erx::{Erx, LayoutedC};
 use crate::web::except::Except;
-use axum::http::header::CONTENT_TYPE;
+use axum::http::header::{CONTENT_TYPE, SERVER};
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::Response;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-const ORIGIN_ERX_CODE: &'static str = "ORIGIN_ERX_CODE";
-const JSON_SERIAL_ERROR: &'static str = "JSON serialization error";
-const OPTION_NONE_MESSAGE: &'static str = "Sorry, some error occurred, but no message was provided";
+static ORIGIN_ERX_CODE: &str = "ORIGIN_ERX_CODE";
+static JSON_SERIAL_ERROR: &str = "JSON serialization error";
+static OPTION_NONE_MESSAGE: &str = "Sorry, some error occurred, but no message was provided";
+static APPLICATION_JSON: &str = "application/json";
+static RINGS_CORE: &str = "RingsCore/1.0";
 
 pub type OutAny = Out<serde_json::Value>;
 
@@ -30,21 +32,28 @@ pub struct Out<T: Serialize> {
     pub profile: Option<Profile>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Debug {
     kvs: HashMap<String, String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Profile {}
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct Profile {
+    start: i64,
+    finsh: i64,
+}
 
 impl Debug {
     pub fn new() -> Debug {
         Debug { kvs: HashMap::new() }
     }
 
-    pub fn add_item(&mut self, key: &str, value: &str) -> &mut Debug {
-        self.kvs.insert(key.to_string(), value.to_string());
+    pub fn add_item<K, V>(&mut self, key: K, val: V) -> &mut Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.kvs.insert(key.into(), val.into());
         self
     }
 
@@ -103,7 +112,12 @@ impl<T: Serialize> Out<T> {
         if self.debug.is_none() {
             self.debug = Some(Debug::new());
         }
-        self.debug.as_mut().unwrap().add_item(key, value);
+
+        if let Some(debug) = self.debug.as_mut() {
+            debug.add_item(key, value);
+        } else {
+            tracing::error!("unable to add debug items: {{ {}=>{} }}", key, value);
+        }
         self
     }
 
@@ -111,20 +125,25 @@ impl<T: Serialize> Out<T> {
         if self.debug.is_none() {
             self.debug = Some(Debug::new());
         }
-        self.debug.as_mut().unwrap().add_items(kvs);
-        self
-    }
-
-    pub fn remove_debug_item(&mut self, key: &str) -> &mut Self {
-        if self.debug.is_some() {
-            self.debug.as_mut().unwrap().remove_item(key);
+        if let Some(debug) = self.debug.as_mut() {
+            debug.add_items(kvs);
+        } else {
+            tracing::error!("unable to add debug items: {:?}", kvs);
         }
         self
     }
 
+    pub fn remove_debug_item(&mut self, key: &str) -> &mut Self {
+        if let Some(debug) = self.debug.as_mut() {
+            debug.remove_item(key);
+        }
+
+        self
+    }
+
     pub fn remove_debug_items(&mut self, keys: Vec<String>) -> &mut Self {
-        if self.debug.is_some() {
-            self.debug.as_mut().unwrap().remove_items(keys);
+        if let Some(debug) = self.debug.as_mut() {
+            debug.remove_items(keys);
         }
         self
     }
@@ -187,8 +206,8 @@ impl<T: Serialize> axum::response::IntoResponse for Out<T> {
         *response.status_mut() = status;
 
         let headers = response.headers_mut();
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        headers.insert("Powered-By", HeaderValue::from_static("Rings"));
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static(APPLICATION_JSON));
+        headers.insert(SERVER, HeaderValue::from_static(RINGS_CORE));
 
         response.into_response()
     }

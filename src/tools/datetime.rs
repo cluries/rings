@@ -37,10 +37,10 @@ pub enum Format {
     DatetimeWithTimeZone, // %Y-%m-%d %H:%M:%S %Z
 }
 
-pub const FORMAT_DATE: &'static str = "%Y-%m-%d";
-pub const FORMAT_TIME: &'static str = "%H:%M:%S";
-pub const FORMAT_DATETIME: &'static str = "%Y-%m-%d %H:%M:%S";
-pub const FORMAT_DATETIME_WITH_TIMEZONE: &'static str = "%Y-%m-%d %H:%M:%S %Z";
+pub const FORMAT_DATE: &str = "%Y-%m-%d";
+pub const FORMAT_TIME: &str = "%H:%M:%S";
+pub const FORMAT_DATETIME: &str = "%Y-%m-%d %H:%M:%S";
+pub const FORMAT_DATETIME_WITH_TIMEZONE: &str = "%Y-%m-%d %H:%M:%S %Z";
 
 impl Format {
     pub fn layout(&self) -> &'static str {
@@ -53,15 +53,15 @@ impl Format {
     }
 }
 
-impl Into<&'static str> for Format {
-    fn into(self) -> &'static str {
-        self.layout()
-    }
-}
+// impl Into<&'static str> for Format {
+//     fn into(self) -> &'static str {
+//         self.layout()
+//     }
+// }
 
-impl Into<String> for Format {
-    fn into(self) -> String {
-        self.layout().to_string()
+impl From<Format> for &'static str {
+    fn from(f: Format) -> Self {
+        f.layout()
     }
 }
 
@@ -81,19 +81,19 @@ impl Format {
         }
     }
 
-    pub fn parse_to_utc(&self, datetime: &str) -> erx::ResultE<chrono::DateTime<chrono::Utc>> {
+    pub fn parse_to_utc(&self, datetime: &str) -> erx::ResultBoxedE<chrono::DateTime<chrono::Utc>> {
         let datetime = chrono::DateTime::parse_from_str(datetime, self.layout());
         match datetime {
             Ok(datetime) => Ok(datetime.with_timezone(&chrono::Utc)),
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(erx::Erx::boxed(e.to_string().as_str())),
         }
     }
 
-    pub fn parse_to_local(&self, datetime: &str) -> erx::ResultE<chrono::DateTime<chrono::Local>> {
+    pub fn parse_to_local(&self, datetime: &str) -> erx::ResultBoxedE<chrono::DateTime<chrono::Local>> {
         let datetime = chrono::DateTime::parse_from_str(datetime, self.layout());
         match datetime {
             Ok(datetime) => Ok(datetime.with_timezone(&chrono::Local)),
-            Err(e) => Err(e.to_string().into()),
+            Err(e) => Err(erx::Erx::boxed(e.to_string().as_str())),
         }
     }
 }
@@ -139,7 +139,7 @@ impl Yearmonth {
     pub fn month_days(&self) -> i32 {
         let year = self.year;
         let month = self.month;
-        let days = if Is::leap(year) {
+        if Is::leap(year) {
             if month == 2 {
                 29
             } else if month == 4 || month == 6 || month == 9 || month == 11 {
@@ -147,27 +147,29 @@ impl Yearmonth {
             } else {
                 31
             }
+        } else if month == 2 {
+            28
+        } else if month == 4 || month == 6 || month == 9 || month == 11 {
+            30
         } else {
-            if month == 2 {
-                28
-            } else if month == 4 || month == 6 || month == 9 || month == 11 {
-                30
-            } else {
-                31
-            }
-        };
-        days
+            31
+        }
     }
 
     /// get days of year
     pub fn year_days(&self) -> i32 {
         let year = self.year;
-        let days = if Is::leap(year) { 366 } else { 365 };
-        days
+        if Is::leap(year) {
+            366
+        } else {
+            365
+        }
     }
+}
 
-    pub fn to_string(&self) -> String {
-        format!("{:04}-{:02}", self.year, self.month)
+impl std::fmt::Display for Yearmonth {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:04}-{:02}", self.year, self.month)
     }
 }
 

@@ -28,7 +28,7 @@ pub async fn logging_initialize() {
         }
     }
 
-    let rebit = crate::conf::rebit().read().expect("conf::rebit is not initialized");
+    let rebit = crate::conf::rebit().read().await;
     let app_name = rebit.name.clone();
     let log_conf = match &rebit.log {
         None => Default::default(),
@@ -52,7 +52,7 @@ pub async fn logging_initialize() {
     }
 
     let logs_dir = log_conf.dirs.trim();
-    if logs_dir.len() > 0 {
+    if !logs_dir.is_empty() {
         let is = fs::Is(logs_dir.to_string());
         if !is.dir().await {
             panic!("log dir is not a directory: {}", logs_dir);

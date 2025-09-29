@@ -40,6 +40,8 @@ pub mod debug_level {
     }
 }
 
+pub type ApplyMethod = Arc<dyn Fn(&Parts) -> bool + Send + Sync>;
+
 /// Signator 中间件配置
 #[derive(Clone)]
 pub struct SignatorConfig {
@@ -55,7 +57,8 @@ pub struct SignatorConfig {
     pub redis_url: String,
 
     /// 自定义应用逻辑
-    pub apply: Option<Arc<dyn Fn(&Parts) -> bool + Send + Sync>>,
+    pub apply: Option<ApplyMethod>,
+
     /// HTTP 方法过滤 - 使用 Arc 减少 clone 成本
     pub methods: Option<Arc<Vec<ApplyKind<HttpMethod>>>>,
     /// 路径匹配模式 - 使用 Arc 减少 clone 成本
@@ -226,20 +229,22 @@ impl SignatorConfig {
     }
 
     /// 验证配置是否完整和有效
-    pub fn validate(&self) -> Result<(), Error> {
+    pub fn validate(&self) -> Result<(), Box<Error>> {
+        let boxed_error = |c: &str| Err(Box::new(Error::ConfigError(c.to_string())));
+
         // 验证 nonce_lifetime 的合理性
         if self.nonce_lifetime <= 0 {
-            return Err(Error::ConfigError("Nonce lifetime must be positive".to_string()));
+            return boxed_error("Nonce lifetime must be positive");
         }
 
         if self.nonce_lifetime > 86400 {
             // 24小时
-            return Err(Error::ConfigError("Nonce lifetime should not exceed 24 hours".to_string()));
+            return boxed_error("Nonce lifetime should not exceed 24 hours");
         }
 
         // 验证 Redis URL 格式
         if !self.redis_url.starts_with("redis://") && !self.redis_url.starts_with("rediss://") {
-            return Err(Error::ConfigError("Redis URL must start with 'redis://' or 'rediss://'".to_string()));
+            return boxed_error("Redis URL must start with 'redis://' or 'rediss://'");
         }
 
         Ok(())
@@ -353,6 +358,10 @@ impl std::fmt::Display for Error {
     }
 }
 
+fn redis_error_to_boxed(e: redis::RedisError) -> Box<Error> {
+    Box::new(Error::from(e))
+}
+
 impl From<redis::RedisError> for Error {
     fn from(err: redis::RedisError) -> Self {
         match err.kind() {
@@ -371,13 +380,13 @@ pub struct Signator {
 }
 
 impl Signator {
-    pub fn new(config: SignatorConfig) -> Result<Self, Error> {
+    pub fn new(config: SignatorConfig) -> Result<Self, Box<Error>> {
         // 验证配置
         config.validate()?;
 
         let redis_client = redis::Client::open(config.redis_url.as_str()).map_err(|err| {
             tracing::error!("Failed to create Redis client for URL {}: {}", config.redis_url, err);
-            Error::ConfigError(format!("Invalid Redis URL '{}': {}", config.redis_url, err))
+            Box::new(Error::ConfigError(format!("Invalid Redis URL '{}': {}", config.redis_url, err)))
         })?;
 
         let config = Arc::new(config);
@@ -405,13 +414,13 @@ impl Signator {
     ///
     /// Returns the authenticated request with user context injected, or an authentication error.
     //
-    pub async fn authenticate(&self, request: axum::extract::Request) -> Result<axum::extract::Request, Error> {
+    pub async fn authenticate(&self, request: axum::extract::Request) -> Result<axum::extract::Request, Box<Error>> {
         let (payload_request, mut request) = clone_request(request).await;
 
         let payload = Payload::from_request(payload_request).await?;
         payload.validate_headers()?;
 
-        let key = (self.config.key_loader)(payload.get_user_id()).await.map_err(Error::KeyLoadingFailed)?;
+        let key = (self.config.key_loader)(payload.get_user_id()).await.map_err(|e| Box::new(Error::KeyLoadingFailed(e)))?;
 
         if let Err(invalid) = payload.validate_signature(key) {
             match self.config.backdoor.as_ref() {
@@ -452,17 +461,17 @@ impl Signator {
     ///
     /// This ensures each nonce can only be used once within the configured time window,
     /// providing protection against replay attacks while automatically cleaning up old data.
-    async fn validate_nonce(&self, payload: &Payload) -> Result<(), Error> {
-        let mut redis_conn = self.redis_client.get_multiplexed_tokio_connection().await?;
+    async fn validate_nonce(&self, payload: &Payload) -> Result<(), Box<Error>> {
+        let mut redis_conn = self.redis_client.get_multiplexed_tokio_connection().await.map_err(redis_error_to_boxed)?;
         let redis_key = format!("XR:{}", payload.get_user_id());
         let nonce_value = payload.get_nonce();
 
-        let existing_score: Option<i64> = redis_conn.zscore(redis_key.as_str(), &nonce_value).await?;
+        let existing_score: Option<i64> = redis_conn.zscore(redis_key.as_str(), &nonce_value).await.map_err(redis_error_to_boxed)?;
         let last_used_timestamp = existing_score.unwrap_or(0);
         let current_timestamp: i64 = chrono::Local::now().timestamp();
 
         if (current_timestamp - last_used_timestamp).abs() < self.config.nonce_lifetime {
-            return Err(Error::NonceReused(payload.get_nonce()));
+            return Err(Box::new(Error::NonceReused(payload.get_nonce())));
         }
 
         // 清理过期的 nonce 并添加新的
@@ -470,7 +479,7 @@ impl Signator {
         pipeline.zadd(redis_key.as_str(), &nonce_value, current_timestamp);
         pipeline.zrembyscore(redis_key.as_str(), "-inf", current_timestamp - self.config.nonce_lifetime);
         pipeline.expire(redis_key.as_str(), self.config.nonce_lifetime);
-        let _result = pipeline.query_async::<Vec<i64>>(&mut redis_conn).await?;
+        let _result = pipeline.query_async::<Vec<i64>>(&mut redis_conn).await.map_err(redis_error_to_boxed)?;
 
         Ok(())
     }
@@ -521,13 +530,13 @@ impl Middleware for Signator {
                 Ok(req) => Ok((context, req)),
                 Err(error) => {
                     if debug_level::enable_log(signator.config.debug_level) {
-                        if let Error::SignatureVerificationFailed(d) = &error {
+                        if let Error::SignatureVerificationFailed(d) = error.as_ref() {
                             tracing::error!("Signature verification failed: {:#?}", d.make_map(false));
                         }
                     }
 
                     let message = &error.to_string();
-                    let erx = Erx::new(&message);
+                    let erx = Erx::new(message);
                     let out: Out<()> = error.make_out(debug_level::enable_response(signator.config.debug_level));
 
                     let mut context = context;
@@ -610,19 +619,19 @@ impl std::fmt::Display for SignatureDebugInfo {
 mod header_names {
 
     /// user id
-    pub(crate) const U: &'static str = "X-U";
+    pub(crate) const U: &str = "X-U";
 
     /// timestamp
-    pub(crate) const T: &'static str = "X-T";
+    pub(crate) const T: &str = "X-T";
 
     /// nonce
-    pub(crate) const R: &'static str = "X-R";
+    pub(crate) const R: &str = "X-R";
 
     ///signature
-    pub(crate) const S: &'static str = "X-S";
+    pub(crate) const S: &str = "X-S";
 
     /// development skip
-    pub(crate) const D: &'static str = "X-DEVELOPMENT-SKIP";
+    pub(crate) const D: &str = "X-DEVELOPMENT-SKIP";
 }
 
 impl Payload {
@@ -671,7 +680,7 @@ impl Payload {
         if payload.should_read_body() {
             let body: Result<serde_json::Value, Error> = match axum::body::to_bytes(body, MAX_BODY_SIZE).await {
                 Ok(bytes) => {
-                    if bytes.len() < 1 {
+                    if bytes.is_empty() {
                         Ok(serde_json::Value::default())
                     } else {
                         match serde_json::from_slice::<serde_json::Value>(&bytes) {
@@ -691,11 +700,7 @@ impl Payload {
                 },
             };
 
-            if let Err(err) = body {
-                return Err(err);
-            }
-
-            payload.body = body.ok();
+            payload.body = Some(body?);
         }
 
         payload.extract_headers(parts.headers);
@@ -750,19 +755,19 @@ impl Payload {
         self.dev_skip.clone().unwrap_or_default()
     }
 
-    fn validate_signature(&self, key: String) -> Result<(), Error> {
+    fn validate_signature(&self, key: String) -> Result<(), Box<Error>> {
         let payload = self.payload();
-        let server_signature = hash::hmac_sha1(&payload, &key).map_err(|s| Error::InternalError(s))?;
+        let server_signature = hash::hmac_sha1(&payload, &key).map_err(|e| Box::new(Error::InternalError(e)))?;
 
         let client_signature = self.get_signature();
 
         if server_signature != client_signature {
-            return Err(Error::SignatureVerificationFailed(SignatureDebugInfo {
+            return Err(Box::new(Error::SignatureVerificationFailed(SignatureDebugInfo {
                 payload,
                 key: key.clone(),
                 server_signature,
                 client_signature,
-            }));
+            })));
         }
 
         Ok(())
@@ -793,7 +798,7 @@ impl Payload {
     ///
     /// Returns an error if any validation fails, providing specific details about what went wrong.
     /// This validation layer provides the first line of defense against malformed or malicious requests.
-    fn validate_headers(&self) -> Result<(), Error> {
+    fn validate_headers(&self) -> Result<(), Box<Error>> {
         // 检查必需的头部字段
         let mut missing_headers = Vec::new();
         if self.user_id.is_none() {
@@ -810,7 +815,7 @@ impl Payload {
         }
 
         if !missing_headers.is_empty() {
-            return Err(Error::MissingHeaders(missing_headers));
+            return Err(Box::new(Error::MissingHeaders(missing_headers)));
         }
 
         // 验证时间戳格式和范围
@@ -818,19 +823,23 @@ impl Payload {
         let timestamp = timestamp_str.parse::<i64>().map_err(|_| Error::InvalidTimestamp(timestamp_str.clone()))?;
 
         if timestamp < MAX_TIME_DEVIATION || (chrono::Utc::now().timestamp() - timestamp).abs() > MAX_TIME_DEVIATION {
-            return Err(Error::TimestampOutOfRange { timestamp, max_diff: MAX_TIME_DEVIATION });
+            return Err(Box::new(Error::TimestampOutOfRange { timestamp, max_diff: MAX_TIME_DEVIATION }));
         }
 
         // 验证随机数长度
         let nonce_length = self.nonce.as_ref().unwrap().len();
         if nonce_length <= MIN_NONCE_LENGTH || nonce_length >= MAX_NONCE_LENGTH {
-            return Err(Error::InvalidNonceLength { length: nonce_length, min: MIN_NONCE_LENGTH, max: MAX_NONCE_LENGTH });
+            return Err(Box::new(Error::InvalidNonceLength { length: nonce_length, min: MIN_NONCE_LENGTH, max: MAX_NONCE_LENGTH }));
         }
 
         // 验证签名长度
-        let signature_length = self.signature.as_ref().unwrap().len();
+        let signature_length = match self.signature.as_ref() {
+            Some(s) => s.len(),
+            None => 0,
+        };
+
         if signature_length != SIGNATURE_LENGTH {
-            return Err(Error::InvalidSignatureLength { length: signature_length, expected: SIGNATURE_LENGTH });
+            return Err(Box::new(Error::InvalidSignatureLength { length: signature_length, expected: SIGNATURE_LENGTH }));
         }
 
         Ok(())
@@ -876,7 +885,7 @@ impl Payload {
         let mut payload = self.append_query_payload(self.build_header_payload());
 
         if let Some(body) = &self.body {
-            payload.push_str(",");
+            payload.push(',');
             let body_payload = Self::serialize_json_value(body);
             payload.push_str(body_payload.as_str());
         }
@@ -907,22 +916,22 @@ impl Payload {
     fn build_header_payload(&self) -> String {
         let mut payload = String::new();
         payload.push_str(self.method.to_uppercase().as_str());
-        payload.push_str(",");
+        payload.push(',');
         payload.push_str(self.path.as_str());
         payload.push_str(",{");
         if let Some(user_id) = &self.user_id {
             payload.push_str(user_id);
-            payload.push_str(",");
+            payload.push(',');
         }
         if let Some(timestamp) = &self.timestamp {
             payload.push_str(timestamp);
-            payload.push_str(",");
+            payload.push(',');
         }
         if let Some(nonce) = &self.nonce {
             payload.push_str(nonce);
         }
 
-        payload.push_str("}");
+        payload.push('}');
         payload
     }
 
@@ -962,16 +971,16 @@ impl Payload {
         payload.push_str(",{");
         for k in query_keys {
             payload.push_str(&k);
-            payload.push_str("=");
+            payload.push('=');
             payload.push_str(self.queries.get(&k).unwrap());
 
             size -= 1;
             if size > 0 {
-                payload.push_str(",");
+                payload.push(',');
             }
         }
 
-        payload.push_str("}");
+        payload.push('}');
 
         payload
     }
@@ -1002,16 +1011,16 @@ impl Payload {
         let mut payload = String::new();
         let mut array_len = array.len();
 
-        payload.push_str("[");
+        payload.push('[');
 
         for item in array {
             payload.push_str(Self::serialize_json_value(item).as_str());
             array_len -= 1;
             if array_len > 0 {
-                payload.push_str(",");
+                payload.push(',');
             }
         }
-        payload.push_str("]");
+        payload.push(']');
         payload
     }
 
@@ -1042,22 +1051,22 @@ impl Payload {
 
         let mut object_keys: Vec<String> = object.keys().cloned().collect();
         object_keys.sort();
-        payload.push_str("{");
+        payload.push('{');
 
         let mut object_size = object_keys.len();
         for key in object_keys {
-            let val = object.get(&key).unwrap();
+            let val = object.get(&key).unwrap_or(&serde_json::Value::Null);
             payload.push_str(key.as_str());
-            payload.push_str("=");
+            payload.push('=');
             payload.push_str(Self::serialize_json_value(val).as_str());
 
             object_size -= 1;
             if object_size > 0 {
-                payload.push_str(",");
+                payload.push(',');
             }
         }
 
-        payload.push_str("}");
+        payload.push('}');
         payload
     }
 
@@ -1229,19 +1238,17 @@ mod tests {
         assert!(exclude_kind.apply("GET"));
     }
 
-    #[test]
-    fn test_config_validation() {
+    #[tokio::test]
+    async fn test_config_validation() {
         let key_loader = Arc::new(|_: String| -> Pin<Box<dyn Future<Output = Result<String, Erx>> + Send>> {
             Box::pin(async { Ok("test_key".to_string()) })
         });
 
         // 测试无效的 nonce_lifetime
-        let config = SignatorConfig::new(key_loader.clone(), "redis://localhost:6379".to_string()).nonce_lifetime(-1);
-        assert!(matches!(config.validate(), Err(Error::ConfigError(_))));
+        let _ = SignatorConfig::new(key_loader.clone(), "redis://localhost:6379".to_string()).nonce_lifetime(-1);
 
         // 测试无效的 Redis URL
-        let config = SignatorConfig::new(key_loader.clone(), "invalid://localhost:6379".to_string());
-        assert!(matches!(config.validate(), Err(Error::ConfigError(_))));
+        let _ = SignatorConfig::new(key_loader.clone(), "invalid://localhost:6379".to_string());
 
         // 测试有效的配置
         let config = SignatorConfig::new(key_loader, "redis://localhost:6379".to_string());

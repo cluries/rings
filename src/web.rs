@@ -2,7 +2,6 @@
 
 pub mod api;
 pub mod context;
-pub mod cookie;
 pub mod define;
 pub mod except;
 pub mod input;
@@ -18,7 +17,8 @@ pub mod types;
 pub mod url;
 pub mod validation;
 
-use crate::rings::{RingState, RingsMod, SafeRS};
+use crate::erx::ResultBoxedE;
+use crate::rings::{RingState, RingsMod, SafeRingState};
 use crate::web::luaction::LuaAction;
 
 use async_trait::async_trait;
@@ -48,14 +48,13 @@ pub struct Web {
     name: String,
     bind: String,
     router: Router,
-    stage: SafeRS,
+    stage: SafeRingState,
     luactions: Arc<RwLock<Vec<LuaAction>>>,
     router_maker: fn() -> Vec<Router>,
     router_reconfiger: Option<fn(router: Router) -> Router>,
     middleware_manager: Arc<crate::web::middleware::Manager>,
 }
 
-///
 pub fn make_web(
     name: &str, bind: &str, router_maker: fn() -> Vec<Router>, middlewares: Vec<Box<dyn crate::web::middleware::Middleware>>,
 ) -> Web {
@@ -63,7 +62,7 @@ pub fn make_web(
         name: name.to_string(),
         bind: bind.to_string(),
         router: Router::default(),
-        stage: RingState::srs_init(),
+        stage: RingState::inited_safe_ring_state(),
         luactions: Default::default(),
         router_maker,
         middleware_manager: Arc::new(crate::web::middleware::Manager::new(middlewares)),
@@ -87,7 +86,7 @@ impl Web {
         }
 
         let luactions = self.luactions.read().expect("luactions lock poisoned");
-        if luactions.len() > 0 {
+        if !luactions.is_empty() {
             info!("lua action found. adding lua [{}] actions", luactions.len());
             for luaction in luactions.iter() {
                 router = router.merge(luaction.route());
@@ -131,28 +130,30 @@ impl RingsMod for Web {
         false
     }
 
-    async fn initialize(&mut self) -> Result<(), crate::erx::Erx> {
+    async fn initialize(&mut self) -> ResultBoxedE<()> {
         self.web_spec();
 
-        RingState::srs_set(&self.stage, RingState::Ready)?;
+        RingState::safe_ring_state_set(&self.stage, RingState::Ready)?;
 
         Ok(())
     }
 
-    async fn unregister(&mut self) -> Result<(), crate::erx::Erx> {
+    async fn unregister(&mut self) -> ResultBoxedE<()> {
         self.shutdown().await
     }
 
-    async fn shutdown(&mut self) -> Result<(), crate::erx::Erx> {
-        let current = RingState::srs_get_must(&self.stage)?;
+    async fn shutdown(&mut self) -> ResultBoxedE<()> {
+        let current = RingState::safe_ring_state_must_get(&self.stage).await?;
 
         if !current.is_ready_to_terminating() {
-            return Err(crate::erx::Erx::new(
-                format!("Ring:{} current state:{} can not terminate", self.name, <RingState as Into<&str>>::into(current)).as_str(),
-            ));
+            return Err(crate::erx::Erx::boxed(&format!(
+                "Ring:{} current state:{} can not terminate",
+                self.name,
+                <RingState as Into<&str>>::into(current)
+            )));
         }
 
-        RingState::srs_set(&self.stage, RingState::Terminating)?;
+        RingState::safe_ring_state_set(&self.stage, RingState::Terminating)?;
 
         Ok(())
     }
@@ -184,17 +185,17 @@ impl RingsMod for Web {
     //     Ok(())
     // }
 
-    async fn fire(&mut self) -> Result<(), crate::erx::Erx> {
-        let web_listen = |name: String, bind: String, router: Router, stage: Arc<RwLock<RingState>>| async move {
+    async fn fire(&mut self) -> ResultBoxedE<()> {
+        let web_listen = |name: String, bind: String, router: Router, stage: Arc<tokio::sync::RwLock<RingState>>| async move {
             let listen = tokio::net::TcpListener::bind(bind.as_str()).await;
             if listen.is_err() {
                 error!("[{} - webserver] can't bind to : {}  ERROR: {}", &name, bind, listen.unwrap_err());
                 return;
             }
 
-            let graceful = |stage: Arc<RwLock<RingState>>, name: String| async move {
+            let graceful = |stage: Arc<tokio::sync::RwLock<RingState>>, name: String| async move {
                 loop {
-                    let stage = *stage.read().unwrap();
+                    let stage = *stage.read().await;
                     if stage == RingState::Terminating || stage == RingState::Terminated {
                         info!("WebMod[ {} ] terminating, current state:{:?}", name, stage);
                         break;
@@ -206,10 +207,12 @@ impl RingsMod for Web {
             let serve = axum::serve(listen.unwrap(), router).with_graceful_shutdown(graceful(Arc::clone(&stage), name.clone()));
 
             info!("WebMod[ {} ] try served : {}", &name, bind);
-            serve.await.expect(format!("WebMod[ {} ] failed to served : {}", &name, bind).as_str());
+            // serve.await.expect(format!("WebMod[ {} ] failed to served : {}", &name, bind).as_str());
+
+            serve.await.unwrap_or_else(|_| panic!("WebMod[ {} ] failed to served : {}", &name, bind));
 
             // *stage.write().unwrap() = RingState::Terminated;
-            let _ = RingState::srs_set_must(&stage, RingState::Terminated);
+            let _ = RingState::safe_ring_state_must_set(&stage, RingState::Terminated).await;
         };
 
         let integrated_router = crate::web::middleware::Manager::integrated(self.middleware_manager.clone(), self.router.clone());
@@ -219,8 +222,8 @@ impl RingsMod for Web {
         Ok(())
     }
 
-    fn stage(&self) -> RingState {
-        RingState::srs_get_must(&self.stage).unwrap()
+    async fn stage(&self) -> RingState {
+        RingState::safe_ring_state_must_get(&self.stage).await.unwrap()
     }
 
     fn level(&self) -> i64 {

@@ -1,8 +1,10 @@
-/// web/middleware.rs
-/// 实现对tower middleware的抽象
+// web/middleware.rs
+// 实现对tower middleware的抽象
+
+pub mod limitor;
 pub mod signator;
 
-use crate::erx;
+use crate::erx::{self, Erx, ResultBoxedEX};
 use crate::web::define::HttpMethod;
 use axum::{extract::Request, http::request::Parts, response::Response};
 use dashmap::DashMap;
@@ -20,12 +22,12 @@ use tower::{
 };
 
 /// Considering the intended usage, the quantity here cannot be excessive, regardless of memory consumption.
-static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(|| Default::default());
+static REGEX_CACHE: Lazy<DashMap<String, regex::Regex>> = Lazy::new(Default::default);
 
-///
-pub type MiddlewareEventErr<T> = (Context, Option<T>, Option<erx::Erx>);
+/// MiddlewareEventErr
+pub type MiddlewareEventErr<T> = (Context, Option<T>, Option<Erx>);
 
-///
+/// MiddlewareFuture
 pub type MiddlewareFuture<T> = Pin<Box<dyn Future<Output = Result<(Context, T), MiddlewareEventErr<T>>> + Send>>;
 
 pub enum MiddlewareImpl<T, E> {
@@ -57,7 +59,6 @@ where
     //         ApplyKind::Exclude(p) => !checker(p),
     //     }
     // }
-
     pub fn apply(&self, value: &str) -> bool {
         match self {
             ApplyKind::Include(t) => t.apply(value),
@@ -284,7 +285,7 @@ impl Averager {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Point {
     pub created: Option<Instant>,
     pub elapsed: Duration,
@@ -297,12 +298,6 @@ impl Point {
             self.elapsed = instant.elapsed();
         }
         self
-    }
-}
-
-impl Default for Point {
-    fn default() -> Self {
-        Self { created: None, elapsed: Duration::default(), errored: false }
     }
 }
 
@@ -448,7 +443,6 @@ impl Context {
         self
     }
 
-    ///
     pub fn extend_metadata_owned<I>(&mut self, iter: I) -> &mut Self
     where
         I: IntoIterator<Item = (String, String)>,
@@ -534,13 +528,15 @@ impl Manager {
         }
 
         self.middlewares.push(middleware);
-        self.middlewares.sort_by(|a, b| a.priority().cmp(&b.priority()));
+        // self.middlewares.sort_by(|a, b| a.priority().cmp(&b.priority()));
+        self.middlewares.sort_by_key(|a| a.priority());
         self
     }
 
-    pub fn applies(&self, parts: &Parts) -> Vec<&Box<dyn Middleware>> {
-        let mut middlewares = Vec::new();
+    pub fn applies(&self, parts: &Parts) -> Vec<&dyn Middleware> {
+        let mut middlewares: Vec<&dyn Middleware> = vec![];
         for middleware in &self.middlewares {
+            let middleware = &(**middleware);
             if self.should_apply_middleware(middleware, parts) {
                 middlewares.push(middleware);
             }
@@ -548,32 +544,32 @@ impl Manager {
         middlewares
     }
 
-    fn should_apply_middleware(&self, middleware: &Box<dyn Middleware>, parts: &Parts) -> bool {
+    fn should_apply_middleware(&self, middleware: &dyn Middleware, parts: &Parts) -> bool {
         if let Some(apply) = middleware.apply(parts) {
             return apply;
         }
 
-        middleware.methods().map_or(true, |methods| {
+        middleware.methods().is_none_or(|methods| {
             methods.iter().any(|method| {
                 let m = parts.method.as_str();
                 method.apply(m)
             })
-        }) && middleware.patterns().map_or(true, |patterns| {
+        }) && middleware.patterns().is_none_or(|patterns| {
             let path = parts.uri.path();
             patterns.iter().any(|pattern| pattern.apply(path))
         })
     }
 
-    pub fn metrics_update<F>(&self, name: &str, f: F) -> Result<(), erx::Erx>
+    pub fn metrics_update<F>(&self, name: &str, f: F) -> ResultBoxedEX
     where
-        F: FnOnce(&mut Metrics) -> Result<(), erx::Erx>,
+        F: FnOnce(&mut Metrics) -> ResultBoxedEX,
     {
-        self.metrics.get_mut(name).map_or(Err(erx::Erx::new("metrics not found")), |metrics_ref| {
+        self.metrics.get_mut(name).map_or(Err(erx::Erx::boxed("metrics not found")), |metrics_ref| {
             let metrics_ref = Arc::clone(&metrics_ref);
             let metrics_guard = metrics_ref.try_write();
             match metrics_guard {
                 Ok(mut metrics_guard) => f(&mut metrics_guard),
-                Err(ex) => Err(erx::Erx::new(ex.to_string().as_str())),
+                Err(ex) => Err(erx::Erx::boxed(ex.to_string().as_str())),
             }
         })
     }
@@ -583,10 +579,16 @@ impl Manager {
     }
 }
 
-/// Convert ManagerLayer into a ServiceBuilder with Identity layer
-impl Into<ServiceBuilder<Stack<ManagerLayer, Identity>>> for ManagerLayer {
-    fn into(self) -> ServiceBuilder<Stack<ManagerLayer, Identity>> {
-        ServiceBuilder::new().layer(self)
+// Convert ManagerLayer into a ServiceBuilder with Identity layer
+// impl Into<ServiceBuilder<Stack<ManagerLayer, Identity>>> for ManagerLayer {
+//     fn into(self) -> ServiceBuilder<Stack<ManagerLayer, Identity>> {
+//         ServiceBuilder::new().layer(self)
+//     }
+// }
+
+impl From<ManagerLayer> for ServiceBuilder<Stack<ManagerLayer, Identity>> {
+    fn from(val: ManagerLayer) -> Self {
+        ServiceBuilder::new().layer(val)
     }
 }
 
@@ -678,11 +680,9 @@ where
                     },
                     MiddlewareImpl::Unimplemented((ctx, req, _ex)) => {
                         context = Some(ctx);
-                        match req {
-                            Some(req) => {
-                                request = Some(req);
-                            },
-                            None => {},
+
+                        if let Some(req) = req {
+                            request = Some(req);
                         }
                     },
                 }
@@ -747,11 +747,9 @@ where
                     },
                     MiddlewareImpl::Unimplemented((ctx, res, _ex)) => {
                         context = Some(ctx);
-                        match res {
-                            Some(res) => {
-                                response = Some(res);
-                            },
-                            None => {},
+
+                        if let Some(res) = res {
+                            response = Some(res);
                         };
                     },
                 }

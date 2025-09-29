@@ -1,27 +1,31 @@
-/// Layouted: 预设好的一些Layout快速方法
-/// ResultE<T> = Result<T, Erx>;
-/// ResultEX = ResultE<()>;
-/// fn smp<T: ToString>(error: T) -> Erx
-/// fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx
-use crate::conf;
-use lazy_static::lazy_static;
+use crate::{conf, core::runtime::tokio_block_on};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::Display;
+use std::str::FromStr;
+use std::sync::OnceLock;
 
-lazy_static! {
-    static ref APP_SHORT: String = conf::rebit().read().expect("failed read rebit object").short.clone();
+static APP_SHORT: OnceLock<String> = OnceLock::new();
+
+pub fn app_short() -> String {
+    APP_SHORT.get_or_init(|| tokio_block_on(async { conf::rebit().read().await.short.clone() })).clone()
 }
 
 /// Zero
-pub static LAYOUTED_C_ZERO: &'static str = "0000";
+pub static LAYOUTED_C_ZERO: &str = "0000";
 
 /// ResultE<T> = Result<T, Erx>;
 pub type ResultE<T> = Result<T, Erx>;
 
 /// ResultEX = ResultE<()>;
 pub type ResultEX = ResultE<()>;
+
+/// ResultBoxedE<T> = Result<T, Box<Erx>>;
+pub type ResultBoxedE<T> = Result<T, Box<Erx>>;
+
+/// ResultBoxedEX = ResultBoxedE<()>;
+pub type ResultBoxedEX = ResultBoxedE<()>;
 
 /// Layouted: Some predefined Layouted methods
 pub struct Layouted;
@@ -36,14 +40,15 @@ pub fn describe_error(e: &dyn std::error::Error) -> String {
     description
 }
 
-/// emp
-/// emp: error message processor - 将标准错误类型转换为Erx错误类型
-/// emp函数的作用是将任何实现了std::error::Error trait的错误转换为Erx错误类型：
+/// error_conv
+/// error_conv: error message processor - 将标准错误类型转换为Erx错误类型
+/// error_conv 函数的作用是将任何实现了std::error::Error trait的错误转换为Erx错误类型：
 /// - 接受一个实现了std::error::Error trait的错误参数
 /// - 使用describe_error函数获取完整的错误链描述，并将其作为额外信息存储在extra字段中
 /// - 将错误的主要消息（error.to_string()）作为message字段
 /// - 使用默认的错误代码（LayoutedC::default()）
 /// - 在extra字段中添加"ORIGIN"键，值为完整的错误链描述
+///
 /// 适用于需要保留原始错误完整信息的场景，特别是当错误具有复杂的因果链时
 /// 与smp函数的区别在于：emp专门处理Error类型并保留错误链信息，而smp只是简单的字符串转换
 ///
@@ -53,32 +58,44 @@ pub fn describe_error(e: &dyn std::error::Error) -> String {
 /// let erx = emp(io_error);
 /// // erx.extra 中会包含 ("ORIGIN", "完整的错误描述包括错误链")
 /// ```
-pub fn emp<T: std::error::Error>(error: T) -> Erx {
+pub fn error_conv<T: std::error::Error>(error: T) -> Erx {
     let extra = vec![(String::from("ORIGIN"), describe_error(&error))];
     let message = error.to_string();
     Erx { code: Default::default(), message, extra }
 }
 
-/// smp: simple convert T: ToString to Erx
+/// error_conv_boxed: error_conv but return Box<Erx>
+pub fn error_conv_boxed<T: std::error::Error>(error: T) -> Box<Erx> {
+    Box::new(error_conv(error))
+}
+
+/// simple_conv: simple convert T: ToString to Erx
 /// smp函数的作用是将任何实现了ToString trait的类型简单转换为Erx错误类型
 /// 这是一个便捷函数，用于快速创建基本的错误对象：
 /// - 使用默认的错误代码（LayoutedC::default()）
 /// - 将输入参数转换为字符串作为错误消息
 /// - 不包含任何额外信息（extra字段为空）
+///
 /// 适用于需要快速创建简单错误的场景，不需要复杂的错误分类或额外上下文信息
-pub fn smp<T: ToString>(error: T) -> Erx {
+pub fn simple_conv<T: ToString>(error: T) -> Erx {
     Erx { code: Default::default(), message: error.to_string(), extra: Vec::new() }
 }
 
-/// amp: return a function that convert T: ToString to Erx
-/// amp: 返回一个函数，该函数将T: ToString转换为Erx，并在错误消息前添加额外的上下文信息
-/// amp函数的作用是创建一个错误转换闭包，用于为错误消息添加上下文前缀：
+/// simple_conv_boxed: simple_conv but return Box<Erx>
+pub fn simple_conv_boxed<T: ToString>(error: T) -> Box<Erx> {
+    Box::new(simple_conv(error))
+}
+
+/// additional_conv: return a function that convert T: ToString to Erx
+/// additional_conv: 返回一个函数，该函数将T: ToString转换为Erx，并在错误消息前添加额外的上下文信息
+/// additional_conv 函数的作用是创建一个错误转换闭包，用于为错误消息添加上下文前缀：
 /// - 接受一个additional参数作为错误消息的前缀
 /// - 返回一个闭包，该闭包可以将任何实现了ToString trait的类型转换为Erx
 /// - 生成的错误消息格式为: "{additional} : {原始错误消息}"
 /// - 使用默认的错误代码（LayoutedC::default()）
 /// - 不包含任何额外信息（extra字段为空）
-/// 适用于需要为一系列相关错误添加统一上下文信息的场景，比如在特定模块或函数中批量处理错误时
+///
+///  适用于需要为一系列相关错误添加统一上下文信息的场景，比如在特定模块或函数中批量处理错误时
 ///
 /// # 示例
 /// ```
@@ -86,9 +103,15 @@ pub fn smp<T: ToString>(error: T) -> Erx {
 /// let error = db_error_converter("Connection timeout");
 /// // 生成的错误消息为: "Database operation failed : Connection timeout"
 /// ```
-pub fn amp<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
+pub fn additional_conv<T: ToString>(additional: &str) -> impl Fn(T) -> Erx {
     let additional = additional.to_string();
     move |err: T| Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() }
+}
+
+/// additional_conv_boxed: additional_conv but return Box<Erx>
+pub fn additional_conv_boxed<T: ToString>(additional: &str) -> impl Fn(T) -> Box<Erx> {
+    let additional = additional.to_string();
+    move |err: T| Box::new(Erx { code: Default::default(), message: format!("{} : {}", additional, err.to_string()), extra: Vec::new() })
 }
 
 /// Predefined Layouted Code with length 4
@@ -112,7 +135,7 @@ pub enum PreL4 {
     TASK,
     /// Cron: Cron错误
     CRON,
-    ///
+    /// Other: 其他错误
     OTHE,
 }
 
@@ -132,24 +155,44 @@ impl PreL4 {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<PreL4> {
-        match s.to_uppercase().as_str() {
-            "FUZZ" => Some(PreL4::FUZZ),
-            "COMM" => Some(PreL4::COMM),
-            "MIDL" => Some(PreL4::MIDL),
-            "SERV" => Some(PreL4::SERV),
-            "MODE" => Some(PreL4::MODE),
-            "ACTN" => Some(PreL4::ACTN),
-            "UNDF" => Some(PreL4::UNDF),
-            "TASK" => Some(PreL4::TASK),
-            "CRON" => Some(PreL4::CRON),
-            "OTHE" => Some(PreL4::OTHE),
-            _ => None,
-        }
-    }
+    // pub fn from_str(s: &str) -> Option<PreL4> {
+    //     match s.to_uppercase().as_str() {
+    //         "FUZZ" => Some(PreL4::FUZZ),
+    //         "COMM" => Some(PreL4::COMM),
+    //         "MIDL" => Some(PreL4::MIDL),
+    //         "SERV" => Some(PreL4::SERV),
+    //         "MODE" => Some(PreL4::MODE),
+    //         "ACTN" => Some(PreL4::ACTN),
+    //         "UNDF" => Some(PreL4::UNDF),
+    //         "TASK" => Some(PreL4::TASK),
+    //         "CRON" => Some(PreL4::CRON),
+    //         "OTHE" => Some(PreL4::OTHE),
+    //         _ => None,
+    //     }
+    // }
 
     pub fn layoutc(&self, category: &str, detail: &str) -> LayoutedC {
         LayoutedC::new(self.four(), category, detail)
+    }
+}
+
+impl FromStr for PreL4 {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "FUZZ" => Ok(PreL4::FUZZ),
+            "COMM" => Ok(PreL4::COMM),
+            "MIDL" => Ok(PreL4::MIDL),
+            "SERV" => Ok(PreL4::SERV),
+            "MODE" => Ok(PreL4::MODE),
+            "ACTN" => Ok(PreL4::ACTN),
+            "UNDF" => Ok(PreL4::UNDF),
+            "TASK" => Ok(PreL4::TASK),
+            "CRON" => Ok(PreL4::CRON),
+            "OTHE" => Ok(PreL4::OTHE),
+            _ => Err(format!("Invalid PreL4 string: {}", s)),
+        }
     }
 }
 
@@ -235,7 +278,7 @@ pub struct LayoutedC {
 impl LayoutedC {
     pub fn okay() -> LayoutedC {
         LayoutedC {
-            application: APP_SHORT.clone(),
+            application: app_short(),
             domain: LAYOUTED_C_ZERO.into(),
             category: LAYOUTED_C_ZERO.into(),
             detail: LAYOUTED_C_ZERO.into(),
@@ -243,11 +286,11 @@ impl LayoutedC {
     }
 
     pub fn new(domain: &str, category: &str, detail: &str) -> LayoutedC {
-        LayoutedC { application: APP_SHORT.clone(), domain: domain.into(), category: category.into(), detail: detail.into() }
+        LayoutedC { application: app_short(), domain: domain.into(), category: category.into(), detail: detail.into() }
     }
 
     pub fn is_okc(&self) -> bool {
-        self.domain.replace("0", "").len() == 0 && self.category.replace("0", "").len() == 0 && self.detail.replace("0", "").len() == 0
+        self.domain.replace("0", "").is_empty() && self.category.replace("0", "").is_empty() && self.detail.replace("0", "").is_empty()
     }
 
     pub fn layout_string(&self) -> String {
@@ -272,7 +315,7 @@ impl LayoutedC {
 
 impl Default for LayoutedC {
     fn default() -> Self {
-        LayoutedC { application: APP_SHORT.clone(), domain: PreL4::UNDF.into(), category: PreL4::UNDF.into(), detail: PreL4::UNDF.into() }
+        LayoutedC { application: app_short(), domain: PreL4::UNDF.into(), category: PreL4::UNDF.into(), detail: PreL4::UNDF.into() }
     }
 }
 
@@ -292,7 +335,7 @@ impl From<String> for LayoutedC {
     fn from(value: String) -> Self {
         let mut c = LayoutedC::default();
         let parts: Vec<&str> = value.split("-").collect();
-        if let Some(application) = parts.get(0) {
+        if let Some(application) = parts.first() {
             c.application = application.to_string();
         }
         if let Some(domain) = parts.get(1) {
@@ -314,7 +357,7 @@ impl From<(String, String, String, String)> for LayoutedC {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Erx {
     code: LayoutedC,
     message: String,
@@ -324,6 +367,14 @@ pub struct Erx {
 impl Erx {
     pub fn new(message: &str) -> Erx {
         Erx { code: Default::default(), message: message.to_string(), extra: Vec::new() }
+    }
+
+    pub fn boxed(message: &str) -> Box<Erx> {
+        Box::new(Erx::new(message))
+    }
+
+    pub fn to_boxed(self) -> Box<Erx> {
+        Box::new(self)
     }
 
     pub fn code(&self) -> LayoutedC {
@@ -348,7 +399,7 @@ impl Erx {
 
     pub fn description(&self) -> String {
         let mut description = self.code.layout_string();
-        description.push_str(" ");
+        description.push(' ');
         description.push_str(&self.message);
         if self.extra.is_empty() {
             return description;
@@ -373,11 +424,11 @@ impl Erx {
 
     /// get extra value, if not exists, return None
     pub fn extra_val(&self, key: &str) -> Option<String> {
-        if self.extra.len() < 1 {
+        if self.extra.is_empty() {
             return None;
         }
 
-        self.extra.iter().find(|e| e.0.eq(key)).and_then(|e| Some(e.1.clone()))
+        self.extra.iter().find(|e| e.0.eq(key)).map(|e| e.1.clone())
     }
 
     /// get extra value, if not exists, return defaults
@@ -417,15 +468,15 @@ impl Display for Erx {
     }
 }
 
-impl Default for Erx {
-    fn default() -> Self {
-        Erx { code: Default::default(), message: Default::default(), extra: Default::default() }
-    }
-}
+// impl<T> Into<Result<T, Erx>> for Erx {
+//     fn into(self) -> Result<T, Erx> {
+//         Err(self)
+//     }
+// }
 
-impl<T> Into<Result<T, Erx>> for Erx {
-    fn into(self) -> Result<T, Erx> {
-        Err(self)
+impl<T> From<Erx> for Result<T, Erx> {
+    fn from(value: Erx) -> Self {
+        Err(value)
     }
 }
 
@@ -447,7 +498,7 @@ impl From<String> for Erx {
             return Erx::default();
         }
 
-        serde_json::from_str(&str).unwrap_or_else(|_| Erx::new(&str))
+        serde_json::from_str(&str).unwrap_or(Erx::new(&str))
     }
 }
 

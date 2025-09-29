@@ -6,7 +6,7 @@ pub fn join(base: &str, other: &str) -> String {
     let be = base.ends_with("/");
     let os = other.starts_with("/");
     if be && os {
-        return format!("{}{}", base, other[1..].to_string());
+        return format!("{}{}", base, &other[1..].to_string());
     }
 
     if !be && !os {
@@ -54,9 +54,7 @@ pub fn parse_query(query: &str) -> HashMap<String, String> {
     url::form_urlencoded::parse(query.as_bytes()).into_owned().collect()
 }
 
-
-pub fn get_query_value(query:&str, name:&str) -> Option<String> {
+pub fn get_query_value(query: &str, name: &str) -> Option<String> {
     let query = parse_query(query);
     query.get(name).cloned()
 }
-

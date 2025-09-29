@@ -1,10 +1,10 @@
-use crate::erx;
+use crate::erx::{simple_conv_boxed, Erx, ResultBoxedE, ResultBoxedEX};
 use crate::rings::RingState;
 use crate::service::ServiceManager;
 use async_trait::async_trait;
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
-use tokio::sync::RwLock as ToKioRwLock;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_cron_scheduler::JobScheduler;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -14,7 +14,7 @@ use uuid::Uuid;
 pub struct SchedulerManager {
     stage: Arc<RwLock<RingState>>,
     count: u64,
-    scheduler: Arc<ToKioRwLock<JobScheduler>>,
+    scheduler: Arc<RwLock<JobScheduler>>,
 }
 
 impl SchedulerManager {
@@ -27,20 +27,20 @@ impl SchedulerManager {
             })
         }));
 
-        Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: Arc::new(ToKioRwLock::new(scheduler)) }
+        Self { stage: Arc::new(RwLock::new(RingState::Init)), count: 0, scheduler: Arc::new(RwLock::new(scheduler)) }
     }
 
-    pub async fn add_job(&mut self, job: tokio_cron_scheduler::Job) -> erx::ResultE<String> {
+    pub async fn add_job(&mut self, job: tokio_cron_scheduler::Job) -> ResultBoxedE<String> {
         let scheduler = Arc::clone(&self.scheduler);
-        let guard = scheduler.try_write().map_err(erx::smp)?;
-        guard.add(job).await.map(Into::into).map_err(erx::smp)
+        let guard = scheduler.try_write().map_err(simple_conv_boxed)?;
+        guard.add(job).await.map(Into::into).map_err(simple_conv_boxed)
     }
 
-    pub async fn remove_job(&mut self, job_id: String) -> erx::ResultE<()> {
+    pub async fn remove_job(&mut self, job_id: String) -> ResultBoxedEX {
         let scheduler = Arc::clone(&self.scheduler);
-        let guard = scheduler.try_write().map_err(erx::smp)?;
-        let uuid = Uuid::from_str(&job_id).map_err(erx::smp)?;
-        guard.remove(&uuid).await.map_err(erx::smp)
+        let guard = scheduler.try_write().map_err(simple_conv_boxed)?;
+        let uuid = Uuid::from_str(&job_id).map_err(simple_conv_boxed)?;
+        guard.remove(&uuid).await.map_err(simple_conv_boxed)
     }
 }
 
@@ -76,7 +76,7 @@ impl crate::rings::RingsMod for SchedulerManager {
         false
     }
 
-    async fn initialize(&mut self) -> Result<(), crate::erx::Erx> {
+    async fn initialize(&mut self) -> ResultBoxedEX {
         let mut futures = vec![]; // Vec<Box<dyn Future<Output = ()> + Send>>;
         let srv_manager = ServiceManager::shared().await;
 
@@ -119,17 +119,16 @@ impl crate::rings::RingsMod for SchedulerManager {
         Ok(())
     }
 
-    async fn unregister(&mut self) -> Result<(), crate::erx::Erx> {
+    async fn unregister(&mut self) -> ResultBoxedEX {
         self.shutdown().await
     }
 
-    async fn shutdown(&mut self) -> Result<(), crate::erx::Erx> {
+    async fn shutdown(&mut self) -> ResultBoxedEX {
         info!("scheduler manager [{}] shutdown", SCHEDULER_MANAGER_NAME);
-        let current = self.stage.try_read().map_err(crate::erx::smp)?.clone();
+        let current = *self.stage.try_read().map_err(simple_conv_boxed)?;
         if !current.is_ready_to_terminating() {
-            return Err(crate::erx::Erx::new(
-                format!("Ring:{} current state:{} can not terminate", self.name(), <RingState as Into<&str>>::into(current)).as_str(),
-            ));
+            let current: &str = current.into();
+            return Err(Erx::boxed(&format!("Ring:{} current state:{} can not terminate", self.name(), current)));
         }
 
         let scheduler = Arc::clone(&self.scheduler);
@@ -137,13 +136,13 @@ impl crate::rings::RingsMod for SchedulerManager {
             error!("scheduler service lock poisoned: {}", ex);
         }
 
-        *self.stage.try_write().map_err(crate::erx::smp)? = RingState::Terminating;
+        *self.stage.try_write().map_err(simple_conv_boxed)? = RingState::Terminating;
 
         Ok(())
     }
 
-    async fn fire(&mut self) -> Result<(), crate::erx::Erx> {
-        *self.stage.write().unwrap() = RingState::Working;
+    async fn fire(&mut self) -> ResultBoxedEX {
+        *self.stage.write().await = RingState::Working;
 
         let stage = self.stage.clone();
         let dog = async move {
@@ -166,7 +165,7 @@ impl crate::rings::RingsMod for SchedulerManager {
                 tokio::time::sleep(duration).await;
             }
 
-            *stage.write().unwrap() = RingState::Terminated;
+            *stage.write().await = RingState::Terminated;
 
             stage_read_lock_failures
         };
@@ -193,8 +192,8 @@ impl crate::rings::RingsMod for SchedulerManager {
         Ok(())
     }
 
-    fn stage(&self) -> RingState {
-        self.stage.read().unwrap().clone()
+    async fn stage(&self) -> RingState {
+        *self.stage.read().await
     }
 
     fn level(&self) -> i64 {

@@ -1,5 +1,5 @@
 /// Any trait implementation for any type.
-
+///
 /// Any trait implementation for any type.
 ///
 /// Defaults implementaion
@@ -27,7 +27,7 @@ pub trait AnyTraitImplMut<T>: AnyTrait {
     fn downcast_mut(&mut self) -> Option<&mut T>;
 }
 
-///
+/// AnyTraitImpl<T>: AnyTraitImplRef<T> + AnyTraitImplMut<T>
 pub trait AnyTraitImpl<T>: AnyTraitImplRef<T> + AnyTraitImplMut<T> {}
 
 // impl<T: std::any::Any + Send + Sync> AnyTrait for T {

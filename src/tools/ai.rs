@@ -1,6 +1,6 @@
 // https://github.com/64bit/async-openai
 
-use crate::erx;
+use crate::erx::{simple_conv_boxed, Erx, ResultBoxedE};
 use crate::tools::strings::suber;
 use async_openai::config::OpenAIConfig;
 use async_openai::types::{
@@ -22,7 +22,6 @@ pub struct Provider {
     pub key: String,
 }
 
-///
 pub struct LLM {
     provider: Provider,
 }
@@ -32,6 +31,7 @@ pub struct ChatResponse {
     response: CreateChatCompletionResponse,
 }
 
+#[derive(Default)]
 pub struct PromptsBuilder {
     messages: Vec<ChatCompletionRequestMessage>,
 }
@@ -50,7 +50,7 @@ impl ChatResponse {
     }
 
     pub fn response_vec(&self) -> Vec<String> {
-        if self.response.choices.len() < 1 {
+        if self.response.choices.is_empty() {
             return Vec::new();
         }
 
@@ -65,15 +65,15 @@ impl ChatResponse {
         self.response_vec().join("")
     }
 
-    pub fn response_json<T: for<'a> Deserialize<'a>>(&self) -> Result<T, erx::Erx> {
+    pub fn response_json<T: for<'a> Deserialize<'a>>(&self) -> ResultBoxedE<T> {
         let c = self.response_string();
         Self::try_parse_json(&c)
     }
 
-    fn try_parse_json<T: for<'a> Deserialize<'a>>(content: &str) -> Result<T, erx::Erx> {
+    fn try_parse_json<T: for<'a> Deserialize<'a>>(content: &str) -> ResultBoxedE<T> {
         let mut c = content.trim();
         if c.is_empty() {
-            return Err("invalid content length".into());
+            return Err(Erx::boxed("invalid content length"));
         }
 
         const PREFIX: &str = "```json";
@@ -87,15 +87,11 @@ impl ChatResponse {
             c = &c[..c.len() - SUFFIX.len()];
         }
 
-        serde_json::from_str::<T>(c).map_err(erx::smp)
+        serde_json::from_str::<T>(c).map_err(simple_conv_boxed)
     }
 }
 
 impl PromptsBuilder {
-    pub fn default() -> Self {
-        Self { messages: Vec::new() }
-    }
-
     pub fn add(&mut self, message: ChatCompletionRequestMessage) -> &mut Self {
         self.messages.push(message);
         self
@@ -158,9 +154,15 @@ impl PromptsBuilder {
     }
 }
 
-impl Into<Vec<ChatCompletionRequestMessage>> for PromptsBuilder {
-    fn into(self) -> Vec<ChatCompletionRequestMessage> {
-        self.messages()
+// impl Into<Vec<ChatCompletionRequestMessage>> for PromptsBuilder {
+//     fn into(self) -> Vec<ChatCompletionRequestMessage> {
+//         self.messages()
+//     }
+// }
+
+impl From<PromptsBuilder> for Vec<ChatCompletionRequestMessage> {
+    fn from(b: PromptsBuilder) -> Self {
+        b.messages()
     }
 }
 
@@ -176,17 +178,17 @@ impl LLM {
         Client::with_config(config)
     }
 
-    pub async fn chat(&self, prompt: Vec<ChatCompletionRequestMessage>) -> Result<ChatResponse, erx::Erx> {
+    pub async fn chat(&self, prompt: Vec<ChatCompletionRequestMessage>) -> ResultBoxedE<ChatResponse> {
         let request = CreateChatCompletionRequestArgs::default()
             .stream(false)
             .model(self.provider.model.clone())
             .response_format(async_openai::types::ResponseFormat::Text)
             .messages(prompt)
             .build()
-            .map_err(erx::smp)?;
+            .map_err(simple_conv_boxed)?;
 
         let start = SystemTime::now();
-        let response = self.cli().chat().create(request).await.map_err(erx::smp)?;
+        let response = self.cli().chat().create(request).await.map_err(simple_conv_boxed)?;
         let duration = SystemTime::now().duration_since(start).unwrap_or_default();
         Ok(ChatResponse::new(duration, response))
     }

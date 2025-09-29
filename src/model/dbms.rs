@@ -14,7 +14,7 @@ pub enum RDBMS {
 }
 
 /// 数据库连接信息
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct ConnectBasic {
     alias: String,                    // 别名, 用于连接时的标识
     host: String,                     // 主机地址
@@ -26,20 +26,20 @@ pub struct ConnectBasic {
     options: HashMap<String, String>, // 其他选项
 }
 
-impl Default for ConnectBasic {
-    fn default() -> ConnectBasic {
-        ConnectBasic {
-            alias: Default::default(),
-            host: Default::default(),
-            port: 0,
-            name: Default::default(),
-            user: Default::default(),
-            pass: Default::default(),
-            charset: None,
-            options: Default::default(),
-        }
-    }
-}
+// impl Default for ConnectBasic {
+//     fn default() -> ConnectBasic {
+//         ConnectBasic {
+//             alias: Default::default(),
+//             host: Default::default(),
+//             port: 0,
+//             name: Default::default(),
+//             user: Default::default(),
+//             pass: Default::default(),
+//             charset: None,
+//             options: Default::default(),
+//         }
+//     }
+// }
 
 impl ConnectBasic {
     pub fn new() -> ConnectBasic {

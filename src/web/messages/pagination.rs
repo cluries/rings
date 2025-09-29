@@ -17,7 +17,8 @@ impl<T> PagedList<T> {
         if self.page_size == 0 {
             0
         } else {
-            (self.total + self.page_size - 1) / self.page_size
+            // (self.total + self.page_size - 1) / self.page_size
+            (self.total + self.page_size - 1).div_ceil(self.page_size)
         }
     }
 
@@ -110,7 +111,7 @@ pub struct PaginationMeta {
 
 impl PaginationMeta {
     pub fn new(current_page: usize, page_size: usize, total_items: usize) -> Self {
-        let total_pages = if page_size == 0 { 0 } else { (total_items + page_size - 1) / page_size };
+        let total_pages = if page_size == 0 { 0 } else { (total_items + page_size - 1).div_ceil(page_size) };
 
         Self { current_page, page_size, total_items, total_pages, has_next: current_page < total_pages, has_prev: current_page > 1 }
     }

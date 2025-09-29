@@ -1,6 +1,6 @@
 use crate::erx::Layouted;
 use crate::tos;
-use crate::web::api::{Debug, Out};
+use crate::web::api::Out;
 use crate::web::define;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -166,7 +166,7 @@ impl ExceptGrow {
     {
         let mut out = self.except.out();
         if !self.grows.is_empty() {
-            let mut debug = out.debug.unwrap_or(Debug::new());
+            let mut debug = out.debug.unwrap_or_default();
             for (key, value) in &self.grows {
                 debug.add_item(key, value);
             }

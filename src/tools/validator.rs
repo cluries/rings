@@ -54,7 +54,7 @@ pub fn regex_find(regex: &str, string: &str) -> Option<String> {
     re.find(string).map(|m| m.as_str().to_string())
 }
 
-///
+/// Net
 impl Net {
     pub fn email(email: &str) -> bool {
         let r = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$";
@@ -62,7 +62,7 @@ impl Net {
     }
 
     pub fn china_mobile(mobile: &str) -> bool {
-        mobile.len() == 11 && mobile.starts_with("1") && mobile.chars().all(|c| c.is_digit(10))
+        mobile.len() == 11 && mobile.starts_with("1") && mobile.chars().all(|c| c.is_ascii_digit())
     }
 
     pub fn chinese(s: &str) -> bool {
@@ -140,10 +140,6 @@ impl Num {
 }
 
 impl Enc {
-    pub fn ascii(s: &str) -> bool {
-        s.chars().all(|c| c.is_ascii())
-    }
-
     pub fn alpha(s: &str) -> bool {
         const R: &str = r"^[a-zA-Z]+$";
         regex_match(R, s)

@@ -1,3 +1,4 @@
+use crate::core::runtime::tokio_block_on;
 use config::{Config, Value};
 use serde::{Deserialize, Serialize};
 ///  struct GetDefault;
@@ -11,12 +12,37 @@ use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::fmt;
 use std::str::FromStr;
-use std::sync::{OnceLock, RwLock};
+use std::sync::OnceLock;
+use tokio::sync::RwLock;
 
 //get or default
 pub struct GetDefault;
 pub struct GetOption;
 pub struct Has;
+
+/// get rebit instance
+/// # Returns
+/// * `&'static RwLock<Rebit>` - rebit instance
+pub fn rebit() -> &'static RwLock<Rebit> {
+    static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
+    REBIT.get_or_init(|| {
+        RwLock::new({
+            if cfg!(test) {
+                Rebit {
+                    name: "Rebit".to_string(),
+                    short: "REBT".to_string(),
+                    debug: true,
+                    web: Default::default(),
+                    model: Model { backends: None },
+                    log: None,
+                    extends: None,
+                }
+            } else {
+                tokio_block_on(async { settings().read().await.clone().try_deserialize::<Rebit>() }).expect("rebit loading error")
+            }
+        })
+    })
+}
 
 /// get settings
 /// it's not recommand to call settings() directly
@@ -36,64 +62,27 @@ pub fn settings() -> &'static RwLock<Config> {
 /// * `&'static Config` - config instance
 /// # Panics
 /// * if file not found or invalid
-pub fn extends(file: &str) -> &'static Config {
+pub async fn extends(file: &str) -> &'static Config {
     static EXTENDS: OnceLock<RwLock<std::collections::HashMap<&'static str, Config>>> = OnceLock::new();
     let extends = EXTENDS.get_or_init(|| RwLock::new(std::collections::HashMap::new()));
 
-    match extends.read() {
-        Ok(read) => {
-            if read.contains_key(file) {
-                let c = read.get(file).unwrap();
-                return unsafe { &*(c as *const Config) };
-            }
-        },
-        Err(er) => {
-            panic!("{}", er)
-        },
+    let read = extends.read().await;
+    if read.contains_key(file) {
+        let c = read.get(file).unwrap();
+        return unsafe { &*(c as *const Config) };
     }
 
-    match extends.write() {
-        Ok(mut write) => {
-            let c = {
-                let conf = config::File::with_name(file).required(true);
-                let builder = Config::builder().add_source(conf);
-                builder.build().unwrap()
-            };
+    let mut write = extends.write().await;
+    let c = {
+        let conf = config::File::with_name(file).required(true);
+        let builder = Config::builder().add_source(conf);
+        builder.build().unwrap()
+    };
 
-            let key = Box::leak(file.to_owned().into_boxed_str());
-            write.insert(key, c);
-        },
-        Err(er) => {
-            panic!("{}", er)
-        },
-    }
+    let key = Box::leak(file.to_owned().into_boxed_str());
+    write.insert(key, c);
 
-    unsafe { &*(extends.read().unwrap().get(file).unwrap() as *const Config) }
-}
-
-/// get rebit instance
-/// # Returns
-/// * `&'static RwLock<Rebit>` - rebit instance
-pub fn rebit() -> &'static RwLock<Rebit> {
-    static REBIT: OnceLock<RwLock<Rebit>> = OnceLock::new();
-    REBIT.get_or_init(|| {
-        RwLock::new(|| -> Rebit {
-            let r = settings().read().unwrap().clone().try_deserialize::<Rebit>();
-            if cfg!(test) {
-                Rebit {
-                    name: "Rebit".to_string(),
-                    short: "REBT".to_string(),
-                    debug: true,
-                    web: Default::default(),
-                    model: Model { backends: None },
-                    log: None,
-                    extends: None,
-                }
-            } else {
-                r.unwrap_or_else(|e| panic!("rebit loading error: {}", e))
-            }
-        }())
-    })
+    unsafe { &*(extends.read().await.get(file).unwrap() as *const Config) }
 }
 
 /// init config
@@ -144,12 +133,10 @@ fn init_config() -> Config {
 /// make getter for settings, if not found, return default value
 macro_rules! make_setting_getter_default {
     ($name:ident, $type:ty, $getter:ident) => {
-        pub fn $name(k: &str, default: $type) -> $type {
+        pub async fn $name(k: &str, default: $type) -> $type {
             // let settings = settings().read();
-            match settings().read() {
-                Ok(guard) => guard.$getter(k).unwrap_or(default),
-                Err(_) => default,
-            }
+            let guard = settings().read().await;
+            guard.$getter(k).unwrap_or(default)
         }
     };
 }
@@ -157,12 +144,10 @@ macro_rules! make_setting_getter_default {
 /// make getter for settings, return Option value
 macro_rules! make_setting_getter_option {
     ($name:ident, $type:ty, $getter:ident) => {
-        pub fn $name(k: &str) -> Option<$type> {
+        pub async fn $name(k: &str) -> Option<$type> {
             // let settings = settings().read();
-            match settings().read() {
-                Ok(guard) => guard.$getter(k).ok(),
-                Err(_) => None,
-            }
+            let guard = settings().read().await;
+            guard.$getter(k).ok()
         }
     };
 }
@@ -188,29 +173,22 @@ make_setting_getter!(table, std::collections::HashMap<String, Value>, get_table)
 make_setting_getter!(array, Vec<Value>, get_array);
 
 impl GetOption {
-    pub fn get<'de, T: Deserialize<'de>>(key: &str) -> Option<T> {
-        match settings().read() {
-            Ok(guard) => guard.get(key).ok(),
-            Err(_) => None,
-        }
+    pub async fn get<'de, T: Deserialize<'de>>(key: &str) -> Option<T> {
+        let guard = settings().read().await;
+        guard.get(key).ok()
     }
 }
 impl GetDefault {
-    pub fn get<'de, T: Deserialize<'de>>(key: &str, default: T) -> T {
-        match settings().read() {
-            Ok(guard) => guard.get(key).unwrap_or(default),
-            Err(_) => default,
-        }
+    pub async fn get<'de, T: Deserialize<'de>>(key: &str, default: T) -> T {
+        let guard = settings().read().await;
+        guard.get(key).unwrap_or(default)
     }
 }
 
 impl Has {
-    pub fn has<T: for<'a> serde::Deserialize<'a>>(k: &str) -> bool {
-        let settings = settings().read();
-        match settings {
-            Ok(guard) => guard.get::<T>(k).is_ok(),
-            Err(_) => false,
-        }
+    pub async fn has<T: for<'a> serde::Deserialize<'a>>(k: &str) -> bool {
+        let guard = settings().read().await;
+        guard.get::<T>(k).is_ok()
     }
 }
 
@@ -364,7 +342,7 @@ impl Rebit {
     pub fn has_backend(&self) -> bool {
         match &self.model.backends {
             None => false,
-            Some(bs) => bs.len() > 0,
+            Some(bs) => !bs.is_empty(),
         }
     }
 
@@ -376,7 +354,7 @@ impl Rebit {
     /// # Returns
     /// * `bool` - true if has web config
     pub fn has_web(&self) -> bool {
-        self.web.len() > 0
+        !self.web.is_empty()
     }
 
     /// get web config
@@ -414,29 +392,29 @@ mod tests {
     use super::*;
     use crate::tools::tests::tools::project_dir;
 
-    #[test]
-    fn tests() {
+    #[tokio::test]
+    async fn tests() {
         // print!("{:?}", settings().read().unwrap().clone().try_deserialize::<std::collections::HashMap<String, Value>>().unwrap());
-        println!("{:?}", GetOption::string("name"));
-        println!("{:?}", GetOption::table("model.backends.postgre"));
+        println!("{:?}", GetOption::string("name").await);
+        println!("{:?}", GetOption::table("model.backends.postgre").await);
     }
 
-    #[test]
-    fn test_path_value() {
+    #[tokio::test]
+    async fn test_path_value() {
         #[derive(Debug, Deserialize, Serialize, Clone)]
         struct Port {
             pub tcp: i32,
             pub udp: i32,
         }
 
-        println!("{:?}", GetOption::get::<Vec<Port>>("providers.cnpc.management.ports"));
+        println!("{:?}", GetOption::get::<Vec<Port>>("providers.cnpc.management.ports").await);
     }
 
     /// test extends
-    #[test]
-    fn test_extends() {
+    #[tokio::test]
+    async fn test_extends() {
         let tests_load = format!("{}/tests/using-test-config.yml", project_dir().to_string_lossy());
-        let c = extends(&tests_load);
+        let c = extends(&tests_load).await;
         println!("{:?}", c);
     }
 }

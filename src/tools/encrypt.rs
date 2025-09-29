@@ -1,4 +1,4 @@
-use crate::erx;
+use crate::erx::{self, ResultBoxedE};
 
 use base64::Engine;
 use rand::Rng;
@@ -93,6 +93,7 @@ pub enum AESMode {
 }
 
 type GAB128 = GenericArray<u8, typenum::U16>;
+type CryptedResult = erx::ResultBoxedE<Vec<u8>>;
 
 impl AESMode {
     const BIT128_BLOCK_SIZE: usize = 16;
@@ -110,15 +111,15 @@ impl AESMode {
         }
     }
 
-    pub fn encrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    pub fn encrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         match self {
             AESMode::ECB => self.ecb_encrypt(key, payload),
             AESMode::CBC { .. } => self.cbc_encrypt(key, payload),
             AESMode::CFB { .. } => self.cfb_encrypt(key, payload),
             AESMode::OFB { .. } => self.ofb_encrypt(key, payload),
             AESMode::CTR { .. } => self.ctr_encrypt(key, payload),
-            AESMode::GCM { .. } => Err(erx::Erx::new("!unimplemented!")),
-            AESMode::CCM { .. } => Err(erx::Erx::new("!unimplemented!")),
+            AESMode::GCM { .. } => Err(erx::Erx::boxed("!unimplemented!")),
+            AESMode::CCM { .. } => Err(erx::Erx::boxed("!unimplemented!")),
         }
     }
 
@@ -129,28 +130,29 @@ impl AESMode {
         iv
     }
 
-    pub fn decrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    pub fn decrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         match self {
             AESMode::ECB => self.ecb_decrypt(key, payload),
             AESMode::CBC { .. } => self.cbc_decrypt(key, payload),
             AESMode::CFB { .. } => self.cfb_decrypt(key, payload),
             AESMode::OFB { .. } => self.ofb_decrypt(key, payload),
             AESMode::CTR { .. } => self.ctr_decrypt(key, payload),
-            AESMode::GCM { .. } => Err(erx::Erx::new("!unimplemented!")),
-            AESMode::CCM { .. } => Err(erx::Erx::new("!unimplemented!")),
+            AESMode::GCM { .. } => Err(erx::Erx::boxed("!unimplemented!")),
+            AESMode::CCM { .. } => Err(erx::Erx::boxed("!unimplemented!")),
         }
     }
 
     fn padding_buffer(payload: &[u8]) -> Vec<u8> {
         let mut payload_vec = payload.to_vec();
         let padding_count = AESMode::BIT128_BLOCK_SIZE - payload.len() % AESMode::BIT128_BLOCK_SIZE;
-        payload_vec.extend(std::iter::repeat(0).take(padding_count));
+        // payload_vec.extend(std::iter::repeat(0).take(padding_count));
+        payload_vec.extend(std::iter::repeat_n(0, padding_count));
         payload_vec
     }
 
-    fn ecb_encrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn ecb_encrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         let key = GAB128::from_slice(key);
-        let cipher = Aes128::new(&key);
+        let cipher = Aes128::new(key);
 
         let payload_length = payload.len();
         let block_count = payload_length / AESMode::BIT128_BLOCK_SIZE + 1;
@@ -175,13 +177,14 @@ impl AESMode {
         Ok(result)
     }
 
-    fn ecb_decrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
-        if payload.len() % AESMode::BIT128_BLOCK_SIZE != 0 {
-            return Err(erx::Erx::new("invalid payload size, must be a multiple of 16"));
+    fn ecb_decrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
+        // if payload.len() % AESMode::BIT128_BLOCK_SIZE != 0 {
+        if !payload.len().is_multiple_of(AESMode::BIT128_BLOCK_SIZE) {
+            return Err(erx::Erx::boxed("invalid payload size, must be a multiple of 16"));
         }
 
         let key = GAB128::from_slice(key);
-        let cipher = Aes128::new(&key);
+        let cipher = Aes128::new(key);
         let block_count = payload.len() / AESMode::BIT128_BLOCK_SIZE;
         let mut result = vec![];
         for i in 0..block_count {
@@ -189,7 +192,7 @@ impl AESMode {
                 GAB128::clone_from_slice(&payload[i * AESMode::BIT128_BLOCK_SIZE..(i + 1) * AESMode::BIT128_BLOCK_SIZE]);
             cipher.decrypt_block(&mut block);
             if i + 1 == block_count {
-                result.extend_from_slice(Pkcs7::unpad(&mut block).map_err(erx::smp)?);
+                result.extend_from_slice(Pkcs7::unpad(&block).map_err(erx::simple_conv)?);
             } else {
                 result.extend_from_slice(&block);
             }
@@ -198,106 +201,106 @@ impl AESMode {
         Ok(result)
     }
 
-    fn cbc_encrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn cbc_encrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         // type Aes128CbcEnc = cbc::Encryptor<Aes128>;
 
         let key = GAB128::from_slice(key);
         let iv = match self {
             AESMode::CBC { iv } => iv.clone(),
             _ => {
-                return Err(erx::Erx::new("error call CBC method"));
+                return Err(erx::Erx::boxed("error call CBC method"));
             },
         };
 
         let mut buffer = Self::padding_buffer(payload);
         let encoder: cbc::Encryptor<Aes128> = cbc::Encryptor::new(key, iv.as_slice().into());
-        let result = encoder.encrypt_padded_mut::<Pkcs7>(&mut buffer.as_mut_slice(), payload.len()).map_err(erx::smp)?.to_vec();
+        let result = encoder.encrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice(), payload.len()).map_err(erx::simple_conv)?.to_vec();
 
         Ok(result)
     }
 
-    fn cbc_decrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn cbc_decrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         let key = GAB128::from_slice(key);
         let iv = match self {
             AESMode::CBC { iv } => iv.clone(),
             _ => {
-                return Err(erx::Erx::new("error call CBC method"));
+                return Err(erx::Erx::boxed("error call CBC method"));
             },
         };
 
         let decoder: cbc::Decryptor<Aes128> = cbc::Decryptor::new(key, iv.as_slice().into());
         let mut buffer = payload.to_vec();
-        let result = decoder.decrypt_padded_mut::<Pkcs7>(&mut buffer.as_mut_slice()).map_err(erx::smp)?.to_vec();
+        let result = decoder.decrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice()).map_err(erx::simple_conv)?.to_vec();
 
         Ok(result)
     }
 
-    fn cfb_encrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn cfb_encrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         let key = GAB128::from_slice(key);
         let iv = match self {
             AESMode::CFB { iv } => iv.clone(),
             _ => {
-                return Err(erx::Erx::new("error call CFB method"));
+                return Err(erx::Erx::boxed("error call CFB method"));
             },
         };
 
         let mut buffer = Self::padding_buffer(payload);
         let encryptor: cfb_mode::Encryptor<Aes128> = cfb_mode::Encryptor::new(key, iv.as_slice().into());
-        let result = encryptor.encrypt_padded_mut::<Pkcs7>(&mut buffer.as_mut_slice(), payload.len()).map_err(erx::smp)?.to_vec();
+        let result = encryptor.encrypt_padded_mut::<Pkcs7>(buffer.as_mut_slice(), payload.len()).map_err(erx::simple_conv)?.to_vec();
 
         Ok(result)
     }
-    fn cfb_decrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn cfb_decrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         let key = GAB128::from_slice(key);
         let iv = match self {
             AESMode::CFB { iv } => iv.clone(),
             _ => {
-                return Err(erx::Erx::new("error call CFB method"));
+                return Err(erx::Erx::boxed("error call CFB method"));
             },
         };
 
         let mut buf = payload.to_vec();
         let dec: cfb_mode::Decryptor<Aes128> = cfb_mode::Decryptor::new(key, iv.as_slice().into());
-        let result = dec.decrypt_padded_mut::<Pkcs7>(&mut buf).map_err(erx::smp)?.to_vec();
+        let result = dec.decrypt_padded_mut::<Pkcs7>(&mut buf).map_err(erx::simple_conv)?.to_vec();
 
         Ok(result)
     }
 
-    fn ofb_encrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn ofb_encrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         let iv = match self {
             AESMode::OFB { iv } => iv.clone(),
             _ => {
-                return Err(erx::Erx::new("error call OFB method"));
+                return Err(erx::Erx::boxed("error call OFB method"));
             },
         };
 
         type Aes128Ofb = ofb::Ofb<Aes128>;
         let mut buffer = payload.to_vec();
         let mut cipher = Aes128Ofb::new(key.into(), iv.as_slice().into());
-        cipher.apply_keystream(&mut buffer.as_mut_slice());
+        cipher.apply_keystream(buffer.as_mut_slice());
 
         Ok(buffer)
     }
 
-    fn ofb_decrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn ofb_decrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         self.ofb_encrypt(key, payload)
     }
 
-    fn ctr_encrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn ctr_encrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         type Aes128Ctr64LE = ctr::Ctr64LE<Aes128>;
         let iv = match self {
             AESMode::CTR { iv } => iv.clone(),
             _ => {
-                return Err(erx::Erx::new("error call CTR method"));
+                return Err(erx::Erx::boxed("error call CTR method"));
             },
         };
         let mut buffer = payload.to_vec();
         let mut cipher = Aes128Ctr64LE::new(key.into(), iv.as_slice().into());
-        cipher.apply_keystream(&mut buffer.as_mut_slice());
+        cipher.apply_keystream(buffer.as_mut_slice());
         Ok(buffer)
     }
 
-    fn ctr_decrypt(&self, key: &[u8], payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn ctr_decrypt(&self, key: &[u8], payload: &[u8]) -> CryptedResult {
         self.ctr_encrypt(key, payload)
     }
 }
@@ -308,22 +311,22 @@ pub enum RSAPadding {
 }
 
 impl RSAPadding {
-    fn encrypt(&self, public_key: &str, payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn encrypt(&self, public_key: &str, payload: &[u8]) -> CryptedResult {
         match self {
             RSAPadding::PKCS1v15 => {
-                let key: RsaPublicKey = DecodeRsaPublicKey::from_pkcs1_pem(public_key).map_err(erx::smp)?;
+                let key: RsaPublicKey = DecodeRsaPublicKey::from_pkcs1_pem(public_key).map_err(erx::simple_conv)?;
                 let mut rng = CompatRng::<rand::rngs::ThreadRng>::thread_rng();
-                let result = key.encrypt(&mut rng, Pkcs1v15Encrypt, payload).map_err(erx::smp)?;
+                let result = key.encrypt(&mut rng, Pkcs1v15Encrypt, payload).map_err(erx::simple_conv)?;
                 Ok(result)
             },
         }
     }
 
-    fn decrypt(&self, private_key: &str, payload: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    fn decrypt(&self, private_key: &str, payload: &[u8]) -> CryptedResult {
         match self {
             RSAPadding::PKCS1v15 => {
-                let key: RsaPrivateKey = DecodeRsaPrivateKey::from_pkcs1_pem(private_key).map_err(erx::smp)?;
-                let result = key.decrypt(Pkcs1v15Encrypt, payload).map_err(erx::smp)?;
+                let key: RsaPrivateKey = DecodeRsaPrivateKey::from_pkcs1_pem(private_key).map_err(erx::simple_conv)?;
+                let result = key.decrypt(Pkcs1v15Encrypt, payload).map_err(erx::simple_conv)?;
                 Ok(result)
             },
         }
@@ -351,13 +354,13 @@ impl RSABits {
 pub struct RSAUtils;
 
 impl RSAUtils {
-    pub fn gen_key_pair(bits: RSABits) -> Result<(String, String), erx::Erx> {
+    pub fn gen_key_pair(bits: RSABits) -> ResultBoxedE<(String, String)> {
         let mut rng = CompatRng::<rand::rngs::ThreadRng>::thread_rng();
-        let private_key = RsaPrivateKey::new(&mut rng, bits.bits()).map_err(erx::smp)?;
+        let private_key = RsaPrivateKey::new(&mut rng, bits.bits()).map_err(erx::simple_conv_boxed)?;
         let public_key = RsaPublicKey::from(&private_key);
 
-        let private_key = private_key.to_pkcs1_pem(Default::default()).map_err(erx::smp)?.to_string();
-        let public_key = public_key.to_pkcs1_pem(Default::default()).map_err(erx::smp)?.to_string();
+        let private_key = private_key.to_pkcs1_pem(Default::default()).map_err(erx::simple_conv)?.to_string();
+        let public_key = public_key.to_pkcs1_pem(Default::default()).map_err(erx::simple_conv)?.to_string();
 
         Ok((private_key, public_key))
     }
@@ -369,32 +372,32 @@ pub enum Encrypt {
 }
 
 impl Encrypt {
-    pub fn encrypt(&self, input: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    pub fn encrypt(&self, input: &[u8]) -> CryptedResult {
         let result = match self {
             Encrypt::AES { key, mode } => mode.encrypt(key.as_bytes(), input)?,
-            Encrypt::RSA { private_key: _, public_key, padding } => padding.encrypt(&public_key, input)?,
+            Encrypt::RSA { private_key: _, public_key, padding } => padding.encrypt(public_key, input)?,
         };
 
         Ok(result)
     }
 
-    pub fn decrypt(&self, input: &[u8]) -> Result<Vec<u8>, erx::Erx> {
+    pub fn decrypt(&self, input: &[u8]) -> CryptedResult {
         let result = match self {
             Encrypt::AES { key, mode } => mode.decrypt(key.as_bytes(), input)?,
-            Encrypt::RSA { private_key, public_key: _, padding } => padding.decrypt(&private_key, input)?,
+            Encrypt::RSA { private_key, public_key: _, padding } => padding.decrypt(private_key, input)?,
         };
 
         Ok(result)
     }
 
-    pub fn encrypt_string_base64(&self, input: &str) -> Result<String, erx::Erx> {
+    pub fn encrypt_string_base64(&self, input: &str) -> erx::ResultBoxedE<String> {
         let end = self.encrypt(input.as_bytes())?;
         let hex = base64::prelude::BASE64_STANDARD.encode(&end);
         Ok(hex)
     }
 
-    pub fn decrypt_string_base64(&self, input: &str) -> Result<Vec<u8>, erx::Erx> {
-        let decoded = base64::prelude::BASE64_STANDARD.decode(input.as_bytes()).map_err(erx::smp)?;
+    pub fn decrypt_string_base64(&self, input: &str) -> CryptedResult {
+        let decoded = base64::prelude::BASE64_STANDARD.decode(input.as_bytes()).map_err(erx::simple_conv)?;
         self.decrypt(&decoded)
     }
 }

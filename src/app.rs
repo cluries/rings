@@ -49,7 +49,7 @@ impl AppBuilder {
     ///
     /// * `AppBuilder` - The rings app builder.
     pub async fn new(defaults_name: &str) -> Self {
-        let name = crate::conf::GetDefault::string("name", s!(defaults_name));
+        let name = crate::conf::GetDefault::string("name", s!(defaults_name)).await;
         let rings_app: RingsApplication = R::make(&name).await;
         AppBuilder { rings_app }
     }
@@ -57,7 +57,7 @@ impl AppBuilder {
     /// use model
     ///
     pub async fn use_model(&mut self) -> &mut Self {
-        let rebit = crate::conf::rebit().read().expect("Failed to read config rebit");
+        let rebit = crate::conf::rebit().read().await;
         let backends = &rebit.model.backends;
         match backends {
             None => {
@@ -81,7 +81,7 @@ impl AppBuilder {
     ///
     /// * `AppBuilder` - The rings app builder.
     pub async fn use_web(&mut self, reconfigor: &mut Vec<AppBuilderWebReconfigor>) -> &mut Self {
-        let rebit = crate::conf::rebit().read().expect("Failed to read config rebit");
+        let rebit = crate::conf::rebit().read().await;
 
         if !rebit.has_web() {
             warn!("no web configuration found, pass init web.");
@@ -125,7 +125,7 @@ impl AppBuilder {
     pub async fn use_scheduler(&mut self) -> &mut Self {
         let scheduler_manager = crate::scheduler::SchedulerManager::new().await;
         let app = Arc::clone(&self.rings_app);
-        app.write().unwrap().register_mod(scheduler_manager).await;
+        app.write().await.register_mod(scheduler_manager).await;
         self
     }
 

@@ -1,50 +1,47 @@
-use mlua::{Error as LuaError, Function as LuaFunction, Lua as LuaLua};
+use mlua::{/*Error as LuaError,*/ Function as LuaFunction, Lua as LuaLua};
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
+#[allow(clippy::type_complexity)]
 pub struct LuaBridge {
     code: String,
-    lua: Arc<Mutex<LuaLua>>,
-    rust_functions: Arc<Mutex<HashMap<String, Box<dyn Fn(&LuaLua) -> mlua::Result<LuaFunction> + Send + Sync>>>>,
+    lua: LuaLua,
+    rust_functions: HashMap<String, Box<dyn Fn(&LuaLua) -> mlua::Result<LuaFunction>>>,
 }
 
-fn re<T: ToString>(e: T) -> LuaError {
-    mlua::Error::RuntimeError(e.to_string())
-}
+// fn re<T: ToString>(e: T) -> LuaError {
+//     mlua::Error::RuntimeError(e.to_string())
+// }
 
 impl LuaBridge {
     pub fn new(code: String) -> Self {
-        LuaBridge { code, lua: Arc::new(Mutex::new(LuaLua::new())), rust_functions: Arc::new(Mutex::new(HashMap::new())) }
+        LuaBridge { code, lua: LuaLua::new(), rust_functions: HashMap::new() }
     }
 
     pub fn register_function<F>(&mut self, name: &str, func: F) -> mlua::Result<()>
     where
         F: Fn(&LuaLua) -> mlua::Result<LuaFunction> + Send + Sync + 'static,
     {
-        self.rust_functions.try_lock().map_err(re)?.insert(name.into(), Box::new(func));
+        self.rust_functions.insert(name.into(), Box::new(func));
         Ok(())
     }
 
     pub fn execute(&self) -> mlua::Result<()> {
-        let lua = self.lua.try_lock().map_err(re)?;
-        let globals = lua.globals();
-        for (name, func) in self.rust_functions.try_lock().map_err(re)?.iter() {
-            globals.set(name.clone(), func(&lua)?)?;
+        let globals = self.lua.globals();
+        for (name, func) in self.rust_functions.iter() {
+            globals.set(name.clone(), func(&self.lua)?)?;
         }
 
-        lua.load(&self.code).exec().map(|_| Ok(()))?
+        self.lua.load(&self.code).exec().map(|_| Ok(()))?
     }
 
     pub fn get_global<T: mlua::FromLua>(&self, name: &str) -> mlua::Result<T> {
-        let lua = self.lua.try_lock().map_err(re)?;
-        let globals = lua.globals();
+        let globals = self.lua.globals();
         globals.get(name)
     }
 
     pub fn set_global<T: mlua::IntoLua>(&self, name: &str, value: T) -> mlua::Result<()> {
-        let lua = self.lua.try_lock().map_err(re)?;
-        let globals = lua.globals();
+        let globals = self.lua.globals();
         globals.set(name, value)
     }
 
@@ -53,15 +50,14 @@ impl LuaBridge {
         A: mlua::IntoLuaMulti,
         R: mlua::FromLuaMulti,
     {
-        let lua = self.lua.try_lock().map_err(re)?;
-        let globals = lua.globals();
+        let globals = self.lua.globals();
         let func: LuaFunction = globals.get(name)?;
         func.call(args)
     }
 }
 
-unsafe impl Send for LuaBridge {}
-unsafe impl Sync for LuaBridge {}
+// unsafe impl Send for LuaBridge {}
+// unsafe impl Sync for LuaBridge {}
 
 #[cfg(test)]
 mod tests {

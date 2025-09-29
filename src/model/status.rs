@@ -1,11 +1,13 @@
+use crate::erx::{Erx, ResultBoxedE};
 use serde::{Deserialize, Serialize};
 
 // Initialize = 0
 // OK( value > 10)
 // Error( value < -10)
 // MarkDeleted = -1
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone, Default)]
 pub enum Status {
+    #[default]
     Initialize,
     OK(i32, String),
     Error(i32, String), //
@@ -18,30 +20,30 @@ const MARK_DELETED: i32 = -1;
 const BOUNDARY_OK: i32 = 11;
 const BOUNDARY_ERROR: i32 = -11;
 
-const MARK_DELETED_STR: &'static str = "MarkDelete";
-const INITIALIZE_STR: &'static str = "Initialize";
+const MARK_DELETED_STR: &str = "MarkDelete";
+const INITIALIZE_STR: &str = "Initialize";
 const PREFIX_OK: &str = "OK(";
 const PREFIX_ERROR: &str = "ERR(";
 
 impl Status {
     /// parse from string
-    pub fn parse(formated: &str) -> crate::erx::ResultE<Self> {
+    pub fn parse(formated: &str) -> ResultBoxedE<Self> {
         let formated = formated.trim();
-        if formated.len() < 1 {
-            return Err("Empty formated status".into());
+        if formated.is_empty() {
+            return Err(Erx::boxed("Empty formated status"));
         }
 
-        fn inner_parse(s: String) -> crate::erx::ResultE<(i32, String)> {
+        fn inner_parse(s: String) -> ResultBoxedE<(i32, String)> {
             let splits: Vec<&str> = s.splitn(2, " ").collect();
-            if splits.len() < 1 {
-                return Err("Empty formated status".into());
+            if splits.is_empty() {
+                return Err(Erx::boxed("Empty formated status"));
             }
 
             if !splits[0].ends_with(")") {
-                return Err("Invalid formated status".into());
+                return Err(Erx::boxed("Invalid formated status"));
             }
 
-            let code = splits[0][..splits[0].len() - 1].parse::<i32>().map_err(crate::erx::smp)?;
+            let code = splits[0][..splits[0].len() - 1].parse::<i32>().map_err(crate::erx::simple_conv_boxed)?;
             Ok((code, if splits.len() > 1 { splits[1] } else { "" }.to_string()))
         }
 
@@ -49,14 +51,14 @@ impl Status {
             INITIALIZE_STR => Ok(Status::Initialize),
             MARK_DELETED_STR => Ok(Status::MarkDeleted),
             formated => {
-                if formated.starts_with(PREFIX_OK) {
-                    let parsed = inner_parse(formated[PREFIX_OK.len()..].to_string())?;
+                if let Some(stripped) = formated.strip_prefix(PREFIX_OK) {
+                    let parsed = inner_parse(stripped.to_string())?;
                     Self::ok(parsed.0, &parsed.1)
-                } else if formated.starts_with(PREFIX_ERROR) {
-                    let parsed = inner_parse(formated[PREFIX_ERROR.len()..].to_string())?;
+                } else if let Some(stripped) = formated.strip_prefix(PREFIX_ERROR) {
+                    let parsed = inner_parse(stripped.to_string())?;
                     Self::error(parsed.0, &parsed.1)
                 } else {
-                    Err(format!("Unknown status: {}", formated).into())
+                    Err(Erx::boxed(&format!("Unknown status: {}", formated)))
                 }
             },
         }
@@ -106,19 +108,19 @@ impl Status {
         Status::MarkDeleted
     }
 
-    pub fn ok(val: i32, message: &str) -> crate::erx::ResultE<Self> {
+    pub fn ok(val: i32, message: &str) -> ResultBoxedE<Self> {
         if Self::valid_ok_code(val) {
             Ok(Status::OK(val, message.to_string()))
         } else {
-            Err(format!("invalid ok code:{}  code must GTE(>=) BOUNDARY_OK:{}", val, BOUNDARY_OK).into())
+            Err(Erx::boxed(&format!("invalid ok code:{}  code must GTE(>=) BOUNDARY_OK:{}", val, BOUNDARY_OK)))
         }
     }
 
-    pub fn error(val: i32, message: &str) -> crate::erx::ResultE<Self> {
+    pub fn error(val: i32, message: &str) -> ResultBoxedE<Self> {
         if Self::valid_error_code(val) {
             Ok(Status::Error(val, message.to_string()))
         } else {
-            Err(format!("invalid error code:{}, code must LTE(<=) BOUNDARY_ERROR:{}", val, BOUNDARY_ERROR).into())
+            Err(Erx::boxed(&format!("invalid error code:{}, code must LTE(<=) BOUNDARY_ERROR:{}", val, BOUNDARY_ERROR)))
         }
     }
 
@@ -142,15 +144,9 @@ impl std::fmt::Display for Status {
     }
 }
 
-impl Default for Status {
-    fn default() -> Self {
-        Status::Initialize
-    }
-}
-
-impl Into<i32> for Status {
-    fn into(self) -> i32 {
-        match self {
+impl From<Status> for i32 {
+    fn from(s: Status) -> Self {
+        match s {
             Status::Initialize => INITIALIZE,
             Status::OK(v, _) => v,
             Status::Error(v, _) => v,
@@ -159,9 +155,9 @@ impl Into<i32> for Status {
     }
 }
 
-impl Into<(i32, String)> for Status {
-    fn into(self) -> (i32, String) {
-        match self {
+impl From<Status> for (i32, String) {
+    fn from(s: Status) -> Self {
+        match s {
             Status::Initialize => (INITIALIZE, String::new()),
             Status::OK(v, m) => (v, m),
             Status::Error(v, m) => (v, m),
